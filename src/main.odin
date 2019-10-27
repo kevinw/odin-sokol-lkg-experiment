@@ -3,8 +3,10 @@ package main
 import sg "sokol:sokol_gfx"
 import sapp "sokol:sokol_app"
 import stime "sokol:sokol_time"
+import sfetch "sokol:sokol_fetch"
 
 import "core:os"
+import "core:fmt"
 using import "core:math"
 
 import shader_meta "./shader_meta";
@@ -13,7 +15,18 @@ state: struct {
 	pass_action: sg.Pass_Action,
 	bind:        sg.Bindings,
 	pip:         sg.Pipeline,
+
+    font_normal_data: [256 * 1024]u8,
+    font_normal: i32,
 };
+
+font_normal_loaded :: proc "c" (response: ^sfetch.Response) {
+    if response.fetched {
+        font_normal = fonsAddFontMem(state.fons, "sans", response.buffer_ptr, response.fetched_size, false);
+    } else {
+        fmt.eprintln("error fetching normal font");
+    }
+}
 
 init_callback :: proc "c" () {
 	sg.setup({
@@ -27,6 +40,18 @@ init_callback :: proc "c" () {
 	});
 
 	stime.setup();
+
+    sfetch.setup({
+        num_channels = 1,
+        num_lanes = 4,
+    });
+
+    sfetch.send({
+        path = "resources/DroidSerif-Regular.ttf",
+        callback = font_normal_loaded,
+        buffer_ptr = &state.font_normal_data[0],
+        buffer_size = size_of(state.font_normal_data),
+    });
 
 	Vertex :: struct {
 		pos: [3]f32,
@@ -87,6 +112,9 @@ frame_callback :: proc "c" () {
 	//
 	// UPDATE
 	//
+
+    sfetch.dowork();
+
 	v := Vec3 {};
 	if key_state.d || key_state.right do v.x -= 1.0;
 	if key_state.a || key_state.left do v.x += 1.0;
@@ -118,11 +146,16 @@ frame_callback :: proc "c" () {
 	sg.commit();
 }
 
+cleanup :: proc "c" () {
+    sfetch.shutdown();
+    sg.shutdown();
+}
+
 main :: proc() {
 	err := sapp.run({
 		init_cb      = init_callback,
 		frame_cb     = frame_callback,
-		cleanup_cb   = proc "c" () { sg.shutdown(); },
+		cleanup_cb   = cleanup,
 		event_cb     = event_callback,
 		width        = 400,
 		height       = 300,
