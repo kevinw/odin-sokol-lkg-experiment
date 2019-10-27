@@ -1,8 +1,8 @@
 package shader_meta;
 
 import sg "sokol:sokol_gfx"
+using import "core:math/linalg"
 
-SOKOL_D3D11 :: true;
 /*
     #version:1# (machine generated, don't edit!)
 
@@ -71,7 +71,7 @@ ATTR_vs_position :: 0;
 ATTR_vs_color0 :: 1;
 SLOT_vs_uniforms :: 0;
 vs_uniforms :: struct #align 16 {
-    mvp: [16]f32,
+    mvp: Matrix4,
 };
 SLOT_global_params :: 0;
 global_params :: struct #align 16 {
@@ -123,8 +123,8 @@ when SOKOL_D3D11 {
         return stage_output;
     }
 */
-@(private)
-vs_source_hlsl5 := [?]u8 {
+
+_vs_source_hlsl5_vertcolor := [?]u8 {
     0x63,0x62,0x75,0x66,0x66,0x65,0x72,0x20,0x76,0x73,0x5f,0x75,0x6e,0x69,0x66,0x6f,
     0x72,0x6d,0x73,0x20,0x3a,0x20,0x72,0x65,0x67,0x69,0x73,0x74,0x65,0x72,0x28,0x62,
     0x30,0x29,0x0a,0x7b,0x0a,0x20,0x20,0x20,0x20,0x72,0x6f,0x77,0x5f,0x6d,0x61,0x6a,
@@ -212,8 +212,8 @@ vs_source_hlsl5 := [?]u8 {
         return stage_output;
     }
 */
-@(private)
-fs_source_hlsl5 := [?]u8 {
+
+_fs_source_hlsl5_vertcolor := [?]u8 {
     0x63,0x62,0x75,0x66,0x66,0x65,0x72,0x20,0x67,0x6c,0x6f,0x62,0x61,0x6c,0x5f,0x70,
     0x61,0x72,0x61,0x6d,0x73,0x20,0x3a,0x20,0x72,0x65,0x67,0x69,0x73,0x74,0x65,0x72,
     0x28,0x62,0x30,0x29,0x0a,0x7b,0x0a,0x20,0x20,0x20,0x20,0x66,0x6c,0x6f,0x61,0x74,
@@ -254,12 +254,11 @@ fs_source_hlsl5 := [?]u8 {
     0x72,0x65,0x74,0x75,0x72,0x6e,0x20,0x73,0x74,0x61,0x67,0x65,0x5f,0x6f,0x75,0x74,
     0x70,0x75,0x74,0x3b,0x0a,0x7d,0x0a,0x00,
 };
-@(private)
 vertcolor_shader_desc_hlsl5 := sg.Shader_Desc {
   0, /* _start_canary */
   { /*attrs*/{"position","TEXCOORD",0},{"color0","TEXCOORD",1},{nil,nil,0},{nil,nil,0},{nil,nil,0},{nil,nil,0},{nil,nil,0},{nil,nil,0},{nil,nil,0},{nil,nil,0},{nil,nil,0},{nil,nil,0},{nil,nil,0},{nil,nil,0},{nil,nil,0},{nil,nil,0}, },
   { /* vs */
-    cstring(&vs_source_hlsl5[0]), /* source */
+    cstring(&_vs_source_hlsl5_vertcolor[0]), /* source */
     nil,  /* bytecode */
     0,  /* bytecode_size */
     "main", /* entry */
@@ -284,7 +283,7 @@ vertcolor_shader_desc_hlsl5 := sg.Shader_Desc {
     { /* images */ {nil,sg.Image_Type._DEFAULT},{nil,sg.Image_Type._DEFAULT},{nil,sg.Image_Type._DEFAULT},{nil,sg.Image_Type._DEFAULT},{nil,sg.Image_Type._DEFAULT},{nil,sg.Image_Type._DEFAULT},{nil,sg.Image_Type._DEFAULT},{nil,sg.Image_Type._DEFAULT},{nil,sg.Image_Type._DEFAULT},{nil,sg.Image_Type._DEFAULT},{nil,sg.Image_Type._DEFAULT},{nil,sg.Image_Type._DEFAULT}, },
   },
   { /* fs */
-    cstring(&fs_source_hlsl5[0]), /* source */
+    cstring(&_fs_source_hlsl5_vertcolor[0]), /* source */
     nil,  /* bytecode */
     0,  /* bytecode_size */
     "main", /* entry */

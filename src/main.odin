@@ -8,6 +8,7 @@ import sfetch "sokol:sokol_fetch"
 import "core:os"
 import "core:fmt"
 using import "core:math"
+using import "core:math/linalg"
 
 import shader_meta "./shader_meta";
 
@@ -17,12 +18,11 @@ state: struct {
 	pip:         sg.Pipeline,
 
     font_normal_data: [256 * 1024]u8,
-    font_normal: i32,
 };
 
 font_normal_loaded :: proc "c" (response: ^sfetch.Response) {
     if response.fetched {
-        font_normal = fonsAddFontMem(state.fons, "sans", response.buffer_ptr, response.fetched_size, false);
+        fmt.println("fetched normal font");
     } else {
         fmt.eprintln("error fetching normal font");
     }
@@ -47,7 +47,7 @@ init_callback :: proc "c" () {
     });
 
     sfetch.send({
-        path = "resources/DroidSerif-Regular.ttf",
+        path = "resources/OpenSans-Regular.json",
         callback = font_normal_loaded,
         buffer_ptr = &state.font_normal_data[0],
         buffer_size = size_of(state.font_normal_data),
@@ -90,7 +90,7 @@ init_callback :: proc "c" () {
 	state.pass_action.colors[0] = {action = .CLEAR, val = {0.5, 0.7, 1.0, 1}};
 }
 
-position := Vec3 {};
+position := Vector3 {};
 last_ticks: u64 = 0;
 
 frame_callback :: proc "c" () {
@@ -115,7 +115,7 @@ frame_callback :: proc "c" () {
 
     sfetch.dowork();
 
-	v := Vec3 {};
+	v := Vector3 {};
 	if key_state.d || key_state.right do v.x -= 1.0;
 	if key_state.a || key_state.left do v.x += 1.0;
 	if key_state.w || key_state.up do v.y -= 1.0;
@@ -124,7 +124,7 @@ frame_callback :: proc "c" () {
 	if v.x != 0 do position.x += v.x * cast(f32)elapsed_seconds;
 	if v.y != 0 do position.y += v.y * cast(f32)elapsed_seconds;
 
-	mvp := mat4_translate(position);
+	mvp := translate_matrix4(position);
 
 	//
 	// DRAW
@@ -134,10 +134,10 @@ frame_callback :: proc "c" () {
 	sg.apply_bindings(state.bind);
 
 	vs_uniforms := shader_meta.vs_uniforms {
-		mvp = (cast(^[16]f32)&mvp)^,
+		mvp = mvp,
 	};
 	global_params_values := shader_meta.global_params {
-		time = cast(f32)now_seconds
+		time = cast(f32)now_seconds * 3.0
 	};
 	sg.apply_uniforms(sg.Shader_Stage.FS, shader_meta.SLOT_global_params, &global_params_values, size_of(shader_meta.global_params));
 	sg.apply_uniforms(sg.Shader_Stage.VS, shader_meta.SLOT_vs_uniforms, &vs_uniforms, size_of(shader_meta.vs_uniforms));
@@ -185,9 +185,9 @@ event_callback :: proc "c" (event: ^sapp.Event) {
 			case .ESCAPE:
 				sapp.request_quit();
 			case .Q:
-				if .CTRL in event.modifiers {
+				//if .CTRL in event.modifiers {
 					sapp.request_quit();
-				}
+				//}
 			case .RIGHT: right = true;
 			case .LEFT: left = true;
 			case .UP: up = true;

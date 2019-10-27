@@ -1,3 +1,4 @@
+@include common.glsl
 
 @vs vs
 in vec4 position;
