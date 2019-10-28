@@ -2,3 +2,6 @@
 *.exp
 *.exe
 *.lib
+*.pdb
+.vs/
+.vscode/

@@ -12,7 +12,7 @@ uniform sdf_vs_uniforms {
 out vec2 v_texcoord;
 
 void main() {
-    gl_Position = u_matrix * vec4(a_pos.xy, 0, 1);
+    gl_Position = u_matrix * vec4(a_pos.xy, 0.5, 1);
     v_texcoord = a_texcoord / u_texsize;
 }
 @end
