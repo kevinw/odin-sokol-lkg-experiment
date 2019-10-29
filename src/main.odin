@@ -30,7 +30,7 @@ state: struct {
     mu_pip:      sg.Pipeline,
     mu_atlas_img: sg.Image,
 
-    font_normal_data: [256 * 1024]u8,
+    font_normal_data: [256 * 1024]u8, // TODO: use a smaller buffer and the streaming capability of sokol-fetch
 };
 
 mu_ctx: mu.Context;
@@ -89,15 +89,16 @@ create_text :: proc(str: string, size: f32) {
     verts := make([]Text_Vertex, num_verts);
 
     for i in 0..<num_verts { // @Speed just use stride/attribute offsets to prevent this copy
+        j := i * 2;
         verts[i] = {
-            {vertex_elems[i * 2], vertex_elems[i * 2 + 1]},
-            {tex_elems[i * 2], tex_elems[i * 2 + 1]},
+            {vertex_elems[j], vertex_elems[j + 1]},
+            {tex_elems[j], tex_elems[j + 1]},
         };
     }
 
     text.bind.vertex_buffers[0] = sg.make_buffer({
         size = cast(i32)(len(verts) * size_of(verts[0])),
-        content = len(verts) > 0 ? &verts[0] : nil,
+        content = &verts[0],
         label = "text-glyph-vertices",
     });
 
@@ -342,7 +343,6 @@ init_callback :: proc "c" () {
             },
         });
 
-        state.pass_action.colors[0] = {action = .CLEAR, val = {0.5, 0.7, 1.0, 1}};
     }
 
     //
@@ -392,6 +392,9 @@ init_callback :: proc "c" () {
 position := Vector3 {};
 last_ticks: u64 = 0;
 
+bg := [?]f32 { 0.5, 0.7, 1.0 };
+
+
 window: mu.Container;
 test_window :: proc(ctx: ^mu.Context) {
     if window.inited == {} {
@@ -403,7 +406,39 @@ test_window :: proc(ctx: ^mu.Context) {
     window.rect.h = max(window.rect.h, 300);
 
     if mu.begin_window(ctx, &window, "micro ui window") {
-        mu.end_window(ctx);
+        defer mu.end_window(ctx);
+
+        @static show_info: i32 = 1;
+        if mu.header(ctx, &show_info, "Window Info") {
+
+            row_info := [?]i32 { 54, -1 };
+            mu.layout_row(ctx, 2, &row_info[0], 0);
+
+            mu.label(ctx, "Position:");
+            mu_label_printf(ctx, "%d, %d", window.rect.x, window.rect.y);
+            mu.label(ctx, "Size:");
+            mu_label_printf(ctx, "%d, %d", window.rect.w, window.rect.h);
+        }
+
+        /* background color sliders */
+        @static show_sliders:i32 = 1;
+        if (mu.header(ctx, &show_sliders, "Background Color")) {
+            mu_layout_row(ctx, 2, { -78, -1 }, 74);
+            /* sliders */
+            mu.layout_begin_column(ctx);
+            mu_layout_row(ctx, 2, { 46, -1 }, 0);
+            mu.label(ctx, "Red:");   mu.slider(ctx, &bg[0], 0, 1.0);
+            mu.label(ctx, "Green:"); mu.slider(ctx, &bg[1], 0, 1.0);
+            mu.label(ctx, "Blue:");  mu.slider(ctx, &bg[2], 0, 1.0);
+            mu.layout_end_column(ctx);
+            /* color preview */
+            r := mu.layout_next(ctx);
+
+            mu.draw_rect(ctx, r, mu.Color{cast(u8)(bg[0]*255.0), cast(u8)(bg[1]*255.0), cast(u8)(bg[2]*255.0), 255});
+            s := fmt.tprintf("#%02X%02X%02X", cast(i32) bg[0], cast(i32) bg[1], cast(i32) bg[2]);
+            c_s := strings.clone_to_cstring(s, context.temp_allocator);
+            mu.draw_control_text(ctx, c_s, r, cast(i32)mu.Style_Color.Text, {mu.Opt.AlignCenter});
+        }
     }
 }
 
@@ -578,6 +613,9 @@ frame_callback :: proc "c" () {
 	//
 	// DRAW
 	//
+
+    // TODO: write this only when the value changes?
+    state.pass_action.colors[0] = {action = .CLEAR, val = {bg[0], bg[1], bg[2], 1}};
 
     sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
 
