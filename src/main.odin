@@ -46,8 +46,6 @@ text: struct {
 
     vertex_elems: [dynamic]f32,
     tex_elems: [dynamic]f32,
-
-    gamma: f32,
 };
 
 _load_count := 0;
@@ -63,12 +61,11 @@ did_load :: proc() {
     if _load_count != 2 do return;
 
     _did_load = true;
-    fmt.println("loaded everything!");
 
     using text;
 
-    size:f32 = 35.0;
-    create_text("this is a test.", size);
+    size:f32 = 95.0;
+    create_text("sdf text", size);
 }
 
 create_text :: proc(str: string, size: f32) {
@@ -192,7 +189,6 @@ font_normal_loaded :: proc "c" (response: ^sfetch.Response) {
     }
 
     defer stbi.image_free(pixel_data);
-    fmt.printf("loaded image %dx%d with %d channels\n", width, height, channels);
 
     text.texture_size = v2(width, height);
 
@@ -247,7 +243,7 @@ text_height_cb :: proc "c" (font: mu.Font) -> i32 {
 
 r_get_text_width :: proc(text: []u8) -> i32 {
     res:i32 = 0;
-    for ch in text {
+    for _ in text {
         res += 10; // TODO
     }
     return res;
@@ -406,7 +402,7 @@ test_window :: proc(ctx: ^mu.Context) {
     window.rect.w = max(window.rect.w, 240);
     window.rect.h = max(window.rect.h, 300);
 
-    if mu.begin_window(ctx, &window, "Demo Window") {
+    if mu.begin_window(ctx, &window, "micro ui window") {
         mu.end_window(ctx);
     }
 }
@@ -571,23 +567,7 @@ frame_callback :: proc "c" () {
             if !mu.next_command(&mu_ctx, &cmd) do break;
             using cmd;
             switch type {
-                case .Text: 
-                    ptr := cast(rawptr)&text.str[0];
-                    as_bytes := cast(^u8)ptr;
-
-                    strlen :: proc(s: ^u8) -> int {
-                        i := 0;
-                        for {
-                            val := mem.ptr_offset(s, i);
-                            if val^ == 0 do break;
-                            i += 1;
-                        }
-                        return i;
-                    }
-
-                    bytes := cast(^u8)&text.str[0];
-                    text_str := mem.slice_ptr(bytes, strlen(bytes));
-                    r_draw_text(text_str, text.pos, text.color);
+                case .Text: r_draw_text(cstring_ptr_to_slice(cast(^u8)&text.str[0]), text.pos, text.color);
                 case .Rect: r_draw_rect(rect.rect, rect.color);
                 case .Icon: r_draw_icon(icon.id, icon.rect, icon.color);
                 case .Clip: r_set_clip_rect(clip.rect);
@@ -628,7 +608,7 @@ frame_callback :: proc "c" () {
         fs_uniforms := shader_meta.sdf_fs_uniforms {
             u_color = Vector4{1, 1, 1, 1},
             u_debug = 0.0,
-            u_gamma = text.gamma,
+            u_gamma = 0.02,
             u_buffer = cast(f32)(192.0 / 256.0),
         };
 
@@ -662,7 +642,7 @@ main :: proc() {
 		event_cb     = event_callback,
 		width        = WINDOW_WIDTH,
 		height       = WINDOW_HEIGHT,
-		window_title = "game",
+		window_title = "testbed",
 	});
 	os.exit(int(err));
 }
