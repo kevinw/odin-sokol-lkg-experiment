@@ -17,9 +17,7 @@ void main() {
 
 @fs fs
 
-uniform global_params {
-    float time;
-};
+@include globals.glsl
 
 in vec4 color;
 out vec4 frag_color;

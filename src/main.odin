@@ -277,8 +277,8 @@ init_callback :: proc "c" () {
 	});
 
     sgl.setup({
-        max_vertices = 4000,
-        max_commands = 100,
+        max_vertices = 10000,
+        max_commands = 1000,
         pipeline_pool_size = 10,
     });
 
