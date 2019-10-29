@@ -1,1 +1,1 @@
-odin run preprocess.odin
+preprocess.exe

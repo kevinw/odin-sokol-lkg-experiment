@@ -87,9 +87,10 @@ main :: proc() {
         }
 
         s := strings.to_string(builder);
-        fmt.println(s);
-
-        os.write_entire_file("globals.glsl", mem.slice_ptr(&s[0], len(s)));
+        //fmt.println(s);
+        output_filename := "globals.glsl";
+        os.write_entire_file(output_filename, mem.slice_ptr(&s[0], len(s)));
+        fmt.println("wrote", output_filename);
     }
 
 }
