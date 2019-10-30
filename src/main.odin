@@ -28,6 +28,20 @@ MAX_FILE_SIZE :: 1024*1024;
 
 sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 
+// per-material texture indices into scene.images for metallic material
+Metallic_Images :: struct {
+    base_color: i16,
+    metallic_roughness: i16,
+    normal: i16,
+    occlusion: i16,
+    emissive: i16,
+}
+
+Metallic_Material :: struct {
+    fs_params: shader_meta.metallic_params,
+    images: Metallic_Images,
+};
+
 Buffer_Creation_Params :: struct {
     type: sg.Buffer_Type,
     offset: i32,
@@ -41,6 +55,26 @@ Image_Creation_Params :: struct {
     wrap_s: sg.Wrap,
     wrap_t: sg.Wrap,
     gltf_image_index: int,
+};
+
+Mesh :: struct {
+    first_primitive: i16, // index into scene.sub_meshes
+    num_primitives: i16,
+};
+
+Vertex_Buffer_Mapping :: struct {
+    num: i32,
+    buffer: [sg.MAX_SHADERSTAGE_BUFFERS]i32,
+}
+
+Sub_Mesh :: struct { // a 'primitive' (aka submesh) contains everything needed to issue a draw call
+    // TODO: check that these types make sense
+    pipeline: i16,
+    material: i16,
+    vertex_buffers: Vertex_Buffer_Mapping,
+    index_buffer: i16,
+    base_element: i32,
+    num_elements: i32,
 };
 
 state: struct {
@@ -61,7 +95,12 @@ state: struct {
     scene: struct {
         buffers: [dynamic]sg.Buffer,
         images: [dynamic]sg.Image,
+        materials: [dynamic]Metallic_Material,
+        meshes: [dynamic]Mesh,
+        sub_meshes: [dynamic]Sub_Mesh,
+        pipelines: [dynamic]sg.Pipeline,
     },
+    pip_cache: [dynamic]Pipeline_Cache_Params,
     point_light: shader_meta.light_params,
     failed: bool,
 
@@ -335,6 +374,7 @@ init_callback :: proc "c" () {
 
     // create shaders
     state.shaders.metallic = sg.make_shader(shader_meta.cgltf_metallic_shader_desc()^);
+    fmt.println("\n~~~~~~~~~\nmetallic\n", state.shaders.metallic,"\n");
 
     // create point light
     state.point_light = {
