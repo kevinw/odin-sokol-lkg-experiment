@@ -8,6 +8,7 @@ import sgl "sokol:sokol_gl"
 import "shared:odin-stb/stbi"
 import mu "../lib/microui"
 import "../lib/basisu"
+import "../lib/cgltf"
 
 import "core:os"
 import "core:strings"
@@ -667,6 +668,8 @@ cleanup :: proc "c" () {
 }
 
 main :: proc() {
+    //cgltf.print_sizes();
+    //return;
 	err := sapp.run({
 		init_cb      = init_callback,
 		frame_cb     = frame_callback,

@@ -8,5 +8,5 @@ preprocess.exe &&^
 %SHDC% vertcolor.glsl --output src/shader_meta/vertcolor.odin && ^
 %SHDC% sdf_text.glsl --output src/shader_meta/sdf_text.odin && ^
 %SHDC% cgltf_sapp.glsl --output src/shader_meta/cgltf_sapp.odin && ^
-odin run src -collection=sokol=../odin-sokol/src -opt=%OPT_LEVEL% -debug -show-timings
+odin run src -collection=sokol=../odin-sokol/src -opt=%OPT_LEVEL% -debug
 

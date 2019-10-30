@@ -2,7 +2,7 @@ package cgltf
 
 import "core:c"
 
-Bool :: int;
+Bool :: i32;
 Size :: int;
 
 File_Type :: enum c.int {
@@ -146,19 +146,21 @@ Accessor_Sparse :: struct {
 	values_extras: Extras,
 };
 
-Accessor :: struct {
+Accessor :: struct #packed {
     component_type: Component_Type,
-	normalized: int,
+	normalized: Bool,
 	type: Type,
 	offset: Size,
 	count: Size,
 	stride: Size,
 	buffer_view: ^Buffer_View,
 	has_min: Bool,
+    pad: i32, // TODO: Why is this necessary
 	min: [16]f32,
 	has_max: Bool,
 	max: [16]f32,
 	is_sparse: Bool,
+    pad2: i32, // TODO: Why is this necessary
 	sparse: Accessor_Sparse,
 	extras: Extras,
 };
@@ -451,4 +453,28 @@ Data :: struct {
     memory_user_data: rawptr,
 };
 
+import "core:fmt"
+print_sizes :: proc() {
+    fmt.println("Options", size_of(Options));
+    fmt.println("Data", size_of(Data));
+    fmt.println("Accessor", size_of(Accessor));
+    fmt.println("  component_type: ", offset_of(Accessor, component_type));
+	fmt.println("  normalized: ", offset_of(Accessor, normalized));
+	fmt.println("  type: ", offset_of(Accessor, type));
+	fmt.println("  offset: ", offset_of(Accessor, offset));
+	fmt.println("  count: ", offset_of(Accessor, count));
+	fmt.println("  stride: ", offset_of(Accessor, stride));
+	fmt.println("  buffer_view: ", offset_of(Accessor, buffer_view));
+	fmt.println("  has_min: ", offset_of(Accessor, has_min));
+	fmt.println("  min: ", offset_of(Accessor, min));
+	fmt.println("  has_max: ", offset_of(Accessor, has_max));
+	fmt.println("  max: ", offset_of(Accessor, max));
+	fmt.println("  is_sparse: ", offset_of(Accessor, is_sparse));
+	fmt.println("  sparse: ", offset_of(Accessor, sparse));
+	fmt.println("  extras: ", offset_of(Accessor, extras));
 
+    fmt.println("Accessor_Sparse", size_of(Accessor_Sparse));
+    fmt.println("Attribute", size_of(Attribute));
+    fmt.println("Primitive", size_of(Primitive));
+    fmt.println("Extras", size_of(Extras));
+};
