@@ -8,7 +8,6 @@ import sgl "sokol:sokol_gl"
 import "shared:odin-stb/stbi"
 import mu "../lib/microui"
 import "../lib/basisu"
-import "../lib/cgltf"
 
 import "core:os"
 import "core:strings"
@@ -55,6 +54,7 @@ state: struct {
     font_normal_data: [256 * 1024]u8, // TODO: use a smaller buffer and the streaming capability of sokol-fetch
 
     // mesh
+    gltf_path_root: string,
     shaders: struct {
         metallic: sg.Shader,
     },
@@ -345,6 +345,7 @@ init_callback :: proc "c" () {
     };
 
     // request the mesh GLTF file
+    state.gltf_path_root = "resources/gltf/DamagedHelmet/";
     sfetch.send({
         path = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf",
         callback = proc "c" (response: ^sfetch.Response) {
@@ -497,6 +498,8 @@ test_window :: proc(ctx: ^mu.Context) {
 }
 
 frame_callback :: proc "c" () {
+    free_all(context.temp_allocator);
+
 	//
 	// TIME
 	//

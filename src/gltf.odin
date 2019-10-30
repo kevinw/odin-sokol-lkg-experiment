@@ -1,9 +1,11 @@
 package main;
+import "core:fmt"
+import "core:mem"
+import "core:strings"
 import sg "sokol:sokol_gfx"
 import sfetch "sokol:sokol_fetch"
 import "../lib/cgltf"
-import "core:fmt"
-import "core:mem"
+import "../lib/basisu"
 
 SCENE_MAX_BUFFERS :: 16;
 SCENE_MAX_IMAGES :: 16;
@@ -31,23 +33,25 @@ gltf_parse :: proc(bytes: []u8) {
 
     // parse the buffer-view attributes
     buffer_views := mem.slice_ptr(gltf.buffer_views, gltf.buffer_views_count);
-    for buf_view in buffer_views {
+    for _, i in buffer_views {
+        using buf_view := &buffer_views[i];
         append(&state.creation_params.buffers, Buffer_Creation_Params{
-            gltf_buffer_index = mem.ptr_sub(buf_view.buffer, gltf.buffers),
-            offset = cast(i32)buf_view.offset,
-            size = cast(i32)buf_view.size,
-            type = buf_view.type == .INDICES ? .INDEXBUFFER : .VERTEXBUFFER,
+            gltf_buffer_index = mem.ptr_sub(buffer, gltf.buffers),
+            offset = cast(i32)offset,
+            size = cast(i32)size,
+            type = type == .INDICES ? .INDEXBUFFER : .VERTEXBUFFER,
         });
         append(&state.scene.buffers, sg.alloc_buffer());
     }
 
     // start loading all the buffers
     buffers := mem.slice_ptr(gltf.buffers, gltf.buffers_count);
-    for gltf_buf, i in buffers {
+    for _, i in buffers {
+        gltf_buf := &buffers[i];
         user_data := GLTF_Buffer_Fetch_Userdata { buffer_index = i };
-        fmt.println("fetching", gltf_buf.uri);
+        uri := fmt.tprintf("%s%s", state.gltf_path_root, gltf_buf.uri);
         sfetch.send({
-            path = gltf_buf.uri,
+            path = strings.clone_to_cstring(uri, context.temp_allocator), // @Speed
             callback = gltf_buffer_fetch_callback,
             user_data_ptr = &user_data,
             user_data_size = size_of(user_data),
@@ -65,17 +69,30 @@ gltf_parse :: proc(bytes: []u8) {
     }
 
     for _, i in textures {
-        tex := &textures[i];
+        using tex := &textures[i];
         append(&state.creation_params.images, Image_Creation_Params{
-            gltf_image_index = mem.ptr_sub(tex.image, gltf.images),
-            min_filter = gltf_to_sg_filter(tex.sampler.min_filter),
-            mag_filter = gltf_to_sg_filter(tex.sampler.mag_filter),
-            wrap_s = gltf_to_sg_wrap(tex.sampler.wrap_s),
-            wrap_t = gltf_to_sg_wrap(tex.sampler.wrap_t),
+            gltf_image_index = mem.ptr_sub(image, gltf.images),
+            min_filter = gltf_to_sg_filter(sampler.min_filter),
+            mag_filter = gltf_to_sg_filter(sampler.mag_filter),
+            wrap_s = gltf_to_sg_wrap(sampler.wrap_s),
+            wrap_t = gltf_to_sg_wrap(sampler.wrap_t),
         });
         append(&state.scene.images, sg.Image{id=sg.INVALID_ID});
     }
 
+    images := mem.slice_ptr(gltf.images, gltf.images_count);
+    for _, i in images {
+        using img := &images[i];
+        user_data := GLTF_Image_Fetch_Userdata { image_index = i };
+
+        full_uri := fmt.tprintf("%s%s", state.gltf_path_root, uri);
+        sfetch.send({
+            path = strings.clone_to_cstring(full_uri, context.temp_allocator),
+            callback = gltf_image_fetch_callback,
+            user_data_ptr = &user_data,
+            user_data_size = size_of(user_data),
+        });
+    }
 }
 
 gltf_buffer_fetch_callback :: proc "c" (response: ^sfetch.Response) {
@@ -94,11 +111,27 @@ gltf_buffer_fetch_callback :: proc "c" (response: ^sfetch.Response) {
     }
 }
 
+gltf_image_fetch_callback :: proc "c" (response: ^sfetch.Response) {
+    if response.dispatched {
+        sfetch.bind_buffer(response.handle, sfetch_buffers[response.channel][response.lane][:]);
+    } else if response.fetched {
+        user_data := cast(^GLTF_Image_Fetch_Userdata)response.user_data;
+        gltf_image_index := cast(int)user_data.image_index;
+        create_sg_images_for_gltf_image(
+            gltf_image_index,
+            mem.slice_ptr(cast(^u8)response.buffer_ptr, cast(int)response.fetched_size));
+    }
+    if response.finished && response.failed {
+        state.failed = true;
+    }
+}
+
 create_sg_buffers_for_gltf_buffer :: proc(gltf_buffer_index: int, bytes: []u8) {
     for buf, i in state.scene.buffers {
         p := &state.creation_params.buffers[i];
         if p.gltf_buffer_index == gltf_buffer_index {
-            assert(cast(int)(p.offset + p.size) < len(bytes));
+            msg := fmt.tprint("assertion failed", p, len(bytes));
+            assert(cast(int)(p.offset + p.size) <= len(bytes), msg);
             sg.init_buffer(buf, {
                 type = p.type,
                 size = p.size,
@@ -108,9 +141,25 @@ create_sg_buffers_for_gltf_buffer :: proc(gltf_buffer_index: int, bytes: []u8) {
     }
 }
 
+create_sg_images_for_gltf_image :: proc(gltf_image_index: int, bytes: []u8) {
+    for _, i in state.scene.images {
+        p := &state.creation_params.images[i];
+        if p.gltf_image_index == gltf_image_index {
+            img_desc := basisu.transcode(bytes);
+            just.finished.this.part
+            state.scene.images[i] = sg.make_image(img_desc);
+            basisu.free(&img_desc);
+        }
+    }
+}
+
 GLTF_Buffer_Fetch_Userdata :: struct {
-    buffer_index: cgltf.Size,
+    buffer_index: int,
 };
+
+GLTF_Image_Fetch_Userdata :: struct {
+    image_index: int,
+}
 
 
 @(private)
