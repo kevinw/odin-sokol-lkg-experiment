@@ -9,6 +9,26 @@ import "core:fmt"
 
 DEFAULT_BUFFER_SIZE :: 200;
 
+
+r_get_text_width :: proc(text: []u8) -> i32 {
+    res:i32 = 0;
+    for _ in text {
+        res += 10; // TODO
+    }
+    return res;
+    /*
+    res:i32 = 0;
+    for p = &text[0]; p^ != nil && len--; p++ {
+        res += atlas[ATLAS_FONT + (unsigned char)*p].w;
+    }
+    return res;
+    */
+}
+
+r_get_text_height :: proc() -> i32 {
+    return 18;
+}
+
 mu_label_printf :: proc(ctx: ^mu.Context, fmt_str: string, args: ..any) {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := strings.builder_from_slice(data[:]);

@@ -8,6 +8,7 @@ import sgl "sokol:sokol_gl"
 import "shared:odin-stb/stbi"
 import mu "../lib/microui"
 import "../lib/basisu"
+import "../lib/cgltf"
 
 import "core:os"
 import "core:strings"
@@ -22,6 +23,27 @@ import shader_meta "./shader_meta";
 WINDOW_WIDTH :: 1280;
 WINDOW_HEIGHT :: 720;
 
+SFETCH_NUM_CHANNELS :: 1;
+SFETCH_NUM_LANES :: 4;
+MAX_FILE_SIZE :: 1024*1024;
+
+sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
+
+Buffer_Creation_Params :: struct {
+    type: sg.Buffer_Type,
+    offset: i32,
+    size: i32,
+    gltf_buffer_index: int,
+}
+
+Image_Creation_Params :: struct {
+    min_filter: sg.Filter,
+    mag_filter: sg.Filter,
+    wrap_s: sg.Wrap,
+    wrap_t: sg.Wrap,
+    gltf_image_index: int,
+};
+
 state: struct {
 	pass_action: sg.Pass_Action,
 	bind:        sg.Bindings,
@@ -31,6 +53,22 @@ state: struct {
     mu_atlas_img: sg.Image,
 
     font_normal_data: [256 * 1024]u8, // TODO: use a smaller buffer and the streaming capability of sokol-fetch
+
+    // mesh
+    shaders: struct {
+        metallic: sg.Shader,
+    },
+    scene: struct {
+        buffers: [dynamic]sg.Buffer,
+        images: [dynamic]sg.Image,
+    },
+    point_light: shader_meta.light_params,
+    failed: bool,
+
+    creation_params: struct {
+        buffers: [dynamic]Buffer_Creation_Params,
+        images: [dynamic]Image_Creation_Params,
+    },
 };
 
 mu_ctx: mu.Context;
@@ -242,25 +280,6 @@ text_height_cb :: proc "c" (font: mu.Font) -> i32 {
     return r_get_text_height();
 }
 
-r_get_text_width :: proc(text: []u8) -> i32 {
-    res:i32 = 0;
-    for _ in text {
-        res += 10; // TODO
-    }
-    return res;
-    /*
-    res:i32 = 0;
-    for p = &text[0]; p^ != nil && len--; p++ {
-        res += atlas[ATLAS_FONT + (unsigned char)*p].w;
-    }
-    return res;
-    */
-}
-
-r_get_text_height :: proc() -> i32 {
-    return 18;
-}
-
 
 init_callback :: proc "c" () {
     text.vertex_elems = make([dynamic]f32);
@@ -309,6 +328,39 @@ init_callback :: proc "c" () {
         buffer_ptr = &text.json_data[0],
         buffer_size = size_of(text.json_data),
     });
+
+    //
+    // MESH SETUP
+    //
+
+    // create shaders
+    state.shaders.metallic = sg.make_shader(shader_meta.cgltf_metallic_shader_desc()^);
+
+    // create point light
+    state.point_light = {
+        light_pos = Vector3{10.0, 10.0, 10.0},
+        light_range = 100.0,
+        light_color = Vector3{1000.0, 1000.0, 1000.0},
+        light_intensity = 1.0
+    };
+
+    // request the mesh GLTF file
+    sfetch.send({
+        path = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf",
+        callback = proc "c" (response: ^sfetch.Response) {
+            if response.dispatched {
+                sfetch.bind_buffer(response.handle, sfetch_buffers[response.channel][response.lane][:]);
+            } else if response.fetched {
+                // file has been loaded, parse as GLTF
+                gltf_parse(mem.slice_ptr(cast(^u8)response.buffer_ptr, cast(int)response.fetched_size));
+            }
+            if response.finished && response.failed {
+                state.failed = true;
+                fmt.eprintln("could not load gltf file");
+            }
+        }
+    });
+
 
     //
     // make quad rendering pipeline
