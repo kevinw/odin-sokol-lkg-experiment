@@ -7,6 +7,7 @@ import sfetch "sokol:sokol_fetch"
 import sgl "sokol:sokol_gl"
 import "shared:odin-stb/stbi"
 import mu "../lib/microui"
+import "../lib/basisu"
 
 import "core:os"
 import "core:strings"
@@ -280,6 +281,8 @@ init_callback :: proc "c" () {
         max_commands = 500,
         pipeline_pool_size = 5,
     });
+
+    basisu.setup();
 
     r_init();
     mu.init(&mu_ctx);
@@ -563,6 +566,7 @@ frame_callback :: proc "c" () {
 }
 
 cleanup :: proc "c" () {
+    basisu.shutdown();
     sfetch.shutdown();
     sg.shutdown();
 }
