@@ -1,2 +1,1 @@
-call b.bat
-devenv /debugexe main.exe
+@call b.bat && devenv /debugexe src.exe

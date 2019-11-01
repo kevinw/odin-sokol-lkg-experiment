@@ -146,7 +146,7 @@ Accessor_Sparse :: struct {
 	values_extras: Extras,
 };
 
-Accessor :: struct #packed {
+Accessor :: struct {
     component_type: Component_Type,
 	normalized: Bool,
 	type: Type,
@@ -155,12 +155,11 @@ Accessor :: struct #packed {
 	stride: Size,
 	buffer_view: ^Buffer_View,
 	has_min: Bool,
-    pad: i32, // TODO: Why is this necessary
 	min: [16]f32,
 	has_max: Bool,
 	max: [16]f32,
 	is_sparse: Bool,
-    pad2: i32, // TODO: Why is this necessary
+    pad2: i32, // TODO: Why is this necessary?
 	sparse: Accessor_Sparse,
 	extras: Extras,
 };

@@ -5,6 +5,8 @@ when ODIN_OS == "windows" do foreign import cgltf_lib "cgltf.lib"
 @(default_calling_convention="c")
 @(link_prefix="cgltf_")
 foreign cgltf_lib {
+    print_struct_sizes :: proc() ---
+
     parse :: proc(
 		options: ^Options,
 		data: ^u8,

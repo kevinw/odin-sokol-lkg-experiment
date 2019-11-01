@@ -1,7 +1,7 @@
 #define CGLTF_IMPLEMENTATION
 #include "cgltf.h"
 
-int showStructSizes(int argc, char** argv) {
+void cgltf_print_struct_sizes() {
     printf("Options %zu\n", sizeof(cgltf_options));
     printf("Data %zu\n", sizeof(cgltf_data));
     printf("Accessor %zu\n", sizeof(cgltf_accessor));
@@ -19,11 +19,8 @@ int showStructSizes(int argc, char** argv) {
 	printf("  is_sparse: %zu\n", offsetof(cgltf_accessor, is_sparse));
 	printf("  sparse: %zu\n", offsetof(cgltf_accessor, sparse));
 	printf("  extras: %zu\n", offsetof(cgltf_accessor, extras));
-
-
     printf("Accessor_Sparse %zu\n", sizeof(cgltf_accessor_sparse));
     printf("Attribute %zu\n", sizeof(cgltf_attribute));
     printf("Primitive %zu\n", sizeof(cgltf_primitive));
     printf("Extras %zu\n", sizeof(cgltf_extras));
-    return 0;
 }

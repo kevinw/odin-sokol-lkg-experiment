@@ -11,7 +11,7 @@ import "../lib/cgltf"
 import "../lib/basisu"
 import "./shader_meta"
 
-VERBOSE :: true;
+VERBOSE :: false;
 
 GLTF_Buffer_Fetch_Userdata :: struct { buffer_index: int };
 GLTF_Image_Fetch_Userdata :: struct { image_index: int }
@@ -260,7 +260,6 @@ create_sg_pipeline_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Pr
         append(&state.pip_cache, pip_params);
         is_metallic:bool = prim.material.has_pbr_metallic_roughness != 0 ? true : false;
         assert(is_metallic, "exptecting metallic for now");
-        fmt.println("SHADER\n", state.shaders.metallic);
         append(&state.scene.pipelines, sg.make_pipeline({
             layout = pip_params.layout,
             shader = state.shaders.metallic, // TODO is_metallic ? state.shaders.metallic : state.shaders.specular,

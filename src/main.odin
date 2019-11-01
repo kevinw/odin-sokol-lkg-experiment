@@ -376,7 +376,6 @@ init_callback :: proc "c" () {
     // create shaders
     state.shaders.metallic = sg.make_shader(shader_meta.cgltf_metallic_shader_desc()^);
     assert(state.shaders.metallic.id != sg.INVALID_ID, "shader didn't compile");
-    fmt.println("\n~~~~~~~~~\nmetallic\n", state.shaders.metallic,"\n");
 
     // create point light
     state.point_light = {
@@ -669,8 +668,14 @@ cleanup :: proc "c" () {
 }
 
 main :: proc() {
+    //fmt.println("--------odin sizes:");
     //cgltf.print_sizes();
-    //return;
+    //fmt.println("--------c sizes:");
+    //cgltf.print_struct_sizes();
+    run_app();
+}
+
+run_app :: proc() {
 	err := sapp.run({
 		init_cb      = init_callback,
 		frame_cb     = frame_callback,
