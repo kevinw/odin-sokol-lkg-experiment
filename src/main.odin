@@ -375,6 +375,7 @@ init_callback :: proc "c" () {
 
     // create shaders
     state.shaders.metallic = sg.make_shader(shader_meta.cgltf_metallic_shader_desc()^);
+    assert(state.shaders.metallic.id != sg.INVALID_ID, "shader didn't compile");
     fmt.println("\n~~~~~~~~~\nmetallic\n", state.shaders.metallic,"\n");
 
     // create point light

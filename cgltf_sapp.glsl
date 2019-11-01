@@ -70,11 +70,11 @@ uniform sampler2D occlusion_texture;
 uniform sampler2D emissive_texture;
 
 vec3 linear_to_srgb(vec3 linear) {
-    return pow(linear, vec3(1.0/2.2));
+    return pow(abs(linear), vec3(1.0/2.2));
 }
 
 vec4 srgb_to_linear(vec4 srgb) {
-    return vec4(pow(srgb.rgb, vec3(2.2)), srgb.a);
+    return vec4(pow(abs(srgb.rgb), vec3(2.2)), srgb.a);
 }
 
 vec3 get_normal() {
@@ -188,7 +188,7 @@ float get_range_attenuation(float range, float distance) {
     if (range < 0.0) {
         return 1.0;
     }
-    return max(min(1.0 - pow(distance / range, 4.0), 1.0), 0.0) / pow(distance, 2.0);
+    return max(min(1.0 - pow(abs(distance / range), 4.0), 1.0), 0.0) / pow(abs(distance), 2.0);
 }
 
 vec3 apply_point_light(material_info_t material_info, vec3 normal, vec3 view) {

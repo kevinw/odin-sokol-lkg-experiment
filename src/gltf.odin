@@ -1,8 +1,9 @@
 package main;
 
 import "core:fmt"
-import "core:os"
+import "core:math/bits"
 import "core:mem"
+import "core:os"
 import "core:strings"
 import sg "sokol:sokol_gfx"
 import sfetch "sokol:sokol_fetch"
@@ -28,6 +29,11 @@ Pipeline_Cache_Params :: struct {
 SCENE_INVALID_INDEX :: -1;
 SCENE_MAX_PIPELINES :: 16;
 
+safe_cast_i16 :: inline proc(n: $T) -> i16 {
+    assert(n < bits.I16_MAX);
+    return cast(i16)n;
+}
+
 gltf_parse :: proc(bytes: []u8) {
     options := cgltf.Options{};
     gltf:^cgltf.Data;
@@ -40,8 +46,8 @@ gltf_parse :: proc(bytes: []u8) {
 
     defer cgltf.free(gltf);
 
-    all := fmt.tprint("%s", gltf);
-    os.write_entire_file("test.data", mem.slice_ptr(&all[0], len(all)));
+    //all := fmt.tprint("%s", gltf);
+    //os.write_entire_file("test.data", mem.slice_ptr(&all[0], len(all)));
 
     //
     // parse buffers
@@ -124,11 +130,11 @@ gltf_parse :: proc(bytes: []u8) {
             scene_mat.fs_params.metallic_factor = metallic_factor;
             scene_mat.fs_params.roughness_factor = roughness_factor;
             scene_mat.images = {
-                base_color = cast(i16)mem.ptr_sub(base_color_texture.texture, gltf.textures),
-                metallic_roughness = cast(i16)mem.ptr_sub(metallic_roughness_texture.texture, gltf.textures),
-                normal = cast(i16)mem.ptr_sub(mat.normal_texture.texture, gltf.textures),
-                occlusion = cast(i16)mem.ptr_sub(mat.occlusion_texture.texture, gltf.textures),
-                emissive = cast(i16)mem.ptr_sub(mat.emissive_texture.texture, gltf.textures),
+                base_color = safe_cast_i16(mem.ptr_sub(base_color_texture.texture, gltf.textures)),
+                metallic_roughness = safe_cast_i16(mem.ptr_sub(metallic_roughness_texture.texture, gltf.textures)),
+                normal = safe_cast_i16(mem.ptr_sub(mat.normal_texture.texture, gltf.textures)),
+                occlusion = safe_cast_i16(mem.ptr_sub(mat.occlusion_texture.texture, gltf.textures)),
+                emissive = safe_cast_i16(mem.ptr_sub(mat.emissive_texture.texture, gltf.textures)),
             };
             append(&state.scene.materials, scene_mat);
         }
@@ -155,7 +161,7 @@ gltf_parse :: proc(bytes: []u8) {
                 pipeline = cast(i16)create_sg_pipeline_for_gltf_primitive(gltf, gltf_prim, &vertex_buffers);
                 material = cast(i16)mem.ptr_sub(gltf_prim.material, gltf.materials);
                 if gltf_prim.indices != nil {
-                    index_buffer = cast(i16)mem.ptr_sub(gltf_prim.indices.buffer_view, gltf.buffer_views);
+                    index_buffer = safe_cast_i16(mem.ptr_sub(gltf_prim.indices.buffer_view, gltf.buffer_views));
                     assert(state.creation_params.buffers[index_buffer].type == sg.Buffer_Type.INDEXBUFFER);
                     assert(gltf_prim.indices.stride != 0);
                     base_element = 0;
@@ -225,7 +231,6 @@ create_sg_layout_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Prim
         }
     }
 
-    fmt.println("layout", layout);
     return layout;
 }
 
@@ -255,6 +260,7 @@ create_sg_pipeline_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Pr
         append(&state.pip_cache, pip_params);
         is_metallic:bool = prim.material.has_pbr_metallic_roughness != 0 ? true : false;
         assert(is_metallic, "exptecting metallic for now");
+        fmt.println("SHADER\n", state.shaders.metallic);
         append(&state.scene.pipelines, sg.make_pipeline({
             layout = pip_params.layout,
             shader = state.shaders.metallic, // TODO is_metallic ? state.shaders.metallic : state.shaders.specular,
