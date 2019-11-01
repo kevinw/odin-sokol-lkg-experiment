@@ -1,9 +1,9 @@
 package main;
 
 import "core:fmt"
+using import "core:math/linalg"
 import "core:math/bits"
 import "core:mem"
-import "core:os"
 import "core:strings"
 import sg "sokol:sokol_gfx"
 import sfetch "sokol:sokol_fetch"
@@ -181,7 +181,47 @@ gltf_parse :: proc(bytes: []u8) {
     //
     // parse nodes
     //
+    nodes := mem.slice_ptr(gltf.nodes, gltf.nodes_count);
+    for _, i in nodes {
+        gltf_node := &nodes[i];
 
+        // ignore nodes without mesh, those are not relevant since we
+        // bake the transform hierarchy into per-node world space transforms
+        if gltf_node.mesh != nil {
+            append(&state.scene.nodes, Node {});
+            node := &state.scene.nodes[len(state.scene.nodes) - 1];
+            node.mesh = safe_cast_i16(mem.ptr_sub(gltf_node.mesh, gltf.meshes));
+            node.transform = build_transform_for_gltf_node(gltf, gltf_node);
+        }
+    }
+}
+
+build_transform_for_gltf_node :: proc(gltf: ^cgltf.Data, node: ^cgltf.Node) -> Matrix4 {
+    parent_tform := identity(Matrix4);
+    if node.parent != nil {
+        parent_tform = build_transform_for_gltf_node(gltf, node.parent);
+    }
+    tform := identity(Matrix4);
+    if node.has_matrix != 0 {
+        tform = (cast(^Matrix4)&node.matrix[0])^;
+    } else {
+        t := identity(Matrix4);
+        r := identity(Matrix4);
+        s := identity(Matrix4);
+        if node.has_translation != 0 {
+            t = translate_matrix4(Vector3{node.translation[0], node.translation[1], node.translation[2]});
+        }
+        if node.has_rotation != 0 {
+            //r = rotate_matrix4(node.
+            fmt.println("TODO: implement rotation nodes");
+        }
+        if node.has_scale != 0 {
+            s = scale_matrix4(identity(Matrix4), Vector3{node.scale[0], node.scale[1], node.scale[2]});
+        }
+        tform = mul(parent_tform, mul(mul(s, r), t));
+    }
+
+    return tform;
 }
 
 // creates a vertex buffer bind slot mapping for a specific GLTF primitive

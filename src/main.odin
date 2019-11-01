@@ -78,6 +78,11 @@ Sub_Mesh :: struct { // a 'primitive' (aka submesh) contains everything needed t
     num_elements: i32,
 };
 
+Node :: struct {
+    mesh: i16, // index into scene.meshes
+    transform: Matrix4,
+};
+
 state: struct {
 	pass_action: sg.Pass_Action,
 	bind:        sg.Bindings,
@@ -98,6 +103,7 @@ state: struct {
         images: [dynamic]sg.Image,
         materials: [dynamic]Metallic_Material,
         meshes: [dynamic]Mesh,
+        nodes: [dynamic]Node,
         sub_meshes: [dynamic]Sub_Mesh,
         pipelines: [dynamic]sg.Pipeline,
     },
