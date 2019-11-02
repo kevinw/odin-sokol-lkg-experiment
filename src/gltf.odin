@@ -447,12 +447,12 @@ gltf_attr_type_to_vs_input_slot :: proc(attr_type: cgltf.Attribute_Type) -> i32 
 @(private)
 gltf_to_prim_type :: proc(prim_type: cgltf.Primitive_Type) -> sg.Primitive_Type {
     switch prim_type {
-        case cgltf.Primitive_Type.POINTS: return sg.Primitive_Type.POINTS;
-        case cgltf.Primitive_Type.LINES: return sg.Primitive_Type.LINES;
-        case cgltf.Primitive_Type.LINE_STRIP: return sg.Primitive_Type.LINE_STRIP;
-        case cgltf.Primitive_Type.TRIANGLES: return sg.Primitive_Type.TRIANGLES;
-        case cgltf.Primitive_Type.TRIANGLE_STRIP: return sg.Primitive_Type.TRIANGLE_STRIP;
-        case: return sg.Primitive_Type._DEFAULT;
+        case .POINTS: return .POINTS;
+        case .LINES: return .LINES;
+        case .LINE_STRIP: return .LINE_STRIP;
+        case .TRIANGLES: return .TRIANGLES;
+        case .TRIANGLE_STRIP: return .TRIANGLE_STRIP;
+        case: return ._DEFAULT;
     }
 }
 
@@ -491,30 +491,30 @@ pipelines_equal :: proc(p0: ^Pipeline_Cache_Params, p1: ^Pipeline_Cache_Params) 
 @(private)
 gltf_to_vertex_format :: proc(acc: ^cgltf.Accessor) -> sg.Vertex_Format {
     switch acc.component_type {
-        case cgltf.Component_Type.R_8:
-            if acc.type == cgltf.Type.VEC4 {
-                return acc.normalized != 0 ? sg.Vertex_Format.BYTE4N : sg.Vertex_Format.BYTE4;
+        case .R_8:
+            if acc.type == .VEC4 {
+                return acc.normalized != 0 ? .BYTE4N : .BYTE4;
             }
-        case cgltf.Component_Type.R_8U:
-            if acc.type == cgltf.Type.VEC4 {
-                return acc.normalized != 0 ? sg.Vertex_Format.UBYTE4N : sg.Vertex_Format.UBYTE4;
+        case .R_8U:
+            if acc.type == .VEC4 {
+                return acc.normalized != 0 ? .UBYTE4N : .UBYTE4;
             }
-        case cgltf.Component_Type.R_16:
+        case .R_16:
             switch acc.type {
-                case cgltf.Type.VEC2: return acc.normalized != 0 ? sg.Vertex_Format.SHORT2N : sg.Vertex_Format.SHORT2;
-                case cgltf.Type.VEC4: return acc.normalized != 0 ? sg.Vertex_Format.SHORT4N : sg.Vertex_Format.SHORT4;
+                case .VEC2: return acc.normalized != 0 ? .SHORT2N : .SHORT2;
+                case .VEC4: return acc.normalized != 0 ? .SHORT4N : .SHORT4;
             }
-        case cgltf.Component_Type.R_32F:
+        case .R_32F:
             switch acc.type {
-                case cgltf.Type.SCALAR: return sg.Vertex_Format.FLOAT;
-                case cgltf.Type.VEC2: return sg.Vertex_Format.FLOAT2;
-                case cgltf.Type.VEC3: return sg.Vertex_Format.FLOAT3;
-                case cgltf.Type.VEC4: return sg.Vertex_Format.FLOAT4;
+                case .SCALAR: return .FLOAT;
+                case .VEC2: return .FLOAT2;
+                case .VEC3: return .FLOAT3;
+                case .VEC4: return .FLOAT4;
             }
     }
 
     fmt.eprintln("error: don't know how to handle gltf.Accessor", acc);
-    return sg.Vertex_Format.INVALID;
+    return .INVALID;
 }
 
 

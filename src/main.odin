@@ -8,7 +8,6 @@ import sgl "sokol:sokol_gl"
 import "shared:odin-stb/stbi"
 import mu "../lib/microui"
 import "../lib/basisu"
-import "../lib/cgltf"
 
 import "core:os"
 import "core:strings"
@@ -32,6 +31,7 @@ sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 Camera :: struct {
     eye_pos: Vector3,
     view_proj: Matrix4,
+    fov: f32,
 };
 
 // per-material texture indices into scene.images for metallic material
@@ -335,10 +335,21 @@ text_height_cb :: proc "c" (font: mu.Font) -> i32 {
     return r_get_text_height();
 }
 
+v3_any :: proc(x: $A, y: $B, z: $C) -> Vector3 { return Vector3 { cast(f32)x, cast(f32)y, cast(f32)z }; }
+v3_empty :: proc() -> Vector3 { return Vector3 {}; }
+v3 :: proc { v3_any, v3_empty };
+sub :: proc(v1, v2: Vector3) -> Vector3 {
+    return Vector3 { v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
+}
+
+DEG_TO_RAD :: PI / 180.0;
+deg2rad :: inline proc(f: $T) -> T { return f * DEG_TO_RAD; }
+
+delta := v3(-1.92, -0.07, 1.52);
 
 init_callback :: proc "c" () {
-    dist:f32 = 3.0;
-    state.camera.eye_pos = Vector3 { 0.0, 1.5, dist };
+    state.camera.eye_pos = delta;
+    state.camera.fov = 60;
 
     text.vertex_elems = make([dynamic]f32);
     text.tex_elems = make([dynamic]f32);
@@ -534,6 +545,18 @@ init_callback :: proc "c" () {
 position := Vector3 {};
 last_ticks: u64 = 0;
 
+fps_counter: struct {
+    last_time_secs: f64,
+    num_frames: int,
+
+    ms_per_frame: f64,
+};
+
+per_frame_stats: struct {
+    draw_calls: u64,
+    num_elements: u64,
+};
+
 bg := [?]f32 { 0.5, 0.7, 1.0 };
 
 
@@ -547,28 +570,31 @@ test_window :: proc(ctx: ^mu.Context) {
     window.rect.w = max(window.rect.w, 240);
     window.rect.h = max(window.rect.h, 300);
 
-    if mu.begin_window(ctx, &window, "micro ui window") {
+    if mu.begin_window(ctx, &window, "") {
         defer mu.end_window(ctx);
 
         @static show_info: i32 = 1;
-        if mu.header(ctx, &show_info, "Window Info") {
+        if mu.header(ctx, &show_info, "debug") {
 
-            row_info := [?]i32 { 54, -1 };
-            mu.layout_row(ctx, 2, &row_info[0], 0);
+            mu_layout_row(ctx, 2,{80, -1}, 0);
+            mu.label(ctx, "ms per frame:"); mu_label_printf(ctx, "%f", fps_counter.ms_per_frame);
+            mu.label(ctx, "num elements:"); mu_label_printf(ctx, "%d", per_frame_stats.num_elements);
 
-            mu.label(ctx, "Position:");
-            mu_label_printf(ctx, "%d, %d", window.rect.x, window.rect.y);
-            mu.label(ctx, "Size:");
-            mu_label_printf(ctx, "%d, %d", window.rect.w, window.rect.h);
 
-            mu.label(ctx, "camera eye pos");
+            mu.label(ctx, "camera eye pos:");
 
             mu.layout_begin_column(ctx);
-            mu_layout_row(ctx, 2, { 46, -1 }, 0);
-            mu.label(ctx, "x:"); mu.slider(ctx, &state.camera.eye_pos[0], -20.0, 20.0);
-            mu.label(ctx, "y:"); mu.slider(ctx, &state.camera.eye_pos[1], -20.0, 20.0);
-            mu.label(ctx, "z:"); mu.slider(ctx, &state.camera.eye_pos[2], -20.0, 20.0);
+            mu_layout_row(ctx, 2, { 20, -1 }, 0);
+            mu.label(ctx, "x:"); mu.slider(ctx, &state.camera.eye_pos[0], -6.0, 6.0);
+            mu.label(ctx, "y:"); mu.slider(ctx, &state.camera.eye_pos[1], -6.0, 6.0);
+            mu.label(ctx, "z:"); mu.slider(ctx, &state.camera.eye_pos[2], -6.0, 6.0);
             mu.layout_end_column(ctx);
+
+            mu_layout_row(ctx, 2, { 40, -1 }, 0);
+            mu.label(ctx, "fov:"); mu.slider(ctx, &state.camera.fov, 1, 200);
+
+            mu.label(ctx, "print"); mu.checkbox(ctx, &do_print, "");
+
         }
 
         /* background color sliders */
@@ -593,6 +619,7 @@ test_window :: proc(ctx: ^mu.Context) {
     }
 }
 
+do_print :i32 = 0;
 frame_callback :: proc "c" () {
     free_all(context.temp_allocator);
 
@@ -611,6 +638,16 @@ frame_callback :: proc "c" () {
 	last_ticks = current_ticks;
 	elapsed_seconds := stime.sec(elapsed_ticks);
 
+    {
+        using fps_counter;
+        num_frames += 1;
+        if now_seconds - last_time_secs >= 1.0 {
+            ms_per_frame = 1000.0 / cast(f64)num_frames;
+            num_frames = 0;
+            last_time_secs += 1.0;
+        }
+    }
+
 	//
 	// UPDATE
 	//
@@ -628,24 +665,42 @@ frame_callback :: proc "c" () {
         if s || down do v.y += 1.0;
     }
 
-	if v.x != 0 do position.x += v.x * cast(f32)elapsed_seconds;
-	if v.y != 0 do position.y += v.y * cast(f32)elapsed_seconds;
+    dt := cast(f32)elapsed_seconds;
+
+	if v.x != 0 do position.x += v.x * dt;
+	if v.y != 0 do position.y += v.y * dt;
 
 	mvp := translate_matrix4(position);
 
     //
     // update scene
     //
-    state.root_transform = rotate_matrix4(Vector3{0, 1, 0}, cast(f32)elapsed_seconds);
+    state.root_transform = rotate_matrix4(Vector3{0, 1, 0}, cast(f32)now_seconds);
 
     // update camera
-    w:f32 = cast(f32) sapp.width();
-    h:f32 = cast(f32) sapp.height();
-    proj := perspective(60.0, w/h, 0.01, 100.0);
-    v3 :: inline proc(x, y, z: $T) -> Vector3 do return Vector3 { cast(f32)x, cast(f32)y, cast(f32)z };
-    UP := v3(0, 1, 0);
-    view := look_at(state.camera.eye_pos, Vector3 { 0.0, 0.0, 0.0 }, UP);
-    state.camera.view_proj = mul(proj, view);
+    {
+        aspect:f32 = cast(f32)sapp.width() / cast(f32)sapp.height();
+        proj := perspective(deg2rad(state.camera.fov), aspect, 0.01, 100.0);
+        {
+            using key_state;
+            using state.camera;
+            if w do eye_pos.z += dt;
+            if a do eye_pos.x -= dt;
+            if s do eye_pos.z -= dt;
+            if d do eye_pos.x += dt;
+        }
+
+        target := Vector3 {};
+        if do_print != 0 {
+            x := target;
+            fmt.println(target);
+            assert(x == target);
+        }
+
+        view := look_at(state.camera.eye_pos, target, Vector3 { 0, 1, 0 });
+        state.camera.view_proj = mul(proj, view);
+        //fmt.println(state.camera.view_proj);
+    }
 
     //
     // MICROUI
@@ -653,8 +708,10 @@ frame_callback :: proc "c" () {
     {
         // microui definition
         mu.begin(&mu_ctx);
-        test_window(&mu_ctx);
         defer mu.end(&mu_ctx);
+
+        test_window(&mu_ctx);
+
     }
     {
         // microui rendering
@@ -673,6 +730,8 @@ frame_callback :: proc "c" () {
             }
         }
     }
+
+    per_frame_stats = {};
 
 	//
 	// DRAW
@@ -751,7 +810,8 @@ frame_callback :: proc "c" () {
 
                 sg.apply_bindings(bind);
 
-                //fmt.println("drawing", prim.num_elements, "for submesh", i);
+                assert(prim.num_elements > 0);
+                per_frame_stats.num_elements += cast(u64)prim.num_elements;
                 sg.draw(cast(int)prim.base_element, cast(int)prim.num_elements, 1);
             }
         }

@@ -3,5 +3,7 @@
 *.exe
 *.lib
 *.pdb
+*.bc
+*.ll
 .vs/
 .vscode/
