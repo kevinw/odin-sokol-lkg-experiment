@@ -106,7 +106,9 @@ state: struct {
         nodes: [dynamic]Node,
         sub_meshes: [dynamic]Sub_Mesh,
         pipelines: [dynamic]sg.Pipeline,
+        
     },
+    placeholders: struct { white, normal, black: sg.Image },
     pip_cache: [dynamic]Pipeline_Cache_Params,
     point_light: shader_meta.light_params,
     failed: bool,
@@ -408,6 +410,28 @@ init_callback :: proc "c" () {
             }
         }
     });
+
+    make_image :: proc(width, height: i32, pixel_format: sg.Pixel_Format, pixels: []u32) -> sg.Image {
+        image_desc := sg.Image_Desc {
+            width = width,
+            height = height,
+            pixel_format = pixel_format
+        };
+        image_desc.content.subimage[0][0] = {
+            ptr = &pixels[0],
+            size = cast(i32)len(pixels), // ??????????????????????????
+        };
+        return sg.make_image(image_desc);
+    }
+
+    // create placeholder textures
+    pixels: [64]u32;
+    for i in 0..<64 do pixels[i] = 0xFFFFFFFF;
+    state.placeholders.white = make_image(8, 8, sg.Pixel_Format.RGBA8, pixels[:]);
+    for i in 0..<64 do pixels[i] = 0xFF000000;
+    state.placeholders.black = make_image(8, 8, sg.Pixel_Format.RGBA8, pixels[:]);
+    for i in 0..<64 do pixels[i] = 0xFFFF7FFF;
+    state.placeholders.normal = make_image(8, 8, sg.Pixel_Format.RGBA8, pixels[:]);
 
 
     //

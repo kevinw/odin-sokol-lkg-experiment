@@ -149,8 +149,8 @@ gltf_parse :: proc(bytes: []u8) {
             gltf_mesh := &meshes[i];
             append(&state.scene.meshes, Mesh {});
             mesh := &state.scene.meshes[len(state.scene.meshes) - 1];
-            mesh.first_primitive = cast(i16)len(state.scene.sub_meshes);
-            mesh.num_primitives = cast(i16)gltf_mesh.primitives_count;
+            mesh.first_primitive = safe_cast_i16(len(state.scene.sub_meshes));
+            mesh.num_primitives = safe_cast_i16(gltf_mesh.primitives_count);
             primitives := mem.slice_ptr(gltf_mesh.primitives, gltf_mesh.primitives_count);
             for _, prim_index in primitives {
                 gltf_prim := &primitives[prim_index];
@@ -158,8 +158,8 @@ gltf_parse :: proc(bytes: []u8) {
 
                 using sub_mesh := &state.scene.sub_meshes[len(&state.scene.sub_meshes) - 1];
                 vertex_buffers = create_vertex_buffer_mapping_for_gltf_primitive(gltf, gltf_prim);
-                pipeline = cast(i16)create_sg_pipeline_for_gltf_primitive(gltf, gltf_prim, &vertex_buffers);
-                material = cast(i16)mem.ptr_sub(gltf_prim.material, gltf.materials);
+                pipeline = safe_cast_i16(create_sg_pipeline_for_gltf_primitive(gltf, gltf_prim, &vertex_buffers));
+                material = safe_cast_i16(mem.ptr_sub(gltf_prim.material, gltf.materials));
                 if gltf_prim.indices != nil {
                     index_buffer = safe_cast_i16(mem.ptr_sub(gltf_prim.indices.buffer_view, gltf.buffer_views));
                     assert(state.creation_params.buffers[index_buffer].type == sg.Buffer_Type.INDEXBUFFER);
@@ -173,7 +173,6 @@ gltf_parse :: proc(bytes: []u8) {
                     base_element = 0;
                     num_elements = cast(i32) gltf_prim.attributes.data.count;
                 }
-
             }
         }
     }
@@ -212,8 +211,7 @@ build_transform_for_gltf_node :: proc(gltf: ^cgltf.Data, node: ^cgltf.Node) -> M
             t = translate_matrix4(Vector3{node.translation[0], node.translation[1], node.translation[2]});
         }
         if node.has_rotation != 0 {
-            //r = rotate_matrix4(node.
-            fmt.println("TODO: implement rotation nodes");
+            r = rotate_matrix4x4_quat(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
         }
         if node.has_scale != 0 {
             s = scale_matrix4(identity(Matrix4), Vector3{node.scale[0], node.scale[1], node.scale[2]});
@@ -222,6 +220,30 @@ build_transform_for_gltf_node :: proc(gltf: ^cgltf.Data, node: ^cgltf.Node) -> M
     }
 
     return tform;
+}
+
+rotate_matrix4x4_quat :: proc(q_x, q_y, q_z, q_w: f32) -> Matrix4x4 {
+    // Precalculate coordinate products
+    x := q_x * 2.0;
+    y := q_y * 2.0;
+    z := q_z * 2.0;
+    xx := q_x * x;
+    yy := q_y * y;
+    zz := q_z * z;
+    xy := q_x * y;
+    xz := q_x * z;
+    yz := q_y * z;
+    wx := q_w * x;
+    wy := q_w * y;
+    wz := q_w * z;
+
+    // Calculate 3x3 matrix from orthonormal basis
+    m: Matrix4;
+    m[0][0] = 1.0 - (yy + zz); m[1][0] = xy + wz; m[2][0] = xz - wy; m[3][0] = 0.0;
+    m[0][1] = xy - wz; m[1][1] = 1.0 - (xx + zz); m[2][1] = yz + wx; m[3][1] = 0.0;
+    m[0][2] = xz + wy; m[1][2] = yz - wx; m[2][2] = 1.0 - (xx + yy); m[3][2] = 0.0;
+    m[0][3] = 0.0; m[1][3] = 0.0; m[2][3] = 0.0; m[3][3] = 1.0;
+    return m;
 }
 
 // creates a vertex buffer bind slot mapping for a specific GLTF primitive
