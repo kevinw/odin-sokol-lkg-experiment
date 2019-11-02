@@ -29,6 +29,11 @@ MAX_FILE_SIZE :: 1024*1024;
 
 sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 
+Camera :: struct {
+    eye_pos: Vector3,
+    view_proj: Matrix4,
+};
+
 // per-material texture indices into scene.images for metallic material
 Metallic_Images :: struct {
     base_color: i16,
@@ -98,6 +103,7 @@ state: struct {
     shaders: struct {
         metallic: sg.Shader,
     },
+    root_transform: Matrix4,
     scene: struct {
         buffers: [dynamic]sg.Buffer,
         images: [dynamic]sg.Image,
@@ -108,6 +114,7 @@ state: struct {
         pipelines: [dynamic]sg.Pipeline,
         
     },
+    camera: Camera,
     placeholders: struct { white, normal, black: sg.Image },
     pip_cache: [dynamic]Pipeline_Cache_Params,
     point_light: shader_meta.light_params,
@@ -330,6 +337,9 @@ text_height_cb :: proc "c" (font: mu.Font) -> i32 {
 
 
 init_callback :: proc "c" () {
+    dist:f32 = 3.0;
+    state.camera.eye_pos = Vector3 { 0.0, 1.5, dist };
+
     text.vertex_elems = make([dynamic]f32);
     text.tex_elems = make([dynamic]f32);
 
@@ -394,9 +404,15 @@ init_callback :: proc "c" () {
     };
 
     // request the mesh GLTF file
+
     state.gltf_path_root = "resources/gltf/DamagedHelmet/";
+    gltf_path:cstring = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf";
+
+    //state.gltf_path_root = "resources/gltf/Triangle/";
+    //gltf_path:cstring = "resources/gltf/Triangle/Triangle.gltf";
+
     sfetch.send({
-        path = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf",
+        path = gltf_path,
         callback = proc "c" (response: ^sfetch.Response) {
             if response.dispatched {
                 sfetch.bind_buffer(response.handle, sfetch_buffers[response.channel][response.lane][:]);
@@ -544,6 +560,15 @@ test_window :: proc(ctx: ^mu.Context) {
             mu_label_printf(ctx, "%d, %d", window.rect.x, window.rect.y);
             mu.label(ctx, "Size:");
             mu_label_printf(ctx, "%d, %d", window.rect.w, window.rect.h);
+
+            mu.label(ctx, "camera eye pos");
+
+            mu.layout_begin_column(ctx);
+            mu_layout_row(ctx, 2, { 46, -1 }, 0);
+            mu.label(ctx, "x:"); mu.slider(ctx, &state.camera.eye_pos[0], 0, 10.0);
+            mu.label(ctx, "y:"); mu.slider(ctx, &state.camera.eye_pos[1], 0, 10.0);
+            mu.label(ctx, "z:"); mu.slider(ctx, &state.camera.eye_pos[2], 0, 10.0);
+            mu.layout_end_column(ctx);
         }
 
         /* background color sliders */
@@ -609,6 +634,20 @@ frame_callback :: proc "c" () {
 	mvp := translate_matrix4(position);
 
     //
+    // update scene
+    //
+    state.root_transform = rotate_matrix4(Vector3{0, 1, 0}, cast(f32)elapsed_seconds);
+
+    // update camera
+    w:f32 = cast(f32) sapp.width();
+    h:f32 = cast(f32) sapp.height();
+    proj := perspective(60.0, w/h, 0.01, 100.0);
+    v3 :: inline proc(x, y, z: $T) -> Vector3 do return Vector3 { cast(f32)x, cast(f32)y, cast(f32)z };
+    UP := v3(0, 1, 0);
+    view := look_at(state.camera.eye_pos, Vector3 { 0.0, 0.0, 0.0 }, UP);
+    state.camera.view_proj = mul(proj, view);
+
+    //
     // MICROUI
     //
     {
@@ -644,7 +683,10 @@ frame_callback :: proc "c" () {
 
     sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
 
-    {
+    draw_quad := false;
+
+    // DRAW MOVABLE QUAD
+    if draw_quad {
         sg.apply_pipeline(state.pip);
         sg.apply_bindings(state.bind);
 
@@ -659,6 +701,63 @@ frame_callback :: proc "c" () {
         sg.draw(0, 6, 1);
     }
 
+    // DRAW MESH
+    {
+        using state.scene;
+        for _, node_index in nodes {
+            node := &nodes[node_index];
+            vs_params := shader_meta.vs_params {
+                model = mul(state.root_transform, node.transform),
+                view_proj = state.camera.view_proj,
+                eye_pos = state.camera.eye_pos,
+            };
+            mesh := &meshes[node.mesh];
+            for i in 0..<mesh.num_primitives {
+                prim := &sub_meshes[i + mesh.first_primitive];
+                metallic := &materials[prim.material];
+                sg.apply_pipeline(pipelines[prim.pipeline]);
+                bind := sg.Bindings {};
+                for vb_slot in 0..<prim.vertex_buffers.num {
+                    bind.vertex_buffers[vb_slot] = buffers[prim.vertex_buffers.buffer[vb_slot]];
+                }
+                if prim.index_buffer != SCENE_INVALID_INDEX {
+                    bind.index_buffer = buffers[prim.index_buffer];
+                }
+                sg.apply_uniforms(sg.Shader_Stage.VS, shader_meta.SLOT_vs_params, &vs_params, size_of(vs_params));
+                sg.apply_uniforms(sg.Shader_Stage.FS, shader_meta.SLOT_light_params, &state.point_light, size_of(state.point_light));
+                //if mat.is_metallic {
+                    base_color_tex := images[metallic.images.base_color];
+                    metallic_roughness_tex := images[metallic.images.metallic_roughness];
+                    normal_tex := images[metallic.images.normal];
+                    occlusion_tex := images[metallic.images.occlusion];
+                    emissive_tex := images[metallic.images.emissive];
+                    if base_color_tex.id == 0 do base_color_tex = state.placeholders.white;
+                    if metallic_roughness_tex.id == 0 do metallic_roughness_tex = state.placeholders.white;
+                    if normal_tex.id == 0 do normal_tex = state.placeholders.normal;
+                    if occlusion_tex.id == 0 do occlusion_tex = state.placeholders.white;
+                    if emissive_tex.id == 0 do emissive_tex = state.placeholders.black;
+                    bind.fs_images[shader_meta.SLOT_base_color_texture] = base_color_tex;
+                    bind.fs_images[shader_meta.SLOT_metallic_roughness_texture] = metallic_roughness_tex;
+                    bind.fs_images[shader_meta.SLOT_normal_texture] = normal_tex;
+                    bind.fs_images[shader_meta.SLOT_occlusion_texture] = occlusion_tex;
+                    bind.fs_images[shader_meta.SLOT_emissive_texture] = emissive_tex;
+                    sg.apply_uniforms(sg.Shader_Stage.FS,
+                        shader_meta.SLOT_metallic_params,
+                        &metallic.fs_params,
+                        size_of(shader_meta.metallic_params));
+                //} else {
+                    //assert(false, "nonmetallic is unimplemented");
+                //}
+
+                sg.apply_bindings(bind);
+
+                //fmt.println("drawing", prim.num_elements, "for submesh", i);
+                sg.draw(cast(int)prim.base_element, cast(int)prim.num_elements, 1);
+            }
+        }
+    }
+
+    // DRAW SDF TEXT
     {
         u_matrix := ortho3d(0, WINDOW_WIDTH, 0, WINDOW_HEIGHT, -10.0, 10.0);
 
@@ -684,10 +783,11 @@ frame_callback :: proc "c" () {
         sg.draw(0, num_verts, 1);
     }
 
+
+    // DRAW UI
     r_draw();
 
     sg.end_pass();
-
 	sg.commit();
 }
 

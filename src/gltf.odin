@@ -169,6 +169,7 @@ gltf_parse :: proc(bytes: []u8) {
                 } else {
                     // hmm... looking up the number of elements to render from
                     // a random vertex component accessor looks a bit shady
+                    fmt.print("SCENE_INVALID_INDEX");
                     index_buffer = SCENE_INVALID_INDEX;
                     base_element = 0;
                     num_elements = cast(i32) gltf_prim.attributes.data.count;
@@ -211,7 +212,7 @@ build_transform_for_gltf_node :: proc(gltf: ^cgltf.Data, node: ^cgltf.Node) -> M
             t = translate_matrix4(Vector3{node.translation[0], node.translation[1], node.translation[2]});
         }
         if node.has_rotation != 0 {
-            r = rotate_matrix4x4_quat(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
+            //r = rotate_matrix4x4_quat(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
         }
         if node.has_scale != 0 {
             s = scale_matrix4(identity(Matrix4), Vector3{node.scale[0], node.scale[1], node.scale[2]});
@@ -387,6 +388,8 @@ create_sg_buffers_for_gltf_buffer :: proc(gltf_buffer_index: int, bytes: []u8) {
         if p.gltf_buffer_index == gltf_buffer_index {
             msg := fmt.tprint("assertion failed", p, len(bytes));
             assert(cast(int)(p.offset + p.size) <= len(bytes), msg);
+
+            fmt.println("init buffer", p.type, "with size", p.size);
             sg.init_buffer(buf, {
                 type = p.type,
                 size = p.size,
