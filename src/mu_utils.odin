@@ -97,7 +97,7 @@ r_begin :: proc(w, h: int) {
     sgl.texture(state.mu_atlas_img);
     sgl.matrix_mode_projection();
     sgl.push_matrix();
-    sgl.ortho(0.0, cast(f32)WINDOW_WIDTH, cast(f32)WINDOW_HEIGHT, 0.0, -1.0, +1.0);
+    sgl.ortho(0.0, cast(f32)w, cast(f32)h, 0.0, -1.0, +1.0);
     sgl.begin_quads();
 }
 
