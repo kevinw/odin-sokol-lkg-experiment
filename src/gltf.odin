@@ -378,6 +378,7 @@ gltf_image_fetch_callback :: proc "c" (response: ^sfetch.Response) {
             mem.slice_ptr(cast(^u8)response.buffer_ptr, cast(int)response.fetched_size));
     }
     if response.finished && response.failed {
+        fmt.eprintln("error fetching image");
         state.failed = true;
     }
 }
@@ -386,10 +387,7 @@ create_sg_buffers_for_gltf_buffer :: proc(gltf_buffer_index: int, bytes: []u8) {
     for buf, i in state.scene.buffers {
         p := &state.creation_params.buffers[i];
         if p.gltf_buffer_index == gltf_buffer_index {
-            msg := fmt.tprint("assertion failed", p, len(bytes));
-            assert(cast(int)(p.offset + p.size) <= len(bytes), msg);
-
-            fmt.println("init buffer", p.type, "with size", p.size);
+            assert(cast(int)(p.offset + p.size) <= len(bytes));
             sg.init_buffer(buf, {
                 type = p.type,
                 size = p.size,
@@ -416,13 +414,13 @@ gltf_to_sg_filter :: proc(gltf_filter: i32) -> sg.Filter {
     // https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#samplerminfilter
 
     switch gltf_filter {
-        case 9728: return sg.Filter.NEAREST;
-        case 9729: return sg.Filter.LINEAR;
-        case 9984: return sg.Filter.NEAREST_MIPMAP_NEAREST;
-        case 9985: return sg.Filter.LINEAR_MIPMAP_NEAREST;
-        case 9986: return sg.Filter.NEAREST_MIPMAP_LINEAR;
-        case 9987: return sg.Filter.LINEAR_MIPMAP_LINEAR;
-        case:      return sg.Filter.LINEAR;
+        case 9728: return .NEAREST;
+        case 9729: return .LINEAR;
+        case 9984: return .NEAREST_MIPMAP_NEAREST;
+        case 9985: return .LINEAR_MIPMAP_NEAREST;
+        case 9986: return .NEAREST_MIPMAP_LINEAR;
+        case 9987: return .LINEAR_MIPMAP_LINEAR;
+        case:      return .LINEAR;
     }
 }
 
@@ -430,10 +428,10 @@ gltf_to_sg_wrap :: proc(gltf_wrap: i32) -> sg.Wrap {
     // https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#samplerwraps
 
     switch gltf_wrap {
-        case 33071: return sg.Wrap.CLAMP_TO_EDGE;
-        case 33648: return sg.Wrap.MIRRORED_REPEAT;
-        case 10497: return sg.Wrap.REPEAT;
-        case:       return sg.Wrap.REPEAT;
+        case 33071: return .CLAMP_TO_EDGE;
+        case 33648: return .MIRRORED_REPEAT;
+        case 10497: return .REPEAT;
+        case:       return .REPEAT;
     }
 }
 
@@ -462,7 +460,7 @@ gltf_to_prim_type :: proc(prim_type: cgltf.Primitive_Type) -> sg.Primitive_Type 
 gltf_to_index_type :: proc(prim: ^cgltf.Primitive) -> sg.Index_Type {
     if prim.indices == nil do return sg.Index_Type.NONE;
 
-    if prim.indices.component_type == cgltf.Component_Type.R_16U {
+    if prim.indices.component_type == .R_16U {
         return sg.Index_Type.UINT16;
     } else {
         return sg.Index_Type.UINT32;

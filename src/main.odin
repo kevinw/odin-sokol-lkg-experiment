@@ -565,9 +565,9 @@ test_window :: proc(ctx: ^mu.Context) {
 
             mu.layout_begin_column(ctx);
             mu_layout_row(ctx, 2, { 46, -1 }, 0);
-            mu.label(ctx, "x:"); mu.slider(ctx, &state.camera.eye_pos[0], 0, 10.0);
-            mu.label(ctx, "y:"); mu.slider(ctx, &state.camera.eye_pos[1], 0, 10.0);
-            mu.label(ctx, "z:"); mu.slider(ctx, &state.camera.eye_pos[2], 0, 10.0);
+            mu.label(ctx, "x:"); mu.slider(ctx, &state.camera.eye_pos[0], -20.0, 20.0);
+            mu.label(ctx, "y:"); mu.slider(ctx, &state.camera.eye_pos[1], -20.0, 20.0);
+            mu.label(ctx, "z:"); mu.slider(ctx, &state.camera.eye_pos[2], -20.0, 20.0);
             mu.layout_end_column(ctx);
         }
 
@@ -759,7 +759,7 @@ frame_callback :: proc "c" () {
 
     // DRAW SDF TEXT
     {
-        u_matrix := ortho3d(0, WINDOW_WIDTH, 0, WINDOW_HEIGHT, -10.0, 10.0);
+        u_matrix := ortho3d(0, cast(f32)sapp.width(), 0, cast(f32)sapp.height(), -10.0, 10.0);
 
         vs_uniforms := shader_meta.sdf_vs_uniforms {
             u_matrix = u_matrix,
