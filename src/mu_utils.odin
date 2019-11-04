@@ -29,6 +29,12 @@ r_get_text_height :: proc() -> i32 {
     return 18;
 }
 
+mu_checkbox :: proc(ctx: ^mu.Context, val: ^bool, label: cstring) {
+    bool_val:i32 = val^ ? 1 : 0;
+    mu.checkbox(ctx, &bool_val, label);
+    val^ = bool_val == 1 ? true : false;
+}
+
 mu_label_printf :: proc(ctx: ^mu.Context, fmt_str: string, args: ..any) {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := strings.builder_from_slice(data[:]);

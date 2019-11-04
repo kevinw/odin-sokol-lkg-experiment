@@ -24,7 +24,7 @@ WINDOW_HEIGHT :: 720;
 
 SFETCH_NUM_CHANNELS :: 1;
 SFETCH_NUM_LANES :: 4;
-MAX_FILE_SIZE :: 1024*1024;
+MAX_FILE_SIZE :: 10*1024*1024;
 
 sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 
@@ -99,7 +99,6 @@ state: struct {
     font_normal_data: [256 * 1024]u8, // TODO: use a smaller buffer and the streaming capability of sokol-fetch
 
     // mesh
-    gltf_path_root: string,
     shaders: struct {
         metallic: sg.Shader,
     },
@@ -112,7 +111,6 @@ state: struct {
         nodes: [dynamic]Node,
         sub_meshes: [dynamic]Sub_Mesh,
         pipelines: [dynamic]sg.Pipeline,
-        
     },
     camera: Camera,
     placeholders: struct { white, normal, black: sg.Image },
@@ -124,6 +122,9 @@ state: struct {
         buffers: [dynamic]Buffer_Creation_Params,
         images: [dynamic]Image_Creation_Params,
     },
+
+    auto_rotate: bool,
+
 };
 
 mu_ctx: mu.Context;
@@ -289,11 +290,11 @@ font_normal_loaded :: proc "c" (response: ^sfetch.Response) {
     pixel_format: sg.Pixel_Format;
     switch channels {
         case 1:
-            pixel_format = sg.Pixel_Format.R8;
+            pixel_format = .R8;
         case 3:
             panic("unimplemented");
         case 4:
-            pixel_format = sg.Pixel_Format.RGBA8;
+            pixel_format = .RGBA8;
         case:
             panic("unexpected number of channels");
     }
@@ -302,8 +303,8 @@ font_normal_loaded :: proc "c" (response: ^sfetch.Response) {
         width = width,
         height = height,
         pixel_format = pixel_format,
-        min_filter = sg.Filter.LINEAR,
-        mag_filter = sg.Filter.LINEAR,
+        min_filter = .LINEAR,
+        mag_filter = .LINEAR,
     };
 
     image_desc.content.subimage[0][0] = {
@@ -415,12 +416,7 @@ init_callback :: proc "c" () {
     };
 
     // request the mesh GLTF file
-
-    state.gltf_path_root = "resources/gltf/DamagedHelmet/";
-    gltf_path:cstring = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf";
-
-    //state.gltf_path_root = "resources/gltf/Triangle/";
-    //gltf_path:cstring = "resources/gltf/Triangle/Triangle.gltf";
+    gltf_path:cstring = "resources/gltf/SampleModels/TriangleWithoutIndices/glTF/TriangleWithoutIndices.gltf";
 
     sfetch.send({
         path = gltf_path,
@@ -429,7 +425,8 @@ init_callback :: proc "c" () {
                 sfetch.bind_buffer(response.handle, sfetch_buffers[response.channel][response.lane][:]);
             } else if response.fetched {
                 // file has been loaded, parse as GLTF
-                gltf_parse(mem.slice_ptr(cast(^u8)response.buffer_ptr, cast(int)response.fetched_size));
+                bytes := mem.slice_ptr(cast(^u8)response.buffer_ptr, cast(int)response.fetched_size);
+                gltf_parse(bytes, dirname(cast(string)response.path));
             }
             if response.finished && response.failed {
                 state.failed = true;
@@ -594,6 +591,15 @@ test_window :: proc(ctx: ^mu.Context) {
             mu.label(ctx, "fov:"); mu.slider(ctx, &state.camera.fov, 1, 200);
 
             mu.label(ctx, "print"); mu.checkbox(ctx, &do_print, "");
+            mu.label(ctx, "rotate"); mu_checkbox(ctx, &state.auto_rotate, "");
+
+            for row_index in 0..<4 {
+                row := &state.camera.view_proj[row_index];
+                mu_layout_row(ctx, 1, { 300, -1 }, 0);
+                mu.label(ctx, strings.clone_to_cstring(
+                    fmt.tprintf("%f  %f  %f  %f", row[0], row[1], row[2], row[3]),
+                    context.temp_allocator));
+            }
 
         }
 
@@ -675,31 +681,23 @@ frame_callback :: proc "c" () {
     //
     // update scene
     //
-    state.root_transform = rotate_matrix4(Vector3{0, 1, 0}, cast(f32)now_seconds);
+    state.root_transform = state.auto_rotate ? rotate_matrix4(Vector3{0, 1, 0}, cast(f32)now_seconds) : identity(Matrix4);
 
     // update camera
     {
-        aspect:f32 = cast(f32)sapp.width() / cast(f32)sapp.height();
-        proj := perspective(deg2rad(state.camera.fov), aspect, 0.01, 100.0);
+        using state.camera;
         {
             using key_state;
-            using state.camera;
             if w do eye_pos.z += dt;
             if a do eye_pos.x -= dt;
             if s do eye_pos.z -= dt;
             if d do eye_pos.x += dt;
         }
 
-        target := Vector3 {};
-        if do_print != 0 {
-            x := target;
-            fmt.println(target);
-            assert(x == target);
-        }
-
-        view := look_at(state.camera.eye_pos, target, Vector3 { 0, 1, 0 });
-        state.camera.view_proj = mul(proj, view);
-        //fmt.println(state.camera.view_proj);
+        aspect:f32 = cast(f32)sapp.width() / cast(f32)sapp.height();
+        proj := perspective(deg2rad(fov), aspect, 0.01, 100.0);
+        view := look_at(eye_pos, Vector3{0, 0, 0}, Vector3 { 0, 1, 0 });
+        view_proj = mul(proj, view);
     }
 
     //
@@ -709,9 +707,7 @@ frame_callback :: proc "c" () {
         // microui definition
         mu.begin(&mu_ctx);
         defer mu.end(&mu_ctx);
-
         test_window(&mu_ctx);
-
     }
     {
         // microui rendering
@@ -748,7 +744,6 @@ frame_callback :: proc "c" () {
     if draw_quad {
         sg.apply_pipeline(state.pip);
         sg.apply_bindings(state.bind);
-
         vs_uniforms := shader_meta.vs_uniforms {
             mvp = mvp,
         };
@@ -773,7 +768,6 @@ frame_callback :: proc "c" () {
             mesh := &meshes[node.mesh];
             for i in 0..<mesh.num_primitives {
                 prim := &sub_meshes[i + mesh.first_primitive];
-                metallic := &materials[prim.material];
                 sg.apply_pipeline(pipelines[prim.pipeline]);
                 bind := sg.Bindings {};
                 for vb_slot in 0..<prim.vertex_buffers.num {
@@ -785,25 +779,35 @@ frame_callback :: proc "c" () {
                 sg.apply_uniforms(sg.Shader_Stage.VS, shader_meta.SLOT_vs_params, &vs_params, size_of(vs_params));
                 sg.apply_uniforms(sg.Shader_Stage.FS, shader_meta.SLOT_light_params, &state.point_light, size_of(state.point_light));
                 //if mat.is_metallic {
-                    base_color_tex := images[metallic.images.base_color];
-                    metallic_roughness_tex := images[metallic.images.metallic_roughness];
-                    normal_tex := images[metallic.images.normal];
-                    occlusion_tex := images[metallic.images.occlusion];
-                    emissive_tex := images[metallic.images.emissive];
-                    if base_color_tex.id == 0 do base_color_tex = state.placeholders.white;
-                    if metallic_roughness_tex.id == 0 do metallic_roughness_tex = state.placeholders.white;
-                    if normal_tex.id == 0 do normal_tex = state.placeholders.normal;
-                    if occlusion_tex.id == 0 do occlusion_tex = state.placeholders.white;
-                    if emissive_tex.id == 0 do emissive_tex = state.placeholders.black;
-                    bind.fs_images[shader_meta.SLOT_base_color_texture] = base_color_tex;
-                    bind.fs_images[shader_meta.SLOT_metallic_roughness_texture] = metallic_roughness_tex;
-                    bind.fs_images[shader_meta.SLOT_normal_texture] = normal_tex;
-                    bind.fs_images[shader_meta.SLOT_occlusion_texture] = occlusion_tex;
-                    bind.fs_images[shader_meta.SLOT_emissive_texture] = emissive_tex;
-                    sg.apply_uniforms(sg.Shader_Stage.FS,
-                        shader_meta.SLOT_metallic_params,
-                        &metallic.fs_params,
-                        size_of(shader_meta.metallic_params));
+
+                    {
+                        base_color_tex := state.placeholders.white;
+                        metallic_roughness_tex := state.placeholders.white;
+                        normal_tex := state.placeholders.normal;
+                        occlusion_tex := state.placeholders.white;
+                        emissive_tex := state.placeholders.black;
+
+                        if prim.material != -1 {
+                            metallic := &materials[prim.material];
+
+                            sg.apply_uniforms(sg.Shader_Stage.FS,
+                                shader_meta.SLOT_metallic_params,
+                                &metallic.fs_params,
+                                size_of(shader_meta.metallic_params));
+
+                            using metallic.images;
+                            if images[base_color].id != 0 do base_color_tex = images[base_color];
+                            if images[metallic_roughness].id != 0 do metallic_roughness_tex = images[metallic_roughness];
+                            if images[normal].id != 0 do normal_tex = images[normal];
+                            if images[occlusion].id != 0 do occlusion_tex = images[occlusion];
+                            if images[emissive].id != 0 do emissive_tex = images[emissive];
+                        }
+                        bind.fs_images[shader_meta.SLOT_base_color_texture] = base_color_tex;
+                        bind.fs_images[shader_meta.SLOT_metallic_roughness_texture] = metallic_roughness_tex;
+                        bind.fs_images[shader_meta.SLOT_normal_texture] = normal_tex;
+                        bind.fs_images[shader_meta.SLOT_occlusion_texture] = occlusion_tex;
+                        bind.fs_images[shader_meta.SLOT_emissive_texture] = emissive_tex;
+                    }
                 //} else {
                     //assert(false, "nonmetallic is unimplemented");
                 //}

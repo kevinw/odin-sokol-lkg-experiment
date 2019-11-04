@@ -10,11 +10,32 @@ import sfetch "sokol:sokol_fetch"
 import "../lib/cgltf"
 import "../lib/basisu"
 import "./shader_meta"
+import "shared:odin-stb/stbi"
 
-VERBOSE :: false;
+VERBOSE :: true;
+
+Image_Type :: enum {
+    Unknown,
+    Basis,
+    PNG,
+    JPEG,
+}
+
+check_cast_i32 :: proc(n: $T) -> i32 {
+    return cast(i32)n; // TODO
+}
+
+image_type_for_ext :: proc(ext: string) -> Image_Type {
+    switch ext {
+        case "png": return .PNG;
+        case "jpeg", "jpg": return .JPEG;
+        case "basis": return .Basis;
+    }
+    return .Unknown;
+}
 
 GLTF_Buffer_Fetch_Userdata :: struct { buffer_index: int };
-GLTF_Image_Fetch_Userdata :: struct { image_index: int }
+GLTF_Image_Fetch_Userdata :: struct { image_index: int, image_type: Image_Type, full_uri: string }
 
 MSAA_SAMPLE_COUNT :: 1;
 
@@ -34,7 +55,12 @@ safe_cast_i16 :: inline proc(n: $T) -> i16 {
     return cast(i16)n;
 }
 
-gltf_parse :: proc(bytes: []u8) {
+optional_i16_offset :: proc(ptr: ^$T, base: ^T) -> i16 {
+    if ptr == nil do return -1; // TODO: not sure keeping an index here is the right thing to do
+    return safe_cast_i16(mem.ptr_sub(ptr, base));
+}
+
+gltf_parse :: proc(bytes: []u8, path_root: string) {
     options := cgltf.Options{};
     gltf:^cgltf.Data;
 
@@ -71,7 +97,7 @@ gltf_parse :: proc(bytes: []u8) {
         for _, i in buffers {
             gltf_buf := &buffers[i];
             user_data := GLTF_Buffer_Fetch_Userdata { buffer_index = i };
-            full_uri := fmt.tprintf("%s%s", state.gltf_path_root, gltf_buf.uri);
+            full_uri := fmt.tprintf("%s%s", path_root, gltf_buf.uri);
             when VERBOSE do fmt.println("<-", full_uri);
             sfetch.send({
                 path = strings.clone_to_cstring(full_uri, context.temp_allocator), // @Speed
@@ -102,10 +128,21 @@ gltf_parse :: proc(bytes: []u8) {
         images := mem.slice_ptr(gltf.images, gltf.images_count);
         for _, i in images {
             using img := &images[i];
-            user_data := GLTF_Image_Fetch_Userdata { image_index = i };
 
-            full_uri := fmt.tprintf("%s%s", state.gltf_path_root, uri);
+            full_uri := fmt.aprintf("%s%s", path_root, uri);
+            user_data := GLTF_Image_Fetch_Userdata {
+                image_index = i,
+                full_uri = full_uri,
+            };
+            // TODO: leak
             when VERBOSE do fmt.println("loading", full_uri);
+
+            last_dot := strings.last_index(full_uri, ".");
+            if last_dot != -1 && last_dot + 1 < len(full_uri) {
+                ext := full_uri[last_dot + 1:];
+                user_data.image_type = image_type_for_ext(ext);
+            }
+
             sfetch.send({
                 path = strings.clone_to_cstring(full_uri, context.temp_allocator),
                 callback = gltf_image_fetch_callback,
@@ -129,13 +166,15 @@ gltf_parse :: proc(bytes: []u8) {
             for d in 0..<3 do scene_mat.fs_params.emissive_factor[d] = mat.emissive_factor[d];
             scene_mat.fs_params.metallic_factor = metallic_factor;
             scene_mat.fs_params.roughness_factor = roughness_factor;
+
             scene_mat.images = {
-                base_color = safe_cast_i16(mem.ptr_sub(base_color_texture.texture, gltf.textures)),
-                metallic_roughness = safe_cast_i16(mem.ptr_sub(metallic_roughness_texture.texture, gltf.textures)),
-                normal = safe_cast_i16(mem.ptr_sub(mat.normal_texture.texture, gltf.textures)),
-                occlusion = safe_cast_i16(mem.ptr_sub(mat.occlusion_texture.texture, gltf.textures)),
-                emissive = safe_cast_i16(mem.ptr_sub(mat.emissive_texture.texture, gltf.textures)),
+                base_color = optional_i16_offset(base_color_texture.texture, gltf.textures),
+                metallic_roughness = optional_i16_offset(metallic_roughness_texture.texture, gltf.textures),
+                normal = optional_i16_offset(mat.normal_texture.texture, gltf.textures),
+                occlusion = optional_i16_offset(mat.occlusion_texture.texture, gltf.textures),
+                emissive = optional_i16_offset(mat.emissive_texture.texture, gltf.textures),
             };
+
             append(&state.scene.materials, scene_mat);
         }
     }
@@ -159,10 +198,10 @@ gltf_parse :: proc(bytes: []u8) {
                 using sub_mesh := &state.scene.sub_meshes[len(&state.scene.sub_meshes) - 1];
                 vertex_buffers = create_vertex_buffer_mapping_for_gltf_primitive(gltf, gltf_prim);
                 pipeline = safe_cast_i16(create_sg_pipeline_for_gltf_primitive(gltf, gltf_prim, &vertex_buffers));
-                material = safe_cast_i16(mem.ptr_sub(gltf_prim.material, gltf.materials));
+                material = optional_i16_offset(gltf_prim.material, gltf.materials);
                 if gltf_prim.indices != nil {
                     index_buffer = safe_cast_i16(mem.ptr_sub(gltf_prim.indices.buffer_view, gltf.buffer_views));
-                    assert(state.creation_params.buffers[index_buffer].type == sg.Buffer_Type.INDEXBUFFER);
+                    //assert(state.creation_params.buffers[index_buffer].type == .INDEXBUFFER, fmt.tprint("expected .INDEXBUFFER, found ", state.creation_params.buffers[index_buffer].type));
                     assert(gltf_prim.indices.stride != 0);
                     base_element = 0;
                     num_elements = cast(i32) gltf_prim.indices.count;
@@ -184,7 +223,6 @@ gltf_parse :: proc(bytes: []u8) {
     nodes := mem.slice_ptr(gltf.nodes, gltf.nodes_count);
     for _, i in nodes {
         gltf_node := &nodes[i];
-
         // ignore nodes without mesh, those are not relevant since we
         // bake the transform hierarchy into per-node world space transforms
         if gltf_node.mesh != nil {
@@ -224,6 +262,8 @@ build_transform_for_gltf_node :: proc(gltf: ^cgltf.Data, node: ^cgltf.Node) -> M
 }
 
 rotate_matrix4x4_quat :: proc(q_x, q_y, q_z, q_w: f32) -> Matrix4x4 {
+    // thanks Unity decompiled
+
     // Precalculate coordinate products
     x := q_x * 2.0;
     y := q_y * 2.0;
@@ -283,14 +323,15 @@ create_sg_layout_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Prim
         attr_slot := gltf_attr_type_to_vs_input_slot(attr.type);
         if (attr_slot != SCENE_INVALID_INDEX) {
             layout.attrs[attr_slot].format = gltf_to_vertex_format(attr.data);
+
+            buffer_view_index := mem.ptr_sub(attr.data.buffer_view, gltf.buffer_views);
+            for vb_slot :i32= 0; vb_slot < vbuf_map.num; vb_slot+=1 {
+                if vbuf_map.buffer[vb_slot] == cast(i32)buffer_view_index {
+                    layout.attrs[attr_slot].buffer_index = vb_slot;
+                }
+            }
         } else {
             fmt.eprintln("error: attr_slot was SCENE_INVALID_INDEX");
-        }
-        buffer_view_index := mem.ptr_sub(attr.data.buffer_view, gltf.buffer_views);
-        for vb_slot :i32= 0; vb_slot < vbuf_map.num; vb_slot+=1 {
-            if vbuf_map.buffer[vb_slot] == cast(i32)buffer_view_index {
-                layout.attrs[attr_slot].buffer_index = vb_slot;
-            }
         }
     }
 
@@ -301,11 +342,14 @@ create_sg_layout_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Prim
 // maintains a cache of shared, unique pipeline objects. Returns an index
 // into state.scene.pipelines
 create_sg_pipeline_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Primitive, vbuf_map: ^Vertex_Buffer_Mapping) -> i32 {
+    assert(gltf != nil, "gtlf data cannot be nil");
+    assert(prim != nil, "prim cannot be null");
+
     pip_params := Pipeline_Cache_Params {
         layout = create_sg_layout_for_gltf_primitive(gltf, prim, vbuf_map),
         prim_type = gltf_to_prim_type(prim.type),
         index_type = gltf_to_index_type(prim),
-        alpha = prim.material.alpha_mode != cgltf.Alpha_Mode.OPAQUE
+        alpha = prim.material != nil && prim.material.alpha_mode != cgltf.Alpha_Mode.OPAQUE
     };
 
 
@@ -321,7 +365,7 @@ create_sg_pipeline_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Pr
 
     if i == len(state.scene.pipelines) && len(state.scene.pipelines) < SCENE_MAX_PIPELINES {
         append(&state.pip_cache, pip_params);
-        is_metallic:bool = prim.material.has_pbr_metallic_roughness != 0 ? true : false;
+        is_metallic:bool = prim.material == nil || prim.material.has_pbr_metallic_roughness != 0 ? true : false;
         assert(is_metallic, "exptecting metallic for now");
         append(&state.scene.pipelines, sg.make_pipeline({
             layout = pip_params.layout,
@@ -330,7 +374,7 @@ create_sg_pipeline_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Pr
             index_type = pip_params.index_type,
             depth_stencil = {
                 depth_write_enabled = !pip_params.alpha,
-                depth_compare_func = sg.Compare_Func.LESS_EQUAL,
+                depth_compare_func = .LESS_EQUAL,
             },
             blend = {
                 enabled = pip_params.alpha,
@@ -368,19 +412,22 @@ gltf_buffer_fetch_callback :: proc "c" (response: ^sfetch.Response) {
 }
 
 gltf_image_fetch_callback :: proc "c" (response: ^sfetch.Response) {
+    user_data := cast(^GLTF_Image_Fetch_Userdata)response.user_data;
     if response.dispatched {
         sfetch.bind_buffer(response.handle, sfetch_buffers[response.channel][response.lane][:]);
     } else if response.fetched {
-        user_data := cast(^GLTF_Image_Fetch_Userdata)response.user_data;
         gltf_image_index := cast(int)user_data.image_index;
         create_sg_images_for_gltf_image(
             gltf_image_index,
+            user_data.image_type,
             mem.slice_ptr(cast(^u8)response.buffer_ptr, cast(int)response.fetched_size));
     }
     if response.finished && response.failed {
-        fmt.eprintln("error fetching image");
+        fmt.eprintln("error fetching image:", user_data.full_uri);
         state.failed = true;
     }
+
+    //free(user_data.full_uri); // TODO: crashes, because no context in proc "C" ? maybe?
 }
 
 create_sg_buffers_for_gltf_buffer :: proc(gltf_buffer_index: int, bytes: []u8) {
@@ -397,13 +444,35 @@ create_sg_buffers_for_gltf_buffer :: proc(gltf_buffer_index: int, bytes: []u8) {
     }
 }
 
-create_sg_images_for_gltf_image :: proc(gltf_image_index: int, bytes: []u8) {
+create_sg_images_for_gltf_image :: proc(gltf_image_index: int, image_type: Image_Type, bytes: []u8) {
     for _, i in state.scene.images {
         p := &state.creation_params.images[i];
-        if p.gltf_image_index == gltf_image_index {
-            img_desc := basisu.transcode(bytes);
-            state.scene.images[i] = sg.make_image(img_desc);
-            basisu.free(&img_desc);
+        if p.gltf_image_index != gltf_image_index do continue;
+        // @Speed should we make a new sg.Image for each one?
+        switch image_type {
+            case .JPEG, .PNG:
+                desired_channels :: 4;
+                x, y, channels_in_file: i32;
+                res := stbi.load_from_memory(&bytes[0], check_cast_i32(len(bytes)), &x, &y, &channels_in_file, desired_channels);
+                assert(res != nil, "stbi could load image from memory");
+                defer stbi.image_free(res);
+
+                assert(x > 0 && y > 0);
+                img_desc := sg.Image_Desc {
+                    width = x,
+                    height = y,
+                    pixel_format = sg.Pixel_Format.RGBA8,
+                    min_filter = sg.Filter.LINEAR,
+                    mag_filter = sg.Filter.LINEAR,
+                };
+                img_desc.content.subimage[0][0] = { ptr = res, size = x * y * desired_channels };
+                state.scene.images[i] = sg.make_image(img_desc);
+            case .Basis:
+                img_desc := basisu.transcode(bytes);
+                state.scene.images[i] = sg.make_image(img_desc);
+                basisu.free(&img_desc);
+            case:
+                assert(false, "unhandled image type");
         }
     }
 }
