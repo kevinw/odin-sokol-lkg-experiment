@@ -416,7 +416,8 @@ init_callback :: proc "c" () {
     };
 
     // request the mesh GLTF file
-    gltf_path:cstring = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf";
+    //gltf_path:cstring = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf";
+    gltf_path:cstring = "resources/gltf/BevelBox/BevelBox.gltf";
 
     sfetch.send({
         path = gltf_path,

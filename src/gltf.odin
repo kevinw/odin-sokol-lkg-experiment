@@ -65,15 +65,31 @@ gltf_parse :: proc(bytes: []u8, path_root: string) {
     gltf:^cgltf.Data;
 
     result := cgltf.parse(&options, &bytes[0], len(bytes), &gltf);
-    if result != cgltf.Result.SUCCESS {
+    if result != .SUCCESS {
         fmt.eprintln("error parsing gltf");
         return;
     }
-
     defer cgltf.free(gltf);
 
-    //all := fmt.tprint("%s", gltf);
-    //os.write_entire_file("test.data", mem.slice_ptr(&all[0], len(all)));
+    //
+    // check for index buffer usage
+    //
+    used_as_index := make([]bool, gltf.buffer_views_count);
+    defer delete(used_as_index);
+
+    meshes := mem.slice_ptr(gltf.meshes, gltf.meshes_count);
+    for _, i in meshes {
+        gltf_mesh := &meshes[i];
+        primitives := mem.slice_ptr(gltf_mesh.primitives, gltf_mesh.primitives_count);
+        for _, prim_index in primitives {
+            indices := primitives[prim_index].indices;
+            if indices != nil {
+                buffer_index := safe_cast_i16(mem.ptr_sub(indices.buffer_view, gltf.buffer_views));
+                used_as_index[buffer_index] = true;
+            }
+        }
+    }
+
 
     //
     // parse buffers
@@ -83,11 +99,12 @@ gltf_parse :: proc(bytes: []u8, path_root: string) {
         buffer_views := mem.slice_ptr(gltf.buffer_views, gltf.buffer_views_count);
         for _, i in buffer_views {
             using buf_view := &buffer_views[i];
+            buffer_index := mem.ptr_sub(buffer, gltf.buffers);
             append(&state.creation_params.buffers, Buffer_Creation_Params{
-                gltf_buffer_index = mem.ptr_sub(buffer, gltf.buffers),
+                gltf_buffer_index = buffer_index,
                 offset = cast(i32)offset,
                 size = cast(i32)size,
-                type = type == .INDICES ? .INDEXBUFFER : .VERTEXBUFFER,
+                type = type == .INDICES || used_as_index[i] ? .INDEXBUFFER : .VERTEXBUFFER,
             });
             append(&state.scene.buffers, sg.alloc_buffer());
         }
@@ -351,7 +368,6 @@ create_sg_pipeline_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Pr
         index_type = gltf_to_index_type(prim),
         alpha = prim.material != nil && prim.material.alpha_mode != cgltf.Alpha_Mode.OPAQUE
     };
-
 
     i := 0;
     for _, p in state.scene.pipelines {
