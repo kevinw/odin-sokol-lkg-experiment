@@ -416,7 +416,7 @@ init_callback :: proc "c" () {
     };
 
     // request the mesh GLTF file
-    gltf_path:cstring = "resources/gltf/SampleModels/TriangleWithoutIndices/glTF/TriangleWithoutIndices.gltf";
+    gltf_path:cstring = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf";
 
     sfetch.send({
         path = gltf_path,
@@ -796,11 +796,11 @@ frame_callback :: proc "c" () {
                                 size_of(shader_meta.metallic_params));
 
                             using metallic.images;
-                            if images[base_color].id != 0 do base_color_tex = images[base_color];
-                            if images[metallic_roughness].id != 0 do metallic_roughness_tex = images[metallic_roughness];
-                            if images[normal].id != 0 do normal_tex = images[normal];
-                            if images[occlusion].id != 0 do occlusion_tex = images[occlusion];
-                            if images[emissive].id != 0 do emissive_tex = images[emissive];
+                            if base_color != -1 && images[base_color].id != 0 do base_color_tex = images[base_color];
+                            if metallic_roughness != -1 && images[metallic_roughness].id != 0 do metallic_roughness_tex = images[metallic_roughness];
+                            if normal != -1 && images[normal].id != 0 do normal_tex = images[normal];
+                            if occlusion != -1 && images[occlusion].id != 0 do occlusion_tex = images[occlusion];
+                            if emissive != -1 && images[emissive].id != 0 do emissive_tex = images[emissive];
                         }
                         bind.fs_images[shader_meta.SLOT_base_color_texture] = base_color_tex;
                         bind.fs_images[shader_meta.SLOT_metallic_roughness_texture] = metallic_roughness_tex;

@@ -506,10 +506,13 @@ gltf_to_sg_wrap :: proc(gltf_wrap: i32) -> sg.Wrap {
 
 gltf_attr_type_to_vs_input_slot :: proc(attr_type: cgltf.Attribute_Type) -> i32 {
     switch attr_type {
-        case cgltf.Attribute_Type.POSITION: return shader_meta.ATTR_vs_cgltf_position;
-        case cgltf.Attribute_Type.NORMAL: return shader_meta.ATTR_vs_normal;
-        case cgltf.Attribute_Type.TEXCOORD: return shader_meta.ATTR_vs_texcoord;
-        case: return SCENE_INVALID_INDEX;
+        case .POSITION: return shader_meta.ATTR_vs_cgltf_position;
+        case .NORMAL: return shader_meta.ATTR_vs_normal;
+        case .TEXCOORD: return shader_meta.ATTR_vs_texcoord;
+        //case .TANGENT: return shader_meta.ATTR_vs_tangent;
+        case:
+            fmt.eprintln("unhandled Attribute_Type", attr_type);
+            return SCENE_INVALID_INDEX;
     }
 }
 
