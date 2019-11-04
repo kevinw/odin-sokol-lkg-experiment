@@ -16,7 +16,7 @@ VERBOSE :: false;
 GLTF_Buffer_Fetch_Userdata :: struct { buffer_index: int };
 GLTF_Image_Fetch_Userdata :: struct { image_index: int }
 
-MSAA_SAMPLE_COUNT :: 4;
+MSAA_SAMPLE_COUNT :: 1;
 
 // pipeline cache helper struct to avoid duplicate pipeline-state-objects
 Pipeline_Cache_Params :: struct {
@@ -212,7 +212,7 @@ build_transform_for_gltf_node :: proc(gltf: ^cgltf.Data, node: ^cgltf.Node) -> M
             t = translate_matrix4(Vector3{node.translation[0], node.translation[1], node.translation[2]});
         }
         if node.has_rotation != 0 {
-            //r = rotate_matrix4x4_quat(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
+            r = rotate_matrix4x4_quat(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
         }
         if node.has_scale != 0 {
             s = scale_matrix4(identity(Matrix4), Vector3{node.scale[0], node.scale[1], node.scale[2]});
@@ -334,13 +334,13 @@ create_sg_pipeline_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Pr
             },
             blend = {
                 enabled = pip_params.alpha,
-                src_factor_rgb = pip_params.alpha ? sg.Blend_Factor.SRC_ALPHA : sg.Blend_Factor._DEFAULT,
-                dst_factor_rgb = pip_params.alpha ? sg.Blend_Factor.ONE_MINUS_SRC_ALPHA : sg.Blend_Factor._DEFAULT,
+                src_factor_rgb = pip_params.alpha ? .SRC_ALPHA : ._DEFAULT,
+                dst_factor_rgb = pip_params.alpha ? .ONE_MINUS_SRC_ALPHA : ._DEFAULT,
                 color_write_mask = pip_params.alpha ? sg.COLOR_MASK_RGB : sg.COLOR_MASK__DEFAULT,
             },
             rasterizer = {
-                cull_mode = sg.Cull_Mode.BACK,
-                face_winding = sg.Face_Winding.CCW,
+                cull_mode = .BACK,
+                face_winding = .CW,
                 sample_count = MSAA_SAMPLE_COUNT,
             }
         }));
