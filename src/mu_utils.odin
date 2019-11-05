@@ -90,12 +90,12 @@ r_init :: proc() {
             enabled = true,
             src_factor_rgb = .SRC_ALPHA,
             dst_factor_rgb = .ONE_MINUS_SRC_ALPHA,
-        }
+        },
     });
 }
 
 
-r_begin :: proc(w, h: int) {
+r_begin :: inline proc(w, h: int) {
     sgl.defaults();
     sgl.push_pipeline();
     sgl.load_pipeline(state.mu_pip);
@@ -107,7 +107,7 @@ r_begin :: proc(w, h: int) {
     sgl.begin_quads();
 }
 
-r_end :: proc() {
+r_end :: inline proc() {
     sgl.end();
     sgl.pop_matrix();
     sgl.pop_pipeline();
@@ -164,5 +164,33 @@ r_push_quad :: proc(dst: mu.Rect, src: mu.Rect, color: mu.Color) {
     sgl.v2f_t2f(x1, y0, u1, v0);
     sgl.v2f_t2f(x1, y1, u1, v1);
     sgl.v2f_t2f(x0, y1, u0, v1);
+}
+
+r_draw_callback :: proc(dst: mu.Rect, callback: rawptr) {
+    callback_proc := cast(proc(rect:mu.Rect))callback;
+    r_push_quad(dst, mu_atlas.atlas[mu_atlas.ATLAS_WHITE], mu.Color { 255, 0, 255, 255 });
+    if callback_proc != nil {
+        callback_proc(dst);
+    }
+
+}
+
+mu_render :: proc(width, height: int) {
+    // microui rendering
+    r_begin(width, height);
+    defer r_end();
+
+    cmd:^mu.Command = nil;
+    for  {
+        if !mu.next_command(&mu_ctx, &cmd) do break;
+        using cmd;
+        switch type {
+            case .Text: r_draw_text(cstring_ptr_to_slice(cast(^u8)&text.str[0]), text.pos, text.color);
+            case .Rect: r_draw_rect(rect.rect, rect.color);
+            case .Icon: r_draw_icon(icon.id, icon.rect, icon.color);
+            case .Clip: r_set_clip_rect(clip.rect);
+            case .DrawCallback: r_draw_callback(draw_callback.rect, draw_callback.callback);
+        }
+    }
 }
 

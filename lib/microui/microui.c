@@ -442,6 +442,16 @@ void mu_draw_rect(mu_Context *ctx, mu_Rect rect, mu_Color color) {
   }
 }
 
+void mu_draw_callback(mu_Context *ctx, mu_Rect rect, void* callback) {
+  mu_Command *cmd;
+  rect = clip_rect(rect, mu_get_clip_rect(ctx));
+  if (rect.w > 0 && rect.h > 0) {
+      cmd = mu_push_command(ctx, MU_COMMAND_DRAW_CALLBACK, sizeof(mu_DrawCallbackCommand));
+      cmd->draw_callback.rect = rect;
+      cmd->draw_callback.callback = callback;
+  }
+}
+
 
 void mu_draw_box(mu_Context *ctx, mu_Rect rect, mu_Color color) {
   mu_draw_rect(ctx, mu_rect(rect.x + 1, rect.y, rect.w - 2, 1), color);

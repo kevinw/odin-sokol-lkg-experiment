@@ -74,8 +74,7 @@ gltf_parse :: proc(bytes: []u8, path_root: string) {
     //
     // check for index buffer usage
     //
-    used_as_index := make([]bool, gltf.buffer_views_count);
-    defer delete(used_as_index);
+    used_as_index := make([]bool, gltf.buffer_views_count, context.temp_allocator);
 
     meshes := mem.slice_ptr(gltf.meshes, gltf.meshes_count);
     for _, i in meshes {

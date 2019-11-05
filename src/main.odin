@@ -417,7 +417,7 @@ init_callback :: proc "c" () {
 
     // request the mesh GLTF file
     //gltf_path:cstring = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf";
-    gltf_path:cstring = "resources/gltf/BevelBox/BevelBox.gltf";
+    gltf_path:cstring = "resources/gltf/BevelBox/BevelBoxSkin.gltf";
 
     sfetch.send({
         path = gltf_path,
@@ -571,6 +571,34 @@ test_window :: proc(ctx: ^mu.Context) {
     if mu.begin_window(ctx, &window, "") {
         defer mu.end_window(ctx);
 
+        mu.layout_begin_column(ctx);
+        mu_layout_row(ctx, 1, {-1,}, 300);
+        cb:rawptr = cast(rawptr)proc(rect: mu.Rect) {
+            r_end();
+            defer r_begin(sapp.width(), sapp.height());
+
+            sgl.defaults();
+            sgl.viewport(0, 0, cast(i32)sapp.width(), cast(i32)sapp.height(), true);
+            sgl.begin_lines();
+            defer sgl.end();
+
+            sgl.push_matrix();
+            defer sgl.pop_matrix();
+            sgl.matrix_mode_projection();
+            sgl.ortho(0.0, cast(f32)sapp.width(), cast(f32)sapp.height(), 0.0, -1.0, +1.0);
+            sgl.matrix_mode_modelview();
+            sgl.c3f(1.0, 1.0, 1.0);
+            //for i in 0..1000 {
+                //sgl.v2f(cast(f32)rect.x, cast(f32)rect.y);
+            //}
+            sgl.v2f(cast(f32)rect.x, cast(f32)rect.y);
+            sgl.v2f(cast(f32)(rect.x + rect.w), cast(f32)(rect.y + rect.h));
+
+            assert(sgl.error() == .NO_ERROR, fmt.tprint("got error", sgl.error()));
+        };
+        mu.draw_callback(ctx, mu.rect(0, 0, 300, 300), cb);
+        mu.layout_end_column(ctx);
+
         @static show_info: i32 = 1;
         if mu.header(ctx, &show_info, "debug") {
 
@@ -710,23 +738,7 @@ frame_callback :: proc "c" () {
         defer mu.end(&mu_ctx);
         test_window(&mu_ctx);
     }
-    {
-        // microui rendering
-        r_begin(sapp.width(), sapp.height());
-        defer r_end();
-
-        cmd:^mu.Command = nil;
-        for  {
-            if !mu.next_command(&mu_ctx, &cmd) do break;
-            using cmd;
-            switch type {
-                case .Text: r_draw_text(cstring_ptr_to_slice(cast(^u8)&text.str[0]), text.pos, text.color);
-                case .Rect: r_draw_rect(rect.rect, rect.color);
-                case .Icon: r_draw_icon(icon.id, icon.rect, icon.color);
-                case .Clip: r_set_clip_rect(clip.rect);
-            }
-        }
-    }
+    mu_render(sapp.width(), sapp.height());
 
     per_frame_stats = {};
 

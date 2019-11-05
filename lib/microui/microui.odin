@@ -32,6 +32,7 @@ Command_Type :: enum c.int {
 	Rect,
 	Text,
 	Icon,
+    DrawCallback,
 	Max,
 }
 
@@ -118,6 +119,7 @@ RectCommand :: struct { base: BaseCommand, rect: Rect, color: Color }
 //FIXME: Find a better way to bind VLAs in Odin
 TextCommand :: struct { base: BaseCommand, font: Font, pos: Vec2, color: Color, str: [1]u8 }
 IconCommand :: struct { base: BaseCommand, rect: Rect, id: c.int, color: Color }
+DrawCallbackCommand :: struct { base: BaseCommand, rect: Rect, callback: rawptr }
 
 Command :: struct #raw_union {
 	type: Command_Type,
@@ -127,6 +129,7 @@ Command :: struct #raw_union {
 	rect: RectCommand,
 	text: TextCommand,
 	icon: IconCommand,
+    draw_callback: DrawCallbackCommand,
 }
 
 Layout :: struct {
@@ -238,6 +241,7 @@ foreign libmicroui {
 	next_command :: proc(ctx: ^Context, cmd: ^^Command) -> b32                                         ---;
 	set_clip     :: proc(ctx: ^Context, rect: Rect)                                                    ---;
 	draw_rect    :: proc(ctx: ^Context, rect: Rect, color: Color)                                      ---;
+	draw_callback:: proc(ctx: ^Context, rect: Rect, cb: rawptr)                                      ---;
 	draw_box     :: proc(ctx: ^Context, rect: Rect, color: Color)                                      ---;
 	draw_text    :: proc(ctx: ^Context, font: Font, str: cstring, len: c.int, pos: Vec2, color: Color) ---;
 	draw_icon    :: proc(ctx: ^Context, id: c.int, rect: Rect, color: Color)                           ---;
