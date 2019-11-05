@@ -90,7 +90,7 @@ main :: proc() {
         //fmt.println(s);
         output_filename := "globals.glsl";
         os.write_entire_file(output_filename, mem.slice_ptr(&s[0], len(s)));
-        fmt.println("wrote", output_filename);
+        //fmt.println("wrote", output_filename);
     }
 
 }

@@ -55,11 +55,12 @@ mu_layout_row :: proc(ctx: ^mu.Context, items: i32, widths: []i32, height: i32) 
 r_init :: proc() {
     mu_atlas.init();
 
-    /* atlas image data is in atlas.inl file, this only contains alpha 
-       values, need to expand this to RGBA8
-    */
+    // atlas image data is in atlas.inl file, this only contains alpha 
+    // values, need to expand this to RGBA8
     rgba8_size:u32 = mu_atlas.WIDTH * mu_atlas.HEIGHT * 4;
     rgba8_pixels := make([]u32, rgba8_size);
+    defer delete(rgba8_pixels);
+
     for y in 0..<mu_atlas.HEIGHT {
         for x in 0..<mu_atlas.WIDTH {
             index := y*mu_atlas.WIDTH + x;
@@ -71,11 +72,10 @@ r_init :: proc() {
     img_desc := sg.Image_Desc {
         width = mu_atlas.WIDTH,
         height = mu_atlas.HEIGHT,
-        /* LINEAR would be better for text quality in HighDPI, but the
-           atlas texture is "leaking" from neighbouring pixels unfortunately
-        */
-        min_filter = sg.Filter.NEAREST,
-        mag_filter = sg.Filter.NEAREST,
+        // LINEAR would be better for text quality in HighDPI, but the
+        // atlas texture is "leaking" from neighbouring pixels unfortunately
+        min_filter = .NEAREST,
+        mag_filter = .NEAREST,
     };
 
     img_desc.content.subimage[0][0] = {
@@ -168,11 +168,12 @@ r_push_quad :: proc(dst: mu.Rect, src: mu.Rect, color: mu.Color) {
 
 r_draw_callback :: proc(dst: mu.Rect, callback: rawptr) {
     callback_proc := cast(proc(rect:mu.Rect))callback;
-    r_push_quad(dst, mu_atlas.atlas[mu_atlas.ATLAS_WHITE], mu.Color { 255, 0, 255, 255 });
     if callback_proc != nil {
         callback_proc(dst);
+    } else {
+        // push a purple quad if the callback was nil
+        r_push_quad(dst, mu_atlas.atlas[mu_atlas.ATLAS_WHITE], mu.Color { 255, 0, 255, 255 });
     }
-
 }
 
 mu_render :: proc(width, height: int) {

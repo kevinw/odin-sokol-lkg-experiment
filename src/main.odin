@@ -416,8 +416,8 @@ init_callback :: proc "c" () {
     };
 
     // request the mesh GLTF file
-    //gltf_path:cstring = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf";
-    gltf_path:cstring = "resources/gltf/BevelBox/BevelBoxSkin.gltf";
+    gltf_path:cstring = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf";
+    //gltf_path:cstring = "resources/gltf/BevelBox/BevelBoxSkin.gltf";
 
     sfetch.send({
         path = gltf_path,
@@ -557,6 +557,7 @@ per_frame_stats: struct {
 
 bg := [?]f32 { 0.5, 0.7, 1.0 };
 
+test_curve := Bezier_Curve { 1, 0, 0, 1 };
 
 window: mu.Container;
 test_window :: proc(ctx: ^mu.Context) {
@@ -572,28 +573,8 @@ test_window :: proc(ctx: ^mu.Context) {
         defer mu.end_window(ctx);
 
         mu.layout_begin_column(ctx);
-        mu_layout_row(ctx, 1, {-1,}, 300);
-        cb:rawptr = cast(rawptr)proc(rect: mu.Rect) {
-            r_end();
-            defer r_begin(sapp.width(), sapp.height());
-
-            sgl.defaults();
-            sgl.viewport(0, 0, cast(i32)sapp.width(), cast(i32)sapp.height(), true);
-            sgl.begin_lines();
-            defer sgl.end();
-
-            sgl.push_matrix();
-            defer sgl.pop_matrix();
-            sgl.matrix_mode_projection();
-            sgl.ortho(0.0, cast(f32)sapp.width(), cast(f32)sapp.height(), 0.0, -1.0, +1.0);
-            sgl.matrix_mode_modelview();
-            sgl.c3f(1.0, 1.0, 1.0);
-            sgl.v2f(cast(f32)rect.x, cast(f32)rect.y);
-            sgl.v2f(cast(f32)(rect.x + rect.w), cast(f32)(rect.y + rect.h));
-
-            assert(sgl.error() == .NO_ERROR, fmt.tprint("got error", sgl.error()));
-        };
-        mu.draw_callback(ctx, mu.rect(0, 0, 300, 300), cb);
+        mu_layout_row(ctx, 1, {100,}, 100);
+        mu_anim_curve(ctx, &test_curve);
         mu.layout_end_column(ctx);
 
         @static show_info: i32 = 1;
@@ -706,6 +687,13 @@ frame_callback :: proc "c" () {
     // update scene
     //
     state.root_transform = state.auto_rotate ? rotate_matrix4(Vector3{0, 1, 0}, cast(f32)now_seconds) : identity(Matrix4);
+
+    // every other second, scrub through curve, pausing at the end for the other second
+    int_part, r := math.modf(cast(f32)now_seconds);
+    if cast(int)int_part % 2 == 0 do r = 1.0 - r;
+
+    vv := evaluate(&test_curve, r);
+    state.root_transform = scale_matrix4(state.root_transform, Vector3{ vv.x, vv.y, r });
 
     // update camera
     {
@@ -873,6 +861,7 @@ main :: proc() {
     //cgltf.print_sizes();
     //fmt.println("--------c sizes:");
     //cgltf.print_struct_sizes();
+
     run_app();
 }
 
