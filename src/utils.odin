@@ -6,7 +6,7 @@ import "core:mem"
 v2 :: inline proc(w, h: $T) -> Vector2 { return Vector2 { cast(f32)w, cast(f32)h }; }
 
 
-strlen :: proc(s: ^$T) -> int {
+strlen :: proc(s: ^$T) -> int { // TODO: doesn't this already exist?
     i := 0;
     for {
         val := mem.ptr_offset(s, i);

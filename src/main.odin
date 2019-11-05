@@ -588,9 +588,6 @@ test_window :: proc(ctx: ^mu.Context) {
             sgl.ortho(0.0, cast(f32)sapp.width(), cast(f32)sapp.height(), 0.0, -1.0, +1.0);
             sgl.matrix_mode_modelview();
             sgl.c3f(1.0, 1.0, 1.0);
-            //for i in 0..1000 {
-                //sgl.v2f(cast(f32)rect.x, cast(f32)rect.y);
-            //}
             sgl.v2f(cast(f32)rect.x, cast(f32)rect.y);
             sgl.v2f(cast(f32)(rect.x + rect.w), cast(f32)(rect.y + rect.h));
 
@@ -601,11 +598,9 @@ test_window :: proc(ctx: ^mu.Context) {
 
         @static show_info: i32 = 1;
         if mu.header(ctx, &show_info, "debug") {
-
             mu_layout_row(ctx, 2,{80, -1}, 0);
             mu.label(ctx, "ms per frame:"); mu_label_printf(ctx, "%f", fps_counter.ms_per_frame);
             mu.label(ctx, "num elements:"); mu_label_printf(ctx, "%d", per_frame_stats.num_elements);
-
 
             mu.label(ctx, "camera eye pos:");
 
@@ -732,13 +727,12 @@ frame_callback :: proc "c" () {
     //
     // MICROUI
     //
-    {
-        // microui definition
+    { // definition
         mu.begin(&mu_ctx);
         defer mu.end(&mu_ctx);
         test_window(&mu_ctx);
     }
-    mu_render(sapp.width(), sapp.height());
+    mu_render(sapp.width(), sapp.height()); // note; this just pushes commands to a queue. r_draw below actually does the draw calls
 
     per_frame_stats = {};
 
