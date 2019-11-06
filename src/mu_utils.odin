@@ -6,6 +6,7 @@ import mu "../lib/microui"
 import mu_atlas "../lib/microui/atlas"
 import "core:strings"
 import "core:fmt"
+using import "core:math/linalg"
 
 DEFAULT_BUFFER_SIZE :: 200;
 
@@ -23,6 +24,14 @@ r_get_text_width :: proc(text: []u8) -> i32 {
     }
     return res;
     */
+}
+
+mu_vector3 :: proc(ctx: ^mu.Context, v: ^Vector3, min_val, max_val: f32) -> mu.Res {
+    res: mu.Res;
+    mu.label(ctx, "x:"); res |= mu.slider(ctx, &v[0], min_val, max_val);
+    mu.label(ctx, "y:"); res |= mu.slider(ctx, &v[1], min_val, max_val);
+    mu.label(ctx, "z:"); res |= mu.slider(ctx, &v[2], min_val, max_val);
+    return res;
 }
 
 r_get_text_height :: proc() -> i32 {

@@ -368,7 +368,7 @@ init_callback :: proc "c" () {
 
     sgl.setup({
         max_vertices = 5000,
-        max_commands = 500,
+        max_commands = 50,
         pipeline_pool_size = 5,
     });
 
@@ -587,9 +587,7 @@ test_window :: proc(ctx: ^mu.Context) {
 
             mu.layout_begin_column(ctx);
             mu_layout_row(ctx, 2, { 20, -1 }, 0);
-            mu.label(ctx, "x:"); mu.slider(ctx, &state.camera.eye_pos[0], -6.0, 6.0);
-            mu.label(ctx, "y:"); mu.slider(ctx, &state.camera.eye_pos[1], -6.0, 6.0);
-            mu.label(ctx, "z:"); mu.slider(ctx, &state.camera.eye_pos[2], -6.0, 6.0);
+            mu_vector3(ctx, &state.camera.eye_pos, -6, 6);
             mu.layout_end_column(ctx);
 
             mu_layout_row(ctx, 2, { 40, -1 }, 0);
@@ -736,7 +734,7 @@ frame_callback :: proc "c" () {
 
     sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
 
-    draw_quad := false;
+    draw_quad := true;
 
     // DRAW MOVABLE QUAD
     if draw_quad {

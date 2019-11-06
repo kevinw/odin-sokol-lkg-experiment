@@ -267,8 +267,8 @@ foreign libmicroui {
 	textbox_raw     :: proc(ctx: ^Context, buf: ^u8, bufsz: c.int, id: Id, r: Rect, opt: Opt_Set) -> b32                       ---;
 	textbox_ex      :: proc(ctx: ^Context, buf: ^u8, bufsz: c.int, opt: Opt_Set) -> b32                                        ---;
 	textbox         :: proc(ctx: ^Context, buf: ^u8, bufsz: c.int) -> b32                                                      ---;
-	slider_ex       :: proc(ctx: ^Context, value: ^Real, low: Real, high: Real, step: Real, fmt: cstring, opt: Opt_Set) -> b32 ---;
-	slider          :: proc(ctx: ^Context, value: ^Real, low: Real, high: Real) -> b32                                         ---;
+	slider_ex       :: proc(ctx: ^Context, value: ^Real, low: Real, high: Real, step: Real, fmt: cstring, opt: Opt_Set) -> Res ---;
+	slider          :: proc(ctx: ^Context, value: ^Real, low: Real, high: Real) -> Res                                         ---;
 	number_ex       :: proc(ctx: ^Context, value: ^Real, step: Real, fmt: cstring, opt: Opt_Set) -> b32                        ---;
 	number          :: proc(ctx: ^Context, value: ^Real, step: Real) -> b32                                                    ---;
 	header          :: proc(ctx: ^Context, state: ^c.int, label: cstring) -> b32                                               ---;
