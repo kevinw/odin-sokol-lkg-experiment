@@ -25,6 +25,7 @@ WINDOW_HEIGHT :: 720;
 SFETCH_NUM_CHANNELS :: 1;
 SFETCH_NUM_LANES :: 4;
 MAX_FILE_SIZE :: 10*1024*1024;
+MSAA_SAMPLE_COUNT :: 4;
 
 sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 
@@ -417,7 +418,6 @@ init_callback :: proc "c" () {
 
     // request the mesh GLTF file
     gltf_path:cstring = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf";
-    //gltf_path:cstring = "resources/gltf/BevelBox/BevelBoxSkin.gltf";
 
     sfetch.send({
         path = gltf_path,
@@ -689,11 +689,14 @@ frame_callback :: proc "c" () {
     state.root_transform = state.auto_rotate ? rotate_matrix4(Vector3{0, 1, 0}, cast(f32)now_seconds) : identity(Matrix4);
 
     // every other second, scrub through curve, pausing at the end for the other second
-    int_part, r := math.modf(cast(f32)now_seconds);
-    if cast(int)int_part % 2 == 0 do r = 1.0 - r;
+    {
+        time := cast(f32)(now_seconds * .3);
+        int_part, r := math.modf(time);
+        if cast(int)int_part % 2 == 0 do r = 1.0 - r;
 
-    vv := evaluate(&test_curve, r);
-    state.root_transform = scale_matrix4(state.root_transform, Vector3{ vv.x, vv.y, r });
+        vv := evaluate(&test_curve, r);
+        state.root_transform = scale_matrix4(state.root_transform, Vector3{ vv.x, vv.y, r });
+    }
 
     // update camera
     {
@@ -745,8 +748,8 @@ frame_callback :: proc "c" () {
         global_params_values := shader_meta.global_params {
             time = cast(f32)now_seconds * 3.0
         };
-        sg.apply_uniforms(sg.Shader_Stage.FS, shader_meta.SLOT_global_params, &global_params_values, size_of(shader_meta.global_params));
-        sg.apply_uniforms(sg.Shader_Stage.VS, shader_meta.SLOT_vs_uniforms, &vs_uniforms, size_of(shader_meta.vs_uniforms));
+        sg.apply_uniforms(.FS, shader_meta.SLOT_global_params, &global_params_values, size_of(shader_meta.global_params));
+        sg.apply_uniforms(.VS, shader_meta.SLOT_vs_uniforms, &vs_uniforms, size_of(shader_meta.vs_uniforms));
         sg.draw(0, 6, 1);
     }
 
@@ -771,8 +774,8 @@ frame_callback :: proc "c" () {
                 if prim.index_buffer != SCENE_INVALID_INDEX {
                     bind.index_buffer = buffers[prim.index_buffer];
                 }
-                sg.apply_uniforms(sg.Shader_Stage.VS, shader_meta.SLOT_vs_params, &vs_params, size_of(vs_params));
-                sg.apply_uniforms(sg.Shader_Stage.FS, shader_meta.SLOT_light_params, &state.point_light, size_of(state.point_light));
+                sg.apply_uniforms(.VS, shader_meta.SLOT_vs_params, &vs_params, size_of(vs_params));
+                sg.apply_uniforms(.FS, shader_meta.SLOT_light_params, &state.point_light, size_of(state.point_light));
                 //if mat.is_metallic {
 
                     {
@@ -797,11 +800,13 @@ frame_callback :: proc "c" () {
                             if occlusion != -1 && images[occlusion].id != 0 do occlusion_tex = images[occlusion];
                             if emissive != -1 && images[emissive].id != 0 do emissive_tex = images[emissive];
                         }
-                        bind.fs_images[shader_meta.SLOT_base_color_texture] = base_color_tex;
-                        bind.fs_images[shader_meta.SLOT_metallic_roughness_texture] = metallic_roughness_tex;
-                        bind.fs_images[shader_meta.SLOT_normal_texture] = normal_tex;
-                        bind.fs_images[shader_meta.SLOT_occlusion_texture] = occlusion_tex;
-                        bind.fs_images[shader_meta.SLOT_emissive_texture] = emissive_tex;
+
+                        using shader_meta;
+                        bind.fs_images[SLOT_base_color_texture] = base_color_tex;
+                        bind.fs_images[SLOT_metallic_roughness_texture] = metallic_roughness_tex;
+                        bind.fs_images[SLOT_normal_texture] = normal_tex;
+                        bind.fs_images[SLOT_occlusion_texture] = occlusion_tex;
+                        bind.fs_images[SLOT_emissive_texture] = emissive_tex;
                     }
                 //} else {
                     //assert(false, "nonmetallic is unimplemented");
@@ -874,6 +879,7 @@ run_app :: proc() {
 		width        = WINDOW_WIDTH,
 		height       = WINDOW_HEIGHT,
 		window_title = "testbed",
+        sample_count = MSAA_SAMPLE_COUNT,
 	});
 	os.exit(int(err));
 }

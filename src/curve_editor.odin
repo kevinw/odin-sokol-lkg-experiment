@@ -25,9 +25,6 @@ Bezier_Curve :: struct {
     p0, p1, p2, p3: Vector2,
 };
 
-edit_curve :: proc(curve: ^Bezier_Curve) {
-}
-
 _base := Vector2 {};
 _curve : Bezier_Curve;
 

@@ -37,8 +37,6 @@ image_type_for_ext :: proc(ext: string) -> Image_Type {
 GLTF_Buffer_Fetch_Userdata :: struct { buffer_index: int };
 GLTF_Image_Fetch_Userdata :: struct { image_index: int, image_type: Image_Type, full_uri: string }
 
-MSAA_SAMPLE_COUNT :: 1;
-
 // pipeline cache helper struct to avoid duplicate pipeline-state-objects
 Pipeline_Cache_Params :: struct {
     layout: sg.Layout_Desc,
