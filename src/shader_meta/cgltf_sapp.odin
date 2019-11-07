@@ -110,6 +110,11 @@ using import "core:math/linalg"
 ATTR_vs_cgltf_position :: 0;
 ATTR_vs_normal :: 1;
 ATTR_vs_texcoord :: 2;
+
+/* @(private) _get_attr_slot :: proc(attr_type: Attr_Type) -> int {
+// TODO!
+    return 0;
+} */
 SLOT_normal_texture :: 0;
 SLOT_metallic_roughness_texture :: 1;
 SLOT_base_color_texture :: 2;
@@ -120,7 +125,6 @@ vs_params :: struct #align 16 {
     model: Matrix4,
     view_proj: Matrix4,
     eye_pos: Vector3,
-    _pad_140: [4]u8,
 };
 SLOT_light_params :: 0;
 light_params :: struct #align 16 {
@@ -135,7 +139,6 @@ metallic_params :: struct #align 16 {
     emissive_factor: Vector3,
     metallic_factor: f32,
     roughness_factor: f32,
-    _pad_36: [12]u8,
 };
 when SOKOL_D3D11 {
 /*

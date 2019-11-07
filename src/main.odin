@@ -465,31 +465,32 @@ init_callback :: proc "c" () {
     {
         Vertex :: struct {
             pos: [3]f32,
-            col: [4]f32,
+            uv: [2]f32,
         };
 
+        C :: 0.6;
         vertices := [?]Vertex{
-            {{+0.5, +0.5, +0.5}, {1.0, 0.0, 0.0, 1.0}},
-            {{+0.5, -0.5, +0.5}, {0.0, 1.0, 0.0, 1.0}},
-            {{-0.5, -0.5, +0.5}, {0.0, 0.0, 1.0, 1.0}},
-            {{-0.5, -0.5, +0.5}, {0.0, 0.0, 1.0, 1.0}},
-            {{-0.5, +0.5, +0.5}, {0.0, 0.0, 1.0, 1.0}},
-            {{+0.5, +0.5, +0.5}, {1.0, 0.0, 0.0, 1.0}},
+            {{+C, +C, +C}, {1.0, 0.0}},
+            {{+C, -C, +C}, {0.0, 1.0}},
+            {{-C, -C, +C}, {0.0, 0.0}},
+            {{-C, -C, +C}, {0.0, 0.0}},
+            {{-C, +C, +C}, {0.0, 0.0}},
+            {{+C, +C, +C}, {1.0, 0.0}},
         };
 
         state.bind.vertex_buffers[0] = sg.make_buffer({
-            label = "triangle-vertices",
+            label = "shadertoy-vertices",
             size = len(vertices)*size_of(vertices[0]),
             content = &vertices[0],
         });
         state.pip = sg.make_pipeline({
-            shader = sg.make_shader(shader_meta.vertcolor_shader_desc()^),
-            label = "triangle-pipeline",
+            shader = sg.make_shader(shader_meta.shadertoy_shader_desc()^),
+            label = "shadertoy-pipeline",
             primitive_type = .TRIANGLES,
             layout = {
                 attrs = {
-                    shader_meta.ATTR_vs_position = {format = .FLOAT3},
-                    shader_meta.ATTR_vs_color0 = {format = .FLOAT4},
+                    shader_meta.ATTR_vs_st_position = {format = .FLOAT3},
+                    shader_meta.ATTR_vs_st_uv = {format = .FLOAT2},
                 },
             },
         });
@@ -629,6 +630,7 @@ test_window :: proc(ctx: ^mu.Context) {
 }
 
 do_print :i32 = 0;
+frame_count:u32;
 frame_callback :: proc "c" () {
     free_all(context.temp_allocator);
 
@@ -636,6 +638,7 @@ frame_callback :: proc "c" () {
 	// TIME
 	//
 
+    frame_count += 1;
 	current_ticks := stime.now();
 	now_seconds := stime.sec(current_ticks);
 	elapsed_ticks: u64 = ---;
@@ -678,8 +681,6 @@ frame_callback :: proc "c" () {
 
 	if v.x != 0 do position.x += v.x * dt;
 	if v.y != 0 do position.y += v.y * dt;
-
-	mvp := translate_matrix4(position);
 
     //
     // update scene
@@ -740,14 +741,16 @@ frame_callback :: proc "c" () {
     if draw_quad {
         sg.apply_pipeline(state.pip);
         sg.apply_bindings(state.bind);
-        vs_uniforms := shader_meta.vs_uniforms {
-            mvp = mvp,
+        global_params_values := shader_meta.st_fs_uniforms {
+            iTime = cast(f32)now_seconds * 3.0,
+            iResolution = Vector3 { cast(f32)sapp.width()/2.0, cast(f32)sapp.height()/2.0, 1.0 },
+            iTimeDelta = dt,
+            iFrame = cast(i32)frame_count,
+            iFrameRate = cast(f32)(1.0 / fps_counter.ms_per_frame),
+            iSampleRate = 44100,
         };
-        global_params_values := shader_meta.global_params {
-            time = cast(f32)now_seconds * 3.0
-        };
-        sg.apply_uniforms(.FS, shader_meta.SLOT_global_params, &global_params_values, size_of(shader_meta.global_params));
-        sg.apply_uniforms(.VS, shader_meta.SLOT_vs_uniforms, &vs_uniforms, size_of(shader_meta.vs_uniforms));
+        // shadertoy uniforms
+        sg.apply_uniforms(.FS, shader_meta.SLOT_st_fs_uniforms, &global_params_values, size_of(shader_meta.st_fs_uniforms));
         sg.draw(0, 6, 1);
     }
 

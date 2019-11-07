@@ -77,12 +77,16 @@ using import "core:math/linalg"
 //#endif
 ATTR_vs_a_pos :: 0;
 ATTR_vs_a_texcoord :: 1;
+
+/* @(private) _get_attr_slot :: proc(attr_type: Attr_Type) -> int {
+// TODO!
+    return 0;
+} */
 SLOT_u_texture :: 0;
 SLOT_sdf_vs_uniforms :: 0;
 sdf_vs_uniforms :: struct #align 16 {
     u_matrix: Matrix4,
     u_texsize: Vector2,
-    _pad_72: [8]u8,
 };
 SLOT_sdf_fs_uniforms :: 0;
 sdf_fs_uniforms :: struct #align 16 {
@@ -90,7 +94,6 @@ sdf_fs_uniforms :: struct #align 16 {
     u_buffer: f32,
     u_gamma: f32,
     u_debug: f32,
-    _pad_28: [4]u8,
 };
 when SOKOL_D3D11 {
 /*
