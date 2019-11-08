@@ -31,7 +31,8 @@ update :: proc(using camera: ^FPS_Camera, dt: f32, key_state: Key_State) {
         first = false;
     } else {
         delta := (last_mouse - state.mouse.pos) * mouse_speed;
-        angle += delta;
+        angle.x += delta.x;
+        angle.y += -delta.y;
 
         // Spherical to Cartesian
         direction := v3(
@@ -50,14 +51,16 @@ update :: proc(using camera: ^FPS_Camera, dt: f32, key_state: Key_State) {
             using key_state;
             if w || up do    position += direction * dt * speed;
             if s || down do  position -= direction * dt * speed;
-            if d || right do position += right_v   * dt * speed;
-            if a || left do  position -= right_v   * dt * speed;
+            if d || right do position -= right_v   * dt * speed;
+            if a || left do  position += right_v   * dt * speed;
+            if e do position -= up_v * dt * speed;
+            if q do position += up_v * dt * speed;
         }
 
         aspect := cast(f32)sapp.width() / cast(f32)sapp.height();
 
         proj = perspective(deg2rad(fov), aspect, near_clip, far_clip);
-        view = look_at(position, normalize(position + direction), up_v); 
+        view = look_at(position, position + direction, up_v); 
     }
 
     last_mouse = state.mouse.pos;

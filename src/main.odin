@@ -29,15 +29,8 @@ MSAA_SAMPLE_COUNT :: 4;
 sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 
 Key_State :: struct {
-	right: bool,
-	left: bool,
-	up: bool,
-	down: bool,
-
-	w: bool,
-	a: bool,
-	s: bool,
-	d: bool,
+	right, left, up, down: bool,
+	w, a, s, d, q, e: bool,
 }
 
 key_state := Key_State {};
@@ -46,12 +39,6 @@ Mouse_State :: struct {
     pos: Vector2,
 }
 
-
-Camera :: struct {
-    eye_pos: Vector3,
-    view_proj: Matrix4,
-    fov: f32,
-};
 
 // per-material texture indices into scene.images for metallic material
 Metallic_Images :: struct {
@@ -131,8 +118,10 @@ state: struct {
         sub_meshes: [dynamic]Sub_Mesh,
         pipelines: [dynamic]sg.Pipeline,
     },
-    camera: Camera,
+
     fps_camera: FPS_Camera,
+    view_proj: Matrix4,
+
     placeholders: struct { white, normal, black: sg.Image },
     pip_cache: [dynamic]Pipeline_Cache_Params,
     point_light: shader_meta.light_params,
@@ -207,9 +196,6 @@ deg2rad :: inline proc(f: $T) -> T { return f * DEG_TO_RAD; }
 delta := v3(-1.92, -0.07, 1.52);
 
 init_callback :: proc "c" () {
-    state.camera.eye_pos = delta;
-    state.camera.fov = 60;
-
     text.vertex_elems = make([dynamic]f32);
     text.tex_elems = make([dynamic]f32);
 
@@ -228,6 +214,8 @@ init_callback :: proc "c" () {
         max_commands = 50,
         pipeline_pool_size = 5,
     });
+
+    sapp.show_mouse(false);
 
     basisu.setup();
 
@@ -415,18 +403,18 @@ test_window :: proc(ctx: ^mu.Context) {
 
             mu.layout_begin_column(ctx);
             mu_layout_row(ctx, 2, { 20, -1 }, 0);
-            mu_vector3(ctx, &state.camera.eye_pos, -6, 6);
+            mu_vector3(ctx, &state.fps_camera.position, -20, 20);
             mu.layout_end_column(ctx);
 
             mu_layout_row(ctx, 2, { 40, -1 }, 0);
-            mu.label(ctx, "fov:"); mu.slider(ctx, &state.camera.fov, 1, 200);
+            mu.label(ctx, "fov:"); mu.slider(ctx, &state.fps_camera.fov, 1, 200);
 
             mu.label(ctx, "print"); mu.checkbox(ctx, &do_print, "");
             mu.label(ctx, "tween"); mu_checkbox(ctx, &do_tween, "");
             mu.label(ctx, "rotate"); mu_checkbox(ctx, &state.auto_rotate, "");
 
             for row_index in 0..<4 {
-                row := &state.camera.view_proj[row_index];
+                row := &state.view_proj[row_index];
                 mu_layout_row(ctx, 1, { 300, -1 }, 0);
                 mu.label(ctx, strings.clone_to_cstring(
                     fmt.tprintf("%f  %f  %f  %f", row[0], row[1], row[2], row[3]),
@@ -524,29 +512,8 @@ frame_callback :: proc "c" () {
     }
 
     // update camera
-    aspect:f32 = cast(f32)sapp.width() / cast(f32)sapp.height();
-    {
-        using state.camera;
-        {
-            using key_state;
-            /*
-            if w do eye_pos.z += dt;
-            if a do eye_pos.x -= dt;
-            if s do eye_pos.z -= dt;
-            if d do eye_pos.x += dt;
-            */
-        }
-
-        proj := perspective(deg2rad(fov), aspect, 0.01, 100.0);
-        view := look_at(eye_pos, Vector3{0, 0, 0}, Vector3 { 0, 1, 0 });
-        view_proj = mul(proj, view);
-    }
-
     update(&state.fps_camera, dt, key_state);
-
-    state.camera.view_proj = mul(state.fps_camera.proj, state.fps_camera.view);
-    state.camera.eye_pos = state.fps_camera.position;
-
+    state.view_proj = mul(state.fps_camera.proj, state.fps_camera.view);
 
     //
     // MICROUI
@@ -593,13 +560,13 @@ frame_callback :: proc "c" () {
         sgl.defaults();
         sgl.matrix_mode_projection();
         sgl.matrix_mode_modelview();
-        sgl.load_matrix(&state.camera.view_proj[0][0]);
+        sgl.load_matrix(&state.view_proj[0][0]);
         grid_frame_count :u32 = 0;
         sgl.translate(sin(f32(grid_frame_count) * 0.02) * 16.0, sin(f32(grid_frame_count) * 0.01) * 4.0, 0.0);
         sgl.c3f(1.0, 0.0, 1.0);
-
         grid(-7.0, grid_frame_count);
         grid(+7.0, grid_frame_count);
+        sgl.draw();
     }
 
     // DRAW MESH
@@ -609,8 +576,8 @@ frame_callback :: proc "c" () {
             node := &nodes[node_index];
             vs_params := shader_meta.vs_params {
                 model = mul(state.root_transform, node.transform),
-                view_proj = state.camera.view_proj,
-                eye_pos = state.camera.eye_pos,
+                view_proj = state.view_proj,
+                eye_pos = state.fps_camera.position,
             };
             mesh := &meshes[node.mesh];
             for i in 0..<mesh.num_primitives {
@@ -748,10 +715,6 @@ event_callback :: proc "c" (event: ^sapp.Event) {
 		switch event.key_code {
 			case .ESCAPE:
 				sapp.request_quit();
-			case .Q:
-				//if .CTRL in event.modifiers {
-					sapp.request_quit();
-				//}
 			case .RIGHT: right = true;
 			case .LEFT: left = true;
 			case .UP: up = true;
@@ -760,6 +723,8 @@ event_callback :: proc "c" (event: ^sapp.Event) {
 			case .S: s = true;
 			case .A: a = true;
 			case .D: d = true;
+            case .Q: q = true;
+            case .E: e = true;
 		}
 	}
 
@@ -774,6 +739,8 @@ event_callback :: proc "c" (event: ^sapp.Event) {
 			case .S: s = false;
 			case .A: a = false;
 			case .D: d = false;
+            case .Q: q = false;
+            case .E: e = false;
 		}
 	}
 }
