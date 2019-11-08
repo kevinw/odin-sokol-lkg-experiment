@@ -5,7 +5,6 @@ import sapp "sokol:sokol_app"
 import stime "sokol:sokol_time"
 import sfetch "sokol:sokol_fetch"
 import sgl "sokol:sokol_gl"
-import "shared:odin-stb/stbi"
 import mu "../lib/microui"
 import "../lib/basisu"
 
@@ -28,6 +27,25 @@ MAX_FILE_SIZE :: 10*1024*1024;
 MSAA_SAMPLE_COUNT :: 4;
 
 sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
+
+Key_State :: struct {
+	right: bool,
+	left: bool,
+	up: bool,
+	down: bool,
+
+	w: bool,
+	a: bool,
+	s: bool,
+	d: bool,
+}
+
+key_state := Key_State {};
+
+Mouse_State :: struct {
+    pos: Vector2,
+}
+
 
 Camera :: struct {
     eye_pos: Vector3,
@@ -114,6 +132,7 @@ state: struct {
         pipelines: [dynamic]sg.Pipeline,
     },
     camera: Camera,
+    fps_camera: FPS_Camera,
     placeholders: struct { white, normal, black: sg.Image },
     pip_cache: [dynamic]Pipeline_Cache_Params,
     point_light: shader_meta.light_params,
@@ -125,199 +144,37 @@ state: struct {
     },
 
     auto_rotate: bool,
+    mouse: Mouse_State,
+
 
 };
+
+position := Vector3 {};
+last_ticks: u64 = 0;
+
+do_print :i32 = 0;
+do_tween:= false;
+
+frame_count:u32;
+fps_counter: struct {
+    last_time_secs: f64,
+    num_frames: int,
+
+    ms_per_frame: f64,
+};
+
+per_frame_stats: struct {
+    draw_calls: u64,
+    num_elements: u64,
+};
+
+bg := [?]f32 { 0.5, 0.7, 1.0 };
+
+test_curve := Bezier_Curve { 1, 0, 0, 1 };
+
+window: mu.Container;
 
 mu_ctx: mu.Context;
-
-text: struct {
-    pass_action: sg.Pass_Action,
-    bind: sg.Bindings,
-    pipeline: sg.Pipeline,
-
-    texture_size: Vector2,
-    json_data: [256 * 1024]u8,
-    metrics: SDF_Text_Metrics,
-
-    vertex_elems: [dynamic]f32,
-    tex_elems: [dynamic]f32,
-};
-
-_load_count := 0;
-_did_load := false;
-
-Text_Vertex :: struct #packed {
-    pos: [2]f32,
-    uv: [2]f32,
-};
-
-did_load :: proc() {
-    _load_count += 1;
-    if _load_count != 2 do return;
-
-    _did_load = true;
-
-    using text;
-
-    size:f32 = 95.0;
-    create_text("sdf text", size);
-}
-
-create_text :: proc(str: string, size: f32) {
-    using text;
-
-    pen := Vector3 {0, 100, 0};
-
-    buf := strings.make_builder();
-    defer strings.destroy_builder(&buf);
-    for r in str {
-        strings.reset_builder(&buf);
-        strings.write_rune(&buf, r);
-        r_str := strings.to_string(buf);
-
-        draw_glyph(r_str, &pen, size, &vertex_elems, &tex_elems);
-    }
-
-    num_verts := len(vertex_elems) / 2;
-    assert(len(vertex_elems) == num_verts * 2);
-
-    verts := make([]Text_Vertex, num_verts);
-
-    for i in 0..<num_verts { // @Speed just use stride/attribute offsets to prevent this copy
-        j := i * 2;
-        verts[i] = {
-            {vertex_elems[j], vertex_elems[j + 1]},
-            {tex_elems[j], tex_elems[j + 1]},
-        };
-    }
-
-    text.bind.vertex_buffers[0] = sg.make_buffer({
-        size = cast(i32)(len(verts) * size_of(verts[0])),
-        content = &verts[0],
-        label = "text-glyph-vertices",
-    });
-
-    delete(verts);
-}
-
-draw_glyph :: proc(character: string, pen: ^Vector3, size: f32, vertex_elements: ^[dynamic]f32, texture_elements: ^[dynamic]f32) {
-    metric, found := text.metrics.chars[character];
-    if !found do return;
-
-    metrics := &text.metrics;
-
-    scale := size / cast(f32)metrics.size;
-    buffer := cast(f32)metrics.buffer;
-
-    factor:f32 = 1.0;
-
-    width := cast(f32)metric.width;
-    height := cast(f32)metric.height;
-    horiBearingX := cast(f32)metric.horizontal_bearing_x;
-    horiBearingY := cast(f32)metric.horizontal_bearing_y;
-    horiAdvance := cast(f32)metric.horizontal_advance;
-    posX := cast(f32)metric.pos_x;
-    posY := cast(f32)metric.pos_y;
-
-    if width > 0 && height > 0 {
-        width += buffer * 2.0;
-        height += buffer * 2.0;
-
-        // Add a quad (= two triangles) per glyph.
-
-        y0 := pen.y - (height - horiBearingY) * scale;
-        y1 := pen.y + (horiBearingY) * scale;
-
-        append(vertex_elements, 
-            (factor * (pen.x + ((horiBearingX - buffer) * scale))), (factor * y0),
-            (factor * (pen.x + ((horiBearingX - buffer + width) * scale))), (factor * y0),
-            (factor * (pen.x + ((horiBearingX - buffer) * scale))), (factor * y1),
-
-            (factor * (pen.x + ((horiBearingX - buffer + width) * scale))), (factor * y0),
-            (factor * (pen.x + ((horiBearingX - buffer) * scale))), (factor * y1),
-            (factor * (pen.x + ((horiBearingX - buffer + width) * scale))), (factor * y1)
-        );
-
-        append(texture_elements,
-            posX, posY + height,
-            posX + width, posY + height,
-            posX, posY,
-
-            posX + width, posY + height,
-            posX, posY,
-            posX + width, posY
-        );
-    }
-
-    // pen.x += Math.ceil(horiAdvance * scale);
-    pen.x = pen.x + horiAdvance * scale;
-}
-
-
-font_json_loaded :: proc "c" (response: ^sfetch.Response) {
-    if !response.fetched {
-        fmt.eprintln("error fetching font json", response);
-        return;
-    }
-
-    json_text := mem.slice_ptr(cast(^u8)response.buffer_ptr, cast(int)response.fetched_size);
-    text.metrics = metrics_from_json(json_text);
-
-    did_load();
-}
-
-font_normal_loaded :: proc "c" (response: ^sfetch.Response) {
-    if !response.fetched {
-        fmt.eprintln("error fetching normal font", response);
-        return;
-    }
-
-    width, height, channels:i32 = ---, ---, ---;
-
-    ptr := cast(^u8)response.buffer_ptr;
-    size := cast(i32)response.fetched_size;
-    
-    pixel_data := stbi.load_from_memory(ptr, size, &width, &height, &channels, 0);
-    
-    if pixel_data == nil {
-        fmt.println("could not load image");
-        return;
-    }
-
-    defer stbi.image_free(pixel_data);
-
-    text.texture_size = v2(width, height);
-
-    pixel_format: sg.Pixel_Format;
-    switch channels {
-        case 1:
-            pixel_format = .R8;
-        case 3:
-            panic("unimplemented");
-        case 4:
-            pixel_format = .RGBA8;
-        case:
-            panic("unexpected number of channels");
-    }
-
-    image_desc := sg.Image_Desc {
-        width = width,
-        height = height,
-        pixel_format = pixel_format,
-        min_filter = .LINEAR,
-        mag_filter = .LINEAR,
-    };
-
-    image_desc.content.subimage[0][0] = {
-        ptr = pixel_data,
-        size = width * height * channels,
-    };
-
-    sg.init_image(text.bind.fs_images[shader_meta.SLOT_u_texture], image_desc);
-    
-    did_load();
-
-}
 
 /* microui callbacks */
 text_width_cb :: proc "c" (font: mu.Font, _text: cstring, _byte_len: i32) -> i32 {
@@ -374,6 +231,8 @@ init_callback :: proc "c" () {
 
     basisu.setup();
 
+    init(&state.fps_camera);
+
     r_init();
     mu.init(&mu_ctx);
     mu_ctx.text_width = text_width_cb;
@@ -386,19 +245,7 @@ init_callback :: proc "c" () {
         num_lanes = 4,
     });
 
-    sfetch.send({
-        path = "resources/OpenSans-Regular.png",
-        callback = font_normal_loaded,
-        buffer_ptr = &state.font_normal_data[0],
-        buffer_size = size_of(state.font_normal_data),
-    });
-
-    sfetch.send({
-        path = "resources/OpenSans-Regular.json",
-        callback = font_json_loaded,
-        buffer_ptr = &text.json_data[0],
-        buffer_size = size_of(text.json_data),
-    });
+    load_sdf_fonts();
 
     //
     // MESH SETUP
@@ -541,26 +388,6 @@ init_callback :: proc "c" () {
     }
 }
 
-position := Vector3 {};
-last_ticks: u64 = 0;
-
-fps_counter: struct {
-    last_time_secs: f64,
-    num_frames: int,
-
-    ms_per_frame: f64,
-};
-
-per_frame_stats: struct {
-    draw_calls: u64,
-    num_elements: u64,
-};
-
-bg := [?]f32 { 0.5, 0.7, 1.0 };
-
-test_curve := Bezier_Curve { 1, 0, 0, 1 };
-
-window: mu.Container;
 test_window :: proc(ctx: ^mu.Context) {
     if window.inited == {} {
         mu.init_window(ctx, &window, {});
@@ -595,6 +422,7 @@ test_window :: proc(ctx: ^mu.Context) {
             mu.label(ctx, "fov:"); mu.slider(ctx, &state.camera.fov, 1, 200);
 
             mu.label(ctx, "print"); mu.checkbox(ctx, &do_print, "");
+            mu.label(ctx, "tween"); mu_checkbox(ctx, &do_tween, "");
             mu.label(ctx, "rotate"); mu_checkbox(ctx, &state.auto_rotate, "");
 
             for row_index in 0..<4 {
@@ -629,8 +457,6 @@ test_window :: proc(ctx: ^mu.Context) {
     }
 }
 
-do_print :i32 = 0;
-frame_count:u32;
 frame_callback :: proc "c" () {
     free_all(context.temp_allocator);
 
@@ -688,7 +514,7 @@ frame_callback :: proc "c" () {
     state.root_transform = state.auto_rotate ? rotate_matrix4(Vector3{0, 1, 0}, cast(f32)now_seconds) : identity(Matrix4);
 
     // every other second, scrub through curve, pausing at the end for the other second
-    {
+    if do_tween {
         time := cast(f32)(now_seconds * .3);
         int_part, r := math.modf(time);
         if cast(int)int_part % 2 == 0 do r = 1.0 - r;
@@ -698,21 +524,29 @@ frame_callback :: proc "c" () {
     }
 
     // update camera
+    aspect:f32 = cast(f32)sapp.width() / cast(f32)sapp.height();
     {
         using state.camera;
         {
             using key_state;
+            /*
             if w do eye_pos.z += dt;
             if a do eye_pos.x -= dt;
             if s do eye_pos.z -= dt;
             if d do eye_pos.x += dt;
+            */
         }
 
-        aspect:f32 = cast(f32)sapp.width() / cast(f32)sapp.height();
         proj := perspective(deg2rad(fov), aspect, 0.01, 100.0);
         view := look_at(eye_pos, Vector3{0, 0, 0}, Vector3 { 0, 1, 0 });
         view_proj = mul(proj, view);
     }
+
+    update(&state.fps_camera, dt, key_state);
+
+    state.camera.view_proj = mul(state.fps_camera.proj, state.fps_camera.view);
+    state.camera.eye_pos = state.fps_camera.position;
+
 
     //
     // MICROUI
@@ -752,6 +586,20 @@ frame_callback :: proc "c" () {
         // shadertoy uniforms
         sg.apply_uniforms(.FS, shader_meta.SLOT_st_fs_uniforms, &global_params_values, size_of(shader_meta.st_fs_uniforms));
         sg.draw(0, 6, 1);
+    }
+
+    // DRAW GRID LINES
+    {
+        sgl.defaults();
+        sgl.matrix_mode_projection();
+        sgl.matrix_mode_modelview();
+        sgl.load_matrix(&state.camera.view_proj[0][0]);
+        grid_frame_count :u32 = 0;
+        sgl.translate(sin(f32(grid_frame_count) * 0.02) * 16.0, sin(f32(grid_frame_count) * 0.01) * 4.0, 0.0);
+        sgl.c3f(1.0, 0.0, 1.0);
+
+        grid(-7.0, grid_frame_count);
+        grid(+7.0, grid_frame_count);
     }
 
     // DRAW MESH
@@ -848,7 +696,6 @@ frame_callback :: proc "c" () {
         sg.draw(0, num_verts, 1);
     }
 
-
     // DRAW UI
     r_draw();
 
@@ -885,20 +732,6 @@ run_app :: proc() {
 	os.exit(int(err));
 }
 
-Key_State :: struct {
-	right: bool,
-	left: bool,
-	up: bool,
-	down: bool,
-
-	w: bool,
-	a: bool,
-	s: bool,
-	d: bool,
-}
-
-key_state := Key_State {};
-
 event_callback :: proc "c" (event: ^sapp.Event) {
     switch event.type {
         case .MOUSE_DOWN:
@@ -907,6 +740,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
             mu.input_mouseup(&mu_ctx, cast(i32)event.mouse_x, cast(i32)event.mouse_y, 1 << cast(u32)event.mouse_button);
         case .MOUSE_MOVE:
             mu.input_mousemove(&mu_ctx, cast(i32)event.mouse_x, cast(i32)event.mouse_y);
+            state.mouse.pos = v2(event.mouse_x, event.mouse_y);
     }
 
 	if event.type == .KEY_DOWN && !event.key_repeat {

@@ -12,7 +12,7 @@ import "../lib/basisu"
 import "./shader_meta"
 import "shared:odin-stb/stbi"
 
-VERBOSE :: true;
+VERBOSE :: false;
 
 Image_Type :: enum {
     Unknown,

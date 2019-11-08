@@ -2,7 +2,7 @@
 setlocal
 set PATH=c:\src\fips-deploy\sokol-tools\win64-vstudio-debug;%PATH%
 set SHDC=sokol-shdc --slang hlsl5 --input
-set OPT_LEVEL=3
+set OPT_LEVEL=0
 
 preprocess.exe &&^
 %SHDC% shadertoy.glsl --output src/shader_meta/shadertoy.odin && ^

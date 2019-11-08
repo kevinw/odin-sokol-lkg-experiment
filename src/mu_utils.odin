@@ -40,8 +40,12 @@ r_get_text_height :: proc() -> i32 {
 
 mu_checkbox :: proc(ctx: ^mu.Context, val: ^bool, label: cstring) {
     bool_val:i32 = val^ ? 1 : 0;
-    mu.checkbox(ctx, &bool_val, label);
-    val^ = bool_val == 1 ? true : false;
+    {
+        mu.push_id(ctx, val, size_of(bool));
+        defer mu.pop_id(ctx);
+        mu.checkbox(ctx, &bool_val, label);
+    }
+    val^ = bool_val != 0 ? true : false;
 }
 
 mu_label_printf :: proc(ctx: ^mu.Context, fmt_str: string, args: ..any) {
