@@ -2,6 +2,7 @@ package main
 
 using import "core:math/linalg"
 using import "core:math"
+import "core:fmt"
 import sapp "sokol:sokol_app"
 
 FPS_Camera :: struct {
@@ -14,56 +15,49 @@ FPS_Camera :: struct {
 }
 
 speed :: 3.0;
-mouse_speed :: 0.005;
-
-last_mouse:Vector2;
-first := true;
+mouse_speed :: 0.006;
 
 near_clip :: 0.1;
 far_clip :: 1000.0;
 
 init :: proc(using Camera: ^FPS_Camera) {
-    fov = 60;
+    fov = 75;
 }
 
 update :: proc(using camera: ^FPS_Camera, dt: f32, key_state: Key_State) {
-    if first {
-        first = false;
-    } else {
-        delta := (last_mouse - state.mouse.pos) * mouse_speed;
-        angle.x += delta.x;
-        angle.y += -delta.y;
+    move_x, move_y: i32 = 0, 0;
+    sapp.get_relative_mouse(&move_x, &move_y);
+    change := v2(move_x, move_y);
 
-        // Spherical to Cartesian
-        direction := v3(
-            cos(angle.y) * sin(angle.x), 
-            sin(angle.y),
-            cos(angle.y) * cos(angle.x));
-        
-        right_v := v3(
-            sin(angle.x - PI/2.0), 
-            0,
-            cos(angle.x - PI/2.0));
-        
-        up_v := cross(right_v, direction);
+    angle += change * mouse_speed;
 
-        {
-            using key_state;
-            if w || up do    position += direction * dt * speed;
-            if s || down do  position -= direction * dt * speed;
-            if d || right do position -= right_v   * dt * speed;
-            if a || left do  position += right_v   * dt * speed;
-            if e do position -= up_v * dt * speed;
-            if q do position += up_v * dt * speed;
-        }
+    // Spherical to Cartesian
+    direction := v3(
+        cos(angle.y) * sin(angle.x), 
+        sin(angle.y),
+        cos(angle.y) * cos(angle.x));
+    
+    right_v := v3(
+        sin(angle.x - PI/2.0), 
+        0,
+        cos(angle.x - PI/2.0));
+    
+    up_v := cross(right_v, direction);
 
-        aspect := cast(f32)sapp.width() / cast(f32)sapp.height();
-
-        proj = perspective(deg2rad(fov), aspect, near_clip, far_clip);
-        view = look_at(position, position + direction, up_v); 
+    {
+        using key_state;
+        if w || up do    position += direction * dt * speed;
+        if s || down do  position -= direction * dt * speed;
+        if d || right do position -= right_v   * dt * speed;
+        if a || left do  position += right_v   * dt * speed;
+        if e do position -= up_v * dt * speed;
+        if q do position += up_v * dt * speed;
     }
 
-    last_mouse = state.mouse.pos;
+    aspect := cast(f32)sapp.width() / cast(f32)sapp.height();
+
+    proj = perspective(deg2rad(fov), aspect, near_clip, far_clip);
+    view = look_at(position, position + direction, up_v); 
 }
 /*
 

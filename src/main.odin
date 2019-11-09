@@ -523,7 +523,6 @@ frame_callback :: proc "c" () {
         defer mu.end(&mu_ctx);
         test_window(&mu_ctx);
     }
-    mu_render(sapp.width(), sapp.height()); // note; this just pushes commands to a queue. r_draw below actually does the draw calls
 
     per_frame_stats = {};
 
@@ -566,8 +565,9 @@ frame_callback :: proc "c" () {
         sgl.c3f(1.0, 0.0, 1.0);
         grid(-7.0, grid_frame_count);
         grid(+7.0, grid_frame_count);
-        sgl.draw();
+        //sgl.draw();
     }
+    mu_render(sapp.width(), sapp.height()); // note; this just pushes commands to a queue. r_draw below actually does the draw calls
 
     // DRAW MESH
     {
@@ -676,29 +676,6 @@ cleanup :: proc "c" () {
     sg.shutdown();
 }
 
-main :: proc() {
-    //fmt.println("--------odin sizes:");
-    //cgltf.print_sizes();
-    //fmt.println("--------c sizes:");
-    //cgltf.print_struct_sizes();
-
-    run_app();
-}
-
-run_app :: proc() {
-	err := sapp.run({
-		init_cb      = init_callback,
-		frame_cb     = frame_callback,
-		cleanup_cb   = cleanup,
-		event_cb     = event_callback,
-		width        = WINDOW_WIDTH,
-		height       = WINDOW_HEIGHT,
-		window_title = "testbed",
-        sample_count = MSAA_SAMPLE_COUNT,
-	});
-	os.exit(int(err));
-}
-
 event_callback :: proc "c" (event: ^sapp.Event) {
     switch event.type {
         case .MOUSE_DOWN:
@@ -708,6 +685,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
         case .MOUSE_MOVE:
             mu.input_mousemove(&mu_ctx, cast(i32)event.mouse_x, cast(i32)event.mouse_y);
             state.mouse.pos = v2(event.mouse_x, event.mouse_y);
+            //fmt.printf("MOUSE_MOVE event (%d, %d)\n", event.mouse_x, event.mouse_y);
     }
 
 	if event.type == .KEY_DOWN && !event.key_repeat {
@@ -744,3 +722,31 @@ event_callback :: proc "c" (event: ^sapp.Event) {
 		}
 	}
 }
+
+/*
+check_sizes :: proc() {
+    fmt.println("--------odin sizes:");
+    cgltf.print_sizes();
+    fmt.println("--------c sizes:");
+    cgltf.print_struct_sizes();
+}
+*/
+
+main :: proc() {
+	os.exit(run_app());
+}
+
+run_app :: proc() -> int {
+	return sapp.run({
+		init_cb      = init_callback,
+		frame_cb     = frame_callback,
+		cleanup_cb   = cleanup,
+		event_cb     = event_callback,
+		width        = WINDOW_WIDTH,
+		height       = WINDOW_HEIGHT,
+		window_title = "testbed",
+        sample_count = MSAA_SAMPLE_COUNT,
+        //high_dpi     = true,
+	});
+}
+
