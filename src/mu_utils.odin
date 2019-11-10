@@ -2,7 +2,7 @@ package main
 
 import sg "sokol:sokol_gfx"
 import sgl "sokol:sokol_gl"
-import mu "../lib/microui"
+using import mu "../lib/microui"
 import mu_atlas "../lib/microui/atlas"
 import "core:strings"
 import "core:fmt"
@@ -26,8 +26,17 @@ r_get_text_width :: proc(text: []u8) -> i32 {
     */
 }
 
-mu_vector3 :: proc(ctx: ^mu.Context, v: ^Vector3, min_val, max_val: f32) -> mu.Res {
-    res: mu.Res;
+mu_label :: proc(ctx: ^Context, s: string) {
+    c_str := strings.clone_to_cstring(s, context.temp_allocator);
+    mu.label(ctx, c_str);
+}
+
+mu_vector3 :: proc(ctx: ^Context, v: ^Vector3, min_val, max_val: f32) -> Res {
+    layout_begin_column(ctx);
+    mu_layout_row(ctx, 2, { 20, -1 }, 0);
+    defer layout_end_column(ctx);
+
+    res: Res;
     mu.label(ctx, "x:"); res |= mu.slider(ctx, &v[0], min_val, max_val);
     mu.label(ctx, "y:"); res |= mu.slider(ctx, &v[1], min_val, max_val);
     mu.label(ctx, "z:"); res |= mu.slider(ctx, &v[2], min_val, max_val);

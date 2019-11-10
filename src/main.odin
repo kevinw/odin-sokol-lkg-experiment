@@ -18,6 +18,9 @@ using import "core:math/linalg"
 
 import shader_meta "./shader_meta";
 
+ANIM_CURVE_WIP :: false;
+
+
 WINDOW_WIDTH :: 1280;
 WINDOW_HEIGHT :: 720;
 
@@ -28,12 +31,13 @@ MSAA_SAMPLE_COUNT :: 4;
 
 sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 
-Key_State :: struct {
+Input_State :: struct {
 	right, left, up, down: bool,
 	w, a, s, d, q, e: bool,
+    left_mouse, right_mouse: bool,
 }
 
-key_state := Key_State {};
+input_state := Input_State {};
 
 Mouse_State :: struct {
     pos: Vector2,
@@ -98,8 +102,8 @@ state: struct {
 	pass_action: sg.Pass_Action,
 	bind:        sg.Bindings,
 	pip:         sg.Pipeline,
-
     mu_pip:      sg.Pipeline,
+    line_rendering_pipeline: sg.Pipeline,
     mu_atlas_img: sg.Image,
 
     font_normal_data: [256 * 1024]u8, // TODO: use a smaller buffer and the streaming capability of sokol-fetch
@@ -215,8 +219,6 @@ init_callback :: proc "c" () {
         pipeline_pool_size = 5,
     });
 
-    sapp.show_mouse(false);
-
     basisu.setup();
 
     init(&state.fps_camera);
@@ -329,7 +331,19 @@ init_callback :: proc "c" () {
                 },
             },
         });
+    }
 
+    // make line rendering pipeline
+    {
+        state.line_rendering_pipeline = sgl.make_pipeline({
+            depth_stencil = {
+                depth_write_enabled = true,
+                depth_compare_func = sg.Compare_Func.LESS_EQUAL,
+            },
+            rasterizer = {
+                sample_count = MSAA_SAMPLE_COUNT,
+            },
+        });
     }
 
     //
@@ -376,7 +390,7 @@ init_callback :: proc "c" () {
     }
 }
 
-test_window :: proc(ctx: ^mu.Context) {
+debug_window :: proc(ctx: ^mu.Context) {
     if window.inited == {} {
         mu.init_window(ctx, &window, {});
         window.rect = mu.rect(40, 40, 300, 450);
@@ -388,12 +402,30 @@ test_window :: proc(ctx: ^mu.Context) {
     if mu.begin_window(ctx, &window, "") {
         defer mu.end_window(ctx);
 
-        mu.layout_begin_column(ctx);
-        mu_layout_row(ctx, 1, {100,}, 100);
-        mu_anim_curve(ctx, &test_curve);
-        mu.layout_end_column(ctx);
+        when ANIM_CURVE_WIP {
+            mu.layout_begin_column(ctx);
+            mu_layout_row(ctx, 1, {100,}, 100);
+            mu_anim_curve(ctx, &test_curve);
+            mu.layout_end_column(ctx);
+        }
 
-        @static show_info: i32 = 1;
+        @static show_tweaks: i32 = 1;
+        if mu.header(ctx, &show_tweaks, "tweaks") {
+            if len(all_tweakables) == 0 {
+                mu.label(ctx, "no tweaks");
+            } else {
+                for tweakable in all_tweakables {
+                    mu_label(ctx, tweakable.name);
+                    any_ptr := tweakable.ptr();
+                    switch v in any_ptr {
+                        case ^Vector3: mu_vector3(ctx, v, -60, 60);
+                        case ^f32: mu.slider(ctx, v, -10, 10);
+                    }
+                }
+            }
+        }
+
+        @static show_info: i32 = 0;
         if mu.header(ctx, &show_info, "debug") {
             mu_layout_row(ctx, 2,{80, -1}, 0);
             mu.label(ctx, "ms per frame:"); mu_label_printf(ctx, "%f", fps_counter.ms_per_frame);
@@ -401,10 +433,7 @@ test_window :: proc(ctx: ^mu.Context) {
 
             mu.label(ctx, "camera eye pos:");
 
-            mu.layout_begin_column(ctx);
-            mu_layout_row(ctx, 2, { 20, -1 }, 0);
             mu_vector3(ctx, &state.fps_camera.position, -20, 20);
-            mu.layout_end_column(ctx);
 
             mu_layout_row(ctx, 2, { 40, -1 }, 0);
             mu.label(ctx, "fov:"); mu.slider(ctx, &state.fps_camera.fov, 1, 200);
@@ -421,11 +450,6 @@ test_window :: proc(ctx: ^mu.Context) {
                     context.temp_allocator));
             }
 
-        }
-
-        /* background color sliders */
-        @static show_sliders:i32 = 1;
-        if (mu.header(ctx, &show_sliders, "Background Color")) {
             mu_layout_row(ctx, 2, { -78, -1 }, 74);
             /* sliders */
             mu.layout_begin_column(ctx);
@@ -441,6 +465,7 @@ test_window :: proc(ctx: ^mu.Context) {
             s := fmt.tprintf("#%02X%02X%02X", cast(i32) bg[0], cast(i32) bg[1], cast(i32) bg[2]);
             c_s := strings.clone_to_cstring(s, context.temp_allocator);
             mu.draw_control_text(ctx, c_s, r, cast(i32)mu.Style_Color.Text, {mu.Opt.AlignCenter});
+
         }
     }
 }
@@ -484,7 +509,7 @@ frame_callback :: proc "c" () {
 
 	v := Vector3 {};
     {
-        using key_state;
+        using input_state;
         if d || right do v.x -= 1.0;
         if a || left do v.x += 1.0;
         if w || up do v.y -= 1.0;
@@ -512,7 +537,8 @@ frame_callback :: proc "c" () {
     }
 
     // update camera
-    update(&state.fps_camera, dt, key_state);
+    aspect := cast(f32)sapp.width() / cast(f32)sapp.height();
+    update(&state.fps_camera, dt, input_state, aspect);
     state.view_proj = mul(state.fps_camera.proj, state.fps_camera.view);
 
     //
@@ -521,7 +547,7 @@ frame_callback :: proc "c" () {
     { // definition
         mu.begin(&mu_ctx);
         defer mu.end(&mu_ctx);
-        test_window(&mu_ctx);
+        debug_window(&mu_ctx);
     }
 
     per_frame_stats = {};
@@ -557,14 +583,16 @@ frame_callback :: proc "c" () {
     // DRAW GRID LINES
     {
         sgl.defaults();
+        sgl.push_pipeline();
+        defer sgl.pop_pipeline();
+        sgl.load_pipeline(state.line_rendering_pipeline);
         sgl.matrix_mode_projection();
         sgl.matrix_mode_modelview();
         sgl.load_matrix(&state.view_proj[0][0]);
-        grid_frame_count :u32 = 0;
-        sgl.translate(sin(f32(grid_frame_count) * 0.02) * 16.0, sin(f32(grid_frame_count) * 0.01) * 4.0, 0.0);
-        sgl.c3f(1.0, 0.0, 1.0);
-        grid(-7.0, grid_frame_count);
-        grid(+7.0, grid_frame_count);
+        grid_frame_count:u32 = 0;
+        //sgl.translate(sin(f32(grid_frame_count) * 0.02) * 16.0, sin(f32(grid_frame_count) * 0.01) * 4.0, 0.0);
+        sgl.c3f(0.5, 0.5, 0.5);
+        grid(0, grid_frame_count);
         //sgl.draw();
     }
     mu_render(sapp.width(), sapp.height()); // note; this just pushes commands to a queue. r_draw below actually does the draw calls
@@ -680,8 +708,16 @@ event_callback :: proc "c" (event: ^sapp.Event) {
     switch event.type {
         case .MOUSE_DOWN:
             mu.input_mousedown(&mu_ctx, cast(i32)event.mouse_x, cast(i32)event.mouse_y, 1 << cast(u32)event.mouse_button);
+            switch event.mouse_button {
+                case .LEFT: input_state.left_mouse = true;
+                case .RIGHT: input_state.right_mouse = true;
+            }
         case .MOUSE_UP:
             mu.input_mouseup(&mu_ctx, cast(i32)event.mouse_x, cast(i32)event.mouse_y, 1 << cast(u32)event.mouse_button);
+            switch event.mouse_button {
+                case .LEFT: input_state.left_mouse = false;
+                case .RIGHT: input_state.right_mouse = false;
+            }
         case .MOUSE_MOVE:
             mu.input_mousemove(&mu_ctx, cast(i32)event.mouse_x, cast(i32)event.mouse_y);
             state.mouse.pos = v2(event.mouse_x, event.mouse_y);
@@ -689,7 +725,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
     }
 
 	if event.type == .KEY_DOWN && !event.key_repeat {
-		using key_state;
+		using input_state;
 		switch event.key_code {
 			case .ESCAPE:
 				sapp.request_quit();
@@ -707,7 +743,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
 	}
 
 	if event.type == .KEY_UP {
-		using key_state;
+		using input_state;
 		switch event.key_code {
 			case .RIGHT: right = false;
 			case .LEFT: left = false;

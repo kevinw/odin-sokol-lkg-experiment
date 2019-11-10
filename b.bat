@@ -8,6 +8,6 @@ preprocess.exe &&^
 %SHDC% shadertoy.glsl --output src/shader_meta/shadertoy.odin && ^
 %SHDC% sdf_text.glsl --output src/shader_meta/sdf_text.odin && ^
 %SHDC% cgltf_sapp.glsl --output src/shader_meta/cgltf_sapp.odin && ^
-odin build src -collection=sokol=../odin-sokol/src -opt=%OPT_LEVEL% 
+odin build src -collection=sokol=../odin-sokol/src -opt=%OPT_LEVEL% -debug -ignore-unknown-attributes
 
 REM -show-timings -keep-temp-files 

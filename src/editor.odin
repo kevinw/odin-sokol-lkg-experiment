@@ -1,11 +1,17 @@
-package main;
+package main
 
 import sgl "sokol:sokol_gl"
+using import "core:math/linalg"
+
+@tweak
+grid_offset := Vector3{0, 0, num * 0.5};
 
 grid :: proc(y: f32, frame_count: u32) {
-    num :: 64;
-    dist:f32: 4.0;
-    z_offset := (dist / 8.0) * f32(frame_count & 7);
+    sgl.push_matrix();
+    defer sgl.pop_matrix();
+    sgl.translate(grid_offset.x, grid_offset.y, grid_offset.z);
+
+    dist:f32: 1.0;
 
     sgl.begin_lines();
     defer sgl.end();
@@ -17,8 +23,11 @@ grid :: proc(y: f32, frame_count: u32) {
     }
 
     for i in 0..<num {
-        z := z_offset + f32(i) * f32(dist) - num * dist;
+        z := f32(i) * f32(dist) - num * dist;
         sgl.v3f(-num * dist * 0.5, y, z);
         sgl.v3f(num * dist * 0.5, y, z);
     }
 }
+
+num :: 64;
+
