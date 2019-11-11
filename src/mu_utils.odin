@@ -36,7 +36,7 @@ mu_label :: proc(ctx: ^mu.Context, s: string) {
     mu.label(ctx, c_str);
 }
 
-mu_vector :: proc(ctx: ^mu.Context, v: ^[$N]f32, min_val, max_val: f32) -> mu.Res
+mu_vector :: proc(ctx: ^mu.Context, v: ^$V/[$N]f32, min_val, max_val: f32) -> mu.Res
     where intrinsics.type_is_integer(type_of(N)) && N > 0
 {
     mu.layout_begin_column(ctx);
@@ -70,13 +70,12 @@ r_get_text_height :: proc() -> i32 {
 }
 
 mu_checkbox_cstring :: proc(ctx: ^mu.Context, val: ^bool, label: cstring = "") {
-    bool_val:i32 = val^ ? 1 : 0;
-    {
-        mu.push_id(ctx, val, size_of(bool));
-        defer mu.pop_id(ctx);
-        mu.checkbox(ctx, &bool_val, label);
-    }
-    val^ = bool_val != 0 ? true : false;
+    mu.push_id_ptr(ctx, val);
+    defer mu.pop_id(ctx);
+
+    checkbox_val:i32 = val^ ? 1 : 0;
+    mu.checkbox(ctx, &checkbox_val, label);
+    val^ = checkbox_val != 0 ? true : false;
 }
 
 mu_checkbox :: proc { mu_checkbox_cstring };
@@ -241,7 +240,7 @@ mu_render :: proc(width, height: int) {
     }
 }
 
-mu_struct_window :: inline proc(value: ^$T) {
+mu_struct_window :: inline proc(ctx: ^mu.Context, value: ^$T) {
     //imgui.push_font(imgui_font_mono);
     //defer imgui.pop_font();
 
@@ -251,11 +250,11 @@ mu_struct_window :: inline proc(value: ^$T) {
     mu_struct_ti("", value, type_info_of(T));
 }
 
-mu_struct :: inline proc(value: ^$T, name: string, do_header := true) {
+mu_struct :: inline proc(ctx: ^mu.Context, value: ^$T, name: string, do_header := true) {
     //imgui.push_font(imgui_font_mono);
     //defer imgui.pop_font();
 
-    mu_struct_ti(name, value, type_info_of(T), "", do_header);
+    mu_struct_ti(ctx, name, value, type_info_of(T), "", do_header);
 }
 
 mu_indent :: proc() {

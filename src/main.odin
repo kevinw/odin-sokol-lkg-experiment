@@ -139,15 +139,13 @@ state: struct {
 
     auto_rotate: bool,
     mouse: Mouse_State,
-
-
 };
 
 position := Vector3 {};
 last_ticks: u64 = 0;
 
 do_print :i32 = 0;
-do_tween:= false;
+do_tween:bool = false;
 
 frame_count:u32;
 fps_counter: struct {
@@ -433,14 +431,14 @@ debug_window :: proc(ctx: ^mu.Context) {
 
             mu.label(ctx, "camera eye pos:");
 
-            mu_vector(ctx, cast(^[3]f32)&state.fps_camera.position, -20, 20);
+            mu_vector(ctx, &state.fps_camera.position, -20, 20);
 
             mu_layout_row(ctx, 2, { 40, -1 }, 0);
             mu.label(ctx, "fov:"); mu.slider(ctx, &state.fps_camera.fov, 1, 200);
 
             mu.label(ctx, "print"); mu.checkbox(ctx, &do_print, "");
-            mu.label(ctx, "tween"); mu_checkbox(ctx, &do_tween, "");
-            mu.label(ctx, "rotate"); mu_checkbox(ctx, &state.auto_rotate, "");
+            mu.label(ctx, "tween"); mu_checkbox(ctx, &do_tween, "tween");
+            mu.label(ctx, "rotate"); mu_checkbox(ctx, &state.auto_rotate, "auto rotate");
 
             for row_index in 0..<4 {
                 row := &state.view_proj[row_index];
