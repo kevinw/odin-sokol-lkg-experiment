@@ -1,3 +1,4 @@
+compile dependencies with all optimizations
 x get shader globals as a struct, parsed by odin, generating a shader file
 goals: make it very easy to say "this value lerps to this other value"
 iq's warp https://www.iquilezles.org/www/articles/warp/warp.htm?utm_source=share&utm_medium=ios_app&utm_name=iossmf

@@ -400,10 +400,9 @@ debug_window :: proc(ctx: ^mu.Context) {
 
     if mu.begin_window(ctx, &window, "") {
         defer mu.end_window(ctx);
-
         when ANIM_CURVE_WIP {
             mu.layout_begin_column(ctx);
-            mu_layout_row(ctx, 1, {100,}, 100);
+            mu_layout_row(ctx, {100,}, 100);
             mu_anim_curve(ctx, &test_curve);
             mu.layout_end_column(ctx);
         }
@@ -416,16 +415,14 @@ debug_window :: proc(ctx: ^mu.Context) {
                 for tweakable in all_tweakables {
                     mu_label(ctx, tweakable.name);
                     any_ptr := tweakable.ptr();
-
-                    ptr_type := type_info_of(any_ptr.id).variant.(Type_Info_Pointer).elem;
-                    mu_struct_ti(ctx, tweakable.name, any_ptr.data, ptr_type);
+                    mu_struct_ti(ctx, tweakable.name, any_ptr.data, type_info_of(any_ptr.id));
                 }
             }
         }
 
         @static show_info: i32 = 0;
         if mu.header(ctx, &show_info, "debug") {
-            mu_layout_row(ctx, 2,{80, -1}, 0);
+            mu_layout_row(ctx, {80, -1}, 0);
             mu.label(ctx, "ms per frame:"); mu_label_printf(ctx, "%f", fps_counter.ms_per_frame);
             mu.label(ctx, "num elements:"); mu_label_printf(ctx, "%d", per_frame_stats.num_elements);
 
@@ -433,7 +430,7 @@ debug_window :: proc(ctx: ^mu.Context) {
 
             mu_vector(ctx, &state.fps_camera.position, -20, 20);
 
-            mu_layout_row(ctx, 2, { 40, -1 }, 0);
+            mu_layout_row(ctx, { 40, -1 }, 0);
             mu.label(ctx, "fov:"); mu.slider(ctx, &state.fps_camera.fov, 1, 200);
 
             mu.label(ctx, "print"); mu.checkbox(ctx, &do_print, "");
@@ -442,16 +439,16 @@ debug_window :: proc(ctx: ^mu.Context) {
 
             for row_index in 0..<4 {
                 row := &state.view_proj[row_index];
-                mu_layout_row(ctx, 1, { 300, -1 }, 0);
+                mu_layout_row(ctx, { 300, -1 }, 0);
                 mu.label(ctx, strings.clone_to_cstring(
                     fmt.tprintf("%f  %f  %f  %f", row[0], row[1], row[2], row[3]),
                     context.temp_allocator));
             }
 
-            mu_layout_row(ctx, 2, { -78, -1 }, 74);
+            mu_layout_row(ctx, { -78, -1 }, 74);
             /* sliders */
             mu.layout_begin_column(ctx);
-            mu_layout_row(ctx, 2, { 46, -1 }, 0);
+            mu_layout_row(ctx, { 46, -1 }, 0);
             mu.label(ctx, "Red:");   mu.slider(ctx, &bg[0], 0, 1.0);
             mu.label(ctx, "Green:"); mu.slider(ctx, &bg[1], 0, 1.0);
             mu.label(ctx, "Blue:");  mu.slider(ctx, &bg[2], 0, 1.0);
@@ -469,7 +466,6 @@ debug_window :: proc(ctx: ^mu.Context) {
 }
 
 frame_callback :: proc "c" () {
-    free_all(context.temp_allocator);
 
 	//
 	// TIME
@@ -700,6 +696,7 @@ cleanup :: proc "c" () {
     basisu.shutdown();
     sfetch.shutdown();
     sg.shutdown();
+    free_all(context.temp_allocator);
 }
 
 event_callback :: proc "c" (event: ^sapp.Event) {

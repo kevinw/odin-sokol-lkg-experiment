@@ -15,6 +15,7 @@ DEFAULT_BUFFER_SIZE :: 200;
 
 // TODO: @Speed just make strings with null bytes on the end and cast the pointer!!!
 tcstring :: proc(s: string) -> cstring do return strings.clone_to_cstring(s, context.temp_allocator);
+tprint :: fmt.tprint;
 
 r_get_text_width :: proc(text: []u8) -> i32 {
     res:i32 = 0;
@@ -40,21 +41,15 @@ mu_vector :: proc(ctx: ^mu.Context, v: ^$V/[$N]f32, min_val, max_val: f32) -> mu
     where intrinsics.type_is_integer(type_of(N)) && N > 0
 {
     mu.layout_begin_column(ctx);
-    mu_layout_row(ctx, 2, { 20, -1 }, 0);
+    mu_layout_row(ctx, { 20, -1 }, 0);
     defer mu.layout_end_column(ctx);
 
     res: mu.Res;
-    mu.label(ctx, "x:"); res |= mu.slider(ctx, &v[0], min_val, max_val);
     when N <= 4 {
-        when N > 1 {
-            mu.label(ctx, "y:"); res |= mu.slider(ctx, &v[1], min_val, max_val);
-        }
-        when N > 2 {
-            mu.label(ctx, "z:"); res |= mu.slider(ctx, &v[2], min_val, max_val);
-        }
-        when N > 3 {
-            mu.label(ctx, "w:"); res |= mu.slider(ctx, &v[3], min_val, max_val);
-        }
+        when N > 0 do mu.label(ctx, "x:"); res |= mu.slider(ctx, &v[0], min_val, max_val);
+        when N > 1 do mu.label(ctx, "y:"); res |= mu.slider(ctx, &v[1], min_val, max_val);
+        when N > 2 do mu.label(ctx, "z:"); res |= mu.slider(ctx, &v[2], min_val, max_val);
+        when N > 3 do mu.label(ctx, "w:"); res |= mu.slider(ctx, &v[3], min_val, max_val);
     } else {
         inline for j in 0..<N {
             mu.label(ctx, fmt.tprintf("[%d]:", j));
@@ -81,20 +76,11 @@ mu_checkbox_cstring :: proc(ctx: ^mu.Context, val: ^bool, label: cstring = "") {
 mu_checkbox :: proc { mu_checkbox_cstring };
 
 mu_label_printf :: proc(ctx: ^mu.Context, fmt_str: string, args: ..any) {
-	data: [DEFAULT_BUFFER_SIZE]byte;
-	buf := strings.builder_from_slice(data[:]);
-	res := fmt.sbprintf(&buf, fmt_str, ..args);
-
-    // @Speed: don't clone
-    c_str := strings.clone_to_cstring(res);
-    defer delete(c_str);
-
-    mu.label(ctx, c_str);
+    mu.label(ctx, tcstring(fmt.tprintf(fmt_str, ..args)));
 }
 
-mu_layout_row :: proc(ctx: ^mu.Context, items: i32, widths: []i32, height: i32) {
-    widths_ptr := &widths[0];
-    mu.layout_row(ctx, items, widths_ptr, height);
+mu_layout_row :: inline proc(ctx: ^mu.Context, widths: []i32, height: i32) {
+    mu.layout_row(ctx, cast(i32)len(widths), &widths[0], height);
 }
 
 r_init :: proc() {
@@ -267,7 +253,7 @@ mu_unindent :: proc() {
 
 _mu_struct_block_field_start :: proc(ctx: ^mu.Context, name: string, typename: string) -> bool {
     // if name != "" {
-        header := name != "" ? fmt.tprint(name, ": ", typename) : fmt.tprint(typename);
+        header := name != "" ? tprint(name, ": ", typename) : tprint(typename);
         TODO_STATE: i32 = 1;
         if mu.header(ctx, &TODO_STATE, tcstring(header)) {
             mu_indent();
@@ -287,13 +273,24 @@ push_id_str :: proc(ctx: ^mu.Context, s: string) {
     mu.push_id(ctx, &s[0], cast(i32)len(s));
 }
 
+@(deferred_out=_pop_column)
+COLUMN :: proc(ctx: ^mu.Context, widths: []i32, height: i32 = 0) -> ^mu.Context {
+    mu.layout_begin_column(ctx);
+    mu_layout_row(ctx, widths, height);
+    return ctx;
+}
+
+_pop_column :: proc(ctx: ^mu.Context) {
+    mu.layout_end_column(ctx);
+}
+
 mu_struct_ti :: proc(ctx: ^mu.Context, name: string, data: rawptr, ti: ^Type_Info, tags: string = "", do_header := true, type_name: string = "") {
     push_id_str(ctx, name);
     defer mu.pop_id(ctx);
 
     if strings.contains(tags, "imgui_readonly") {
         mu_label(ctx, name); // TODO: same line as below
-        mu_label(ctx, fmt.tprint(any{data, ti.id}));
+        mu_label(ctx, tprint(any{data, ti.id}));
         return;
     }
 
@@ -338,7 +335,7 @@ mu_struct_ti :: proc(ctx: ^mu.Context, name: string, data: rawptr, ti: ^Type_Inf
                     case 4: new_data := cast(i32)(cast(^i32)data)^; input_int(ctx, name, &new_data); (cast(^i32)data)^ = cast(i32)new_data;
                     case 2: new_data := cast(i32)(cast(^i16)data)^; input_int(ctx, name, &new_data); (cast(^i16)data)^ = cast(i16)new_data;
                     case 1: new_data := cast(i32)(cast(^i8 )data)^; input_int(ctx, name, &new_data); (cast(^i8 )data)^ = cast(i8 )new_data;
-                    case: assert(false, fmt.tprint(ti.size));
+                    case: assert(false, tprint(ti.size));
                 }
             }
             else {
@@ -347,13 +344,14 @@ mu_struct_ti :: proc(ctx: ^mu.Context, name: string, data: rawptr, ti: ^Type_Inf
                     case 4: new_data := cast(i32)(cast(^u32)data)^; input_int(ctx, name, &new_data); (cast(^u32)data)^ = cast(u32)new_data;
                     case 2: new_data := cast(i32)(cast(^u16)data)^; input_int(ctx, name, &new_data); (cast(^u16)data)^ = cast(u16)new_data;
                     case 1: new_data := cast(i32)(cast(^u8 )data)^; input_int(ctx, name, &new_data); (cast(^u8 )data)^ = cast(u8 )new_data;
-                    case: assert(false, fmt.tprint(ti.size));
+                    case: assert(false, tprint(ti.size));
                 }
             }
         }
         case Type_Info_Float: {
             switch ti.size {
                 case 8: {
+                    assert(false, "need to handle ids in this case");
                     new_data := cast(f32)(cast(^f64)data)^;
                     if has_range_constraint {
                         mu_label(ctx, name);
@@ -366,17 +364,15 @@ mu_struct_ti :: proc(ctx: ^mu.Context, name: string, data: rawptr, ti: ^Type_Inf
                     (cast(^f64)data)^ = cast(f64)new_data;
                 }
                 case 4: {
-                    new_data := cast(f32)(cast(^f32)data)^;
                     mu_label(ctx, name); // TODO
                     if has_range_constraint {
-                        mu.slider(ctx, &new_data, range_min, range_max);
+                        mu.slider(ctx, cast(^f32)data, range_min, range_max);
                     }
                     else {
-                        mu.number(ctx, &new_data, 0.1);
+                        mu.number(ctx, cast(^f32)data, 0.1);
                     }
-                    (cast(^f32)data)^ = cast(f32)new_data;
                 }
-                case: assert(false, fmt.tprint(ti.size));
+                case: assert(false, tprint(ti.size));
             }
         }
         case Type_Info_String: {
@@ -405,9 +401,10 @@ mu_struct_ti :: proc(ctx: ^mu.Context, name: string, data: rawptr, ti: ^Type_Inf
             mu_checkbox(ctx, cast(^bool)data, tcstring(name));
         }
         case Type_Info_Pointer: {
-            mu.text(ctx, tcstring(fmt.tprint(name, " = ", "\"", data, "\"")));
+            mu.text(ctx, tcstring(tprint(name, " = ", "\"", data, "\"")));
         }
         case Type_Info_Named: {
+            // distinct type, just follow through .base
             mu_struct_ti(ctx, name, data, kind.base, "", do_header, kind.name);
         }
         case Type_Info_Struct: {
@@ -471,7 +468,7 @@ mu_struct_ti :: proc(ctx: ^mu.Context, name: string, data: rawptr, ti: ^Type_Inf
                 defer if do_header do _mu_struct_block_field_end(ctx, name);
 
                 slice := (cast(^mem.Raw_Slice)data)^;
-                for i in 0..slice.len-1 {
+                for i in 0..<slice.len {
                     push_id_str(ctx, fmt.tprint(i));
                     defer mu.pop_id(ctx);
                     mu_struct_ti(ctx, fmt.tprint("[", i, "]"), mem.ptr_offset(cast(^byte)slice.data, i * kind.elem_size), kind.elem);
@@ -482,10 +479,29 @@ mu_struct_ti :: proc(ctx: ^mu.Context, name: string, data: rawptr, ti: ^Type_Inf
             if !do_header || _mu_struct_block_field_start(ctx, name, fmt.tprint("[", kind.count, "]", kind.elem)) {
                 defer if do_header do _mu_struct_block_field_end(ctx, name);
 
-                for i in 0..kind.count-1 {
-                    push_id_str(ctx, fmt.tprint(i));
-                    defer mu.pop_id(ctx);
-                    mu_struct_ti(ctx, fmt.tprint("[", i, "]"), mem.ptr_offset(cast(^byte)data, i * kind.elem_size), kind.elem);
+                W :: 50;
+                switch (kind.count) {
+                    case 2:
+                        COLUMN(ctx, {25, W, 25, W});
+                        mu_struct_ti(ctx, "x", mem.ptr_offset(cast(^u8)data, 0 * kind.elem_size), kind.elem);
+                        mu_struct_ti(ctx, "y", mem.ptr_offset(cast(^u8)data, 1 * kind.elem_size), kind.elem);
+                    case 3:
+                        COLUMN(ctx, {25, W, 25, W, 25, W});
+                        mu_struct_ti(ctx, "x", mem.ptr_offset(cast(^u8)data, 0 * kind.elem_size), kind.elem);
+                        mu_struct_ti(ctx, "y", mem.ptr_offset(cast(^u8)data, 1 * kind.elem_size), kind.elem);
+                        mu_struct_ti(ctx, "z", mem.ptr_offset(cast(^u8)data, 2 * kind.elem_size), kind.elem);
+                    case 4:
+                        COLUMN(ctx, {25, W, 25, W, 25, W, 25, W});
+                        mu_struct_ti(ctx, "x", mem.ptr_offset(cast(^u8)data, 0 * kind.elem_size), kind.elem);
+                        mu_struct_ti(ctx, "y", mem.ptr_offset(cast(^u8)data, 1 * kind.elem_size), kind.elem);
+                        mu_struct_ti(ctx, "z", mem.ptr_offset(cast(^u8)data, 2 * kind.elem_size), kind.elem);
+                        mu_struct_ti(ctx, "w", mem.ptr_offset(cast(^u8)data, 3 * kind.elem_size), kind.elem);
+                    case:
+                    for i in 0..<kind.count {
+                        COLUMN(ctx, {25, -1});
+                        sub_name := tprint("[", i, "]");
+                        mu_struct_ti(ctx, sub_name, mem.ptr_offset(cast(^u8)data, i * kind.elem_size), kind.elem);
+                    }
                 }
             }
         }
@@ -494,7 +510,7 @@ mu_struct_ti :: proc(ctx: ^mu.Context, name: string, data: rawptr, ti: ^Type_Inf
                 defer if do_header do _mu_struct_block_field_end(ctx, name);
 
                 array := (cast(^mem.Raw_Dynamic_Array)data)^;
-                for i in 0..array.len-1 {
+                for i in 0..<array.len {
                     push_id_str(ctx, fmt.tprint(i));
                     defer mu.pop_id(ctx);
                     mu_struct_ti(ctx, fmt.tprint("[", i, "]"), mem.ptr_offset(cast(^byte)array.data, i * kind.elem_size), kind.elem);

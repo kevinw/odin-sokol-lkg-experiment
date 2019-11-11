@@ -116,7 +116,7 @@ process_tweakable :: proc(builder: ^strings.Builder, value: ^Value_Decl) {
             switch t in v.type.derived {
                 case Ident:
                     identifier_name := value.names[0].derived.(Ident).name;
-                    sbprintf(builder, "    { \"%s\", proc() -> any { return &%s; } },\n", identifier_name, identifier_name);
+                    sbprintf(builder, "    { \"%s\", proc() -> any { return %s; } },\n", identifier_name, identifier_name);
                 case:
                     eprintln("unhandled value type in tweakable:");
                     eprintln(v.type.derived);
