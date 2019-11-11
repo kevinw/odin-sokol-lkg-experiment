@@ -8,6 +8,7 @@ import sgl "sokol:sokol_gl"
 import mu "../lib/microui"
 import "../lib/basisu"
 
+using import "core:runtime"
 import "core:os"
 import "core:strings"
 import "core:mem"
@@ -411,16 +412,15 @@ debug_window :: proc(ctx: ^mu.Context) {
 
         @static show_tweaks: i32 = 1;
         if mu.header(ctx, &show_tweaks, "tweaks") {
-            if len(all_tweakables) == 0 {
+            when len(all_tweakables) == 0 {
                 mu.label(ctx, "no tweaks");
             } else {
                 for tweakable in all_tweakables {
                     mu_label(ctx, tweakable.name);
                     any_ptr := tweakable.ptr();
-                    switch v in any_ptr {
-                        case ^Vector3: mu_vector3(ctx, v, -60, 60);
-                        case ^f32: mu.slider(ctx, v, -10, 10);
-                    }
+
+                    ptr_type := type_info_of(any_ptr.id).variant.(Type_Info_Pointer).elem;
+                    mu_struct_ti(ctx, tweakable.name, any_ptr.data, ptr_type);
                 }
             }
         }
@@ -433,7 +433,7 @@ debug_window :: proc(ctx: ^mu.Context) {
 
             mu.label(ctx, "camera eye pos:");
 
-            mu_vector3(ctx, &state.fps_camera.position, -20, 20);
+            mu_vector(ctx, cast(^[3]f32)&state.fps_camera.position, -20, 20);
 
             mu_layout_row(ctx, 2, { 40, -1 }, 0);
             mu.label(ctx, "fov:"); mu.slider(ctx, &state.fps_camera.fov, 1, 200);
