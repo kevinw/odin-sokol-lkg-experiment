@@ -1,5 +1,6 @@
 package main
 
+import sapp "sokol:sokol_app"
 import sg "sokol:sokol_gfx"
 import sgl "sokol:sokol_gl"
 import mu "../lib/microui"
@@ -12,6 +13,17 @@ using import "core:runtime"
 using import "core:math/linalg"
 
 DEFAULT_BUFFER_SIZE :: 200;
+
+key_map: = [512]u8 {
+    sapp.Key_Code.LEFT_SHIFT       = cast(u8)mu.Key.Shift,
+    sapp.Key_Code.RIGHT_SHIFT      = cast(u8)mu.Key.Shift,
+    sapp.Key_Code.LEFT_CONTROL     = cast(u8)mu.Key.Ctrl,
+    sapp.Key_Code.RIGHT_CONTROL    = cast(u8)mu.Key.Ctrl,
+    sapp.Key_Code.LEFT_ALT         = cast(u8)mu.Key.Alt,
+    sapp.Key_Code.RIGHT_ALT        = cast(u8)mu.Key.Alt,
+    sapp.Key_Code.ENTER            = cast(u8)mu.Key.Return,
+    sapp.Key_Code.BACKSPACE        = cast(u8)mu.Key.Backspace,
+};
 
 // TODO: @Speed just make strings with null bytes on the end and cast the pointer!!!
 tcstring :: proc(s: string) -> cstring do return strings.clone_to_cstring(s, context.temp_allocator);
@@ -379,6 +391,7 @@ mu_struct_ti :: proc(ctx: ^mu.Context, name: string, data: rawptr, ti: ^Type_Inf
             assert(ti.size == size_of(string));
             // todo(josh): arbitrary string length, right now there is a max length
             // https://github.com/ocornut/imgui/issues/1008
+
             text_edit_buffer: [256]u8;
             fmt.bprint(text_edit_buffer[:], (cast(^string)data)^);
 

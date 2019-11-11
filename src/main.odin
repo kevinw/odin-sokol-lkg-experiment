@@ -716,7 +716,14 @@ event_callback :: proc "c" (event: ^sapp.Event) {
         case .MOUSE_MOVE:
             mu.input_mousemove(&mu_ctx, cast(i32)event.mouse_x, cast(i32)event.mouse_y);
             state.mouse.pos = v2(event.mouse_x, event.mouse_y);
-            //fmt.printf("MOUSE_MOVE event (%d, %d)\n", event.mouse_x, event.mouse_y);
+        case .KEY_DOWN:
+            mu.input_keydown(&mu_ctx, cast(i32)key_map[event.key_code & cast(sapp.Key_Code)511]);
+        case .KEY_UP:
+            mu.input_keyup(&mu_ctx, cast(i32)key_map[event.key_code & cast(sapp.Key_Code)511]);
+        case .CHAR:
+            txt := [2]u8 { cast(u8)(event.char_code & 255), 0 };
+            mu.input_text(&mu_ctx, cstring(&txt[0]));
+
     }
 
 	if event.type == .KEY_DOWN && !event.key_repeat {

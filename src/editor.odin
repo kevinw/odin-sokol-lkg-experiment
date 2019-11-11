@@ -6,16 +6,19 @@ using import "core:math/linalg"
 @tweak
 editor_settings : struct {
     grid_offset: Vector3,
+    test_string: string,
+    test_int: int,
 };
 
 
 //@tweak grid_offset := Vector3 {0, 0, num * 0.5};
 
 grid :: proc(y: f32, frame_count: u32) {
+    using editor_settings;
+
     sgl.push_matrix();
     defer sgl.pop_matrix();
 
-    using editor_settings;
     sgl.translate(grid_offset.x, grid_offset.y, grid_offset.z);
 
     dist:f32: 1.0;
