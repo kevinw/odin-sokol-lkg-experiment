@@ -3,12 +3,19 @@ package main
 import sgl "sokol:sokol_gl"
 using import "core:math/linalg"
 
-@tweak grid_offset := Vector3 {0, 0, num * 0.5};
+@tweak
+editor_settings : struct {
+    grid_offset: Vector3,
+};
+
+
+//@tweak grid_offset := Vector3 {0, 0, num * 0.5};
 
 grid :: proc(y: f32, frame_count: u32) {
     sgl.push_matrix();
     defer sgl.pop_matrix();
 
+    using editor_settings;
     sgl.translate(grid_offset.x, grid_offset.y, grid_offset.z);
 
     dist:f32: 1.0;

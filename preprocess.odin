@@ -109,20 +109,14 @@ get_tweakable :: proc (value: ^Value_Decl) -> bool {
 }
 
 process_tweakable :: proc(builder: ^strings.Builder, value: ^Value_Decl) {
-    assert(value.type == nil, "didn't expect to have a value type here");
-    assert(len(value.values) == 1, "expected one value");
-    switch v in value.values[0].derived {
-        case Comp_Lit:
-            switch t in v.type.derived {
-                case Ident:
-                    identifier_name := value.names[0].derived.(Ident).name;
-                    sbprintf(builder, "    { \"%s\", proc() -> any { return %s; } },\n", identifier_name, identifier_name);
-                case:
-                    eprintln("unhandled value type in tweakable:");
-                    eprintln(v.type.derived);
+    for name in value.names {
+        switch ident in name.derived {
+            case Ident:
+                identifier_name := ident.name;
+                sbprintf(builder, "    { \"%s\", proc() -> any { return %s; } },\n", identifier_name, identifier_name);
+            case:
+                fmt.eprintln("unhandled name type:", ident);
             }
-        case:
-            eprintln("error: unhandled value in process_tweakable");
     }
 }
 
@@ -151,7 +145,7 @@ main :: proc() {
             if d, ok = decl.derived.(Value_Decl); !ok do continue;
 
             assert(len(d.names) == 1);
-            ident := d.names[0].derived.(Ident);
+            //ident := d.names[0].derived.(Ident);
 
             if get_tweakable(&d) {
                 process_tweakable(&builder, &d);

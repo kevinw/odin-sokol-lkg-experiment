@@ -3,5 +3,5 @@
 package main
 
 all_tweakables := [?]Tweakable {
-    { "grid_offset", proc() -> any { return grid_offset; } },
+    { "editor_settings", proc() -> any { return editor_settings; } },
 };
