@@ -224,6 +224,7 @@ void mu_begin(mu_Context *ctx);
 void mu_end(mu_Context *ctx);
 void mu_set_focus(mu_Context *ctx, mu_Id id);
 mu_Id mu_get_id(mu_Context *ctx, const void *data, int size);
+void mu_push_id_ptr(mu_Context *ctx, const void *data);
 void mu_push_id(mu_Context *ctx, const void *data, int size);
 void mu_pop_id(mu_Context *ctx);
 void mu_push_clip_rect(mu_Context *ctx, mu_Rect rect);

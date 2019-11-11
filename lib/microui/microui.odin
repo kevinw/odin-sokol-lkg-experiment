@@ -220,6 +220,7 @@ foreign libmicroui {
 	set_focus      :: proc(ctx: ^Context, id: Id)                          ---;
 	get_id         :: proc(ctx: ^Context, data: rawptr, size: c.int) -> Id ---;
 	push_id        :: proc(ctx: ^Context, data: rawptr, size: c.int)       ---;
+	push_id_ptr    :: proc(ctx: ^Context, data: rawptr)                    ---;
 	pop_id         :: proc(ctx: ^Context)                                  ---;
 	push_clip_rect :: proc(ctx: ^Context, rect: Rect)                      ---;
 	pop_clip_rect  :: proc(ctx: ^Context)                                  ---;

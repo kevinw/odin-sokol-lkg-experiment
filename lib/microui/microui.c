@@ -250,6 +250,11 @@ mu_Id mu_get_id(mu_Context *ctx, const void *data, int size) {
   return res;
 }
 
+void mu_push_id_ptr(mu_Context *ctx, const void *data) {
+  const void* ptr_to_data = &data;
+  push(ctx->id_stack, mu_get_id(ctx, ptr_to_data, sizeof(ptr_to_data)));
+}
+
 
 void mu_push_id(mu_Context *ctx, const void *data, int size) {
   push(ctx->id_stack, mu_get_id(ctx, data, size));
