@@ -707,12 +707,16 @@ cleanup :: proc "c" () {
 event_callback :: proc "c" (event: ^sapp.Event) {
     switch event.type {
         case .MOUSE_DOWN:
+            set_capture(sapp.win32_get_hwnd());
+
             mu.input_mousedown(&mu_ctx, cast(i32)event.mouse_x, cast(i32)event.mouse_y, 1 << cast(u32)event.mouse_button);
             switch event.mouse_button {
                 case .LEFT: input_state.left_mouse = true;
                 case .RIGHT: input_state.right_mouse = true;
             }
         case .MOUSE_UP:
+            release_capture(sapp.win32_get_hwnd());
+
             mu.input_mouseup(&mu_ctx, cast(i32)event.mouse_x, cast(i32)event.mouse_y, 1 << cast(u32)event.mouse_button);
             switch event.mouse_button {
                 case .LEFT: input_state.left_mouse = false;
