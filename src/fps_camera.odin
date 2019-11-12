@@ -42,12 +42,6 @@ update :: proc(using camera: ^FPS_Camera, dt: f32, input_state: Input_State, asp
     up      = v3(view[0][1], view[1][1], view[2][1]);
     forward = v3(view[0][2], view[1][2], view[2][2]);
 
-    view = mul(view, translate_matrix4(position));
-
-    //forward = normalize(v3(cos(angle.y) * sin(angle.x), sin(angle.y), cos(angle.y) * cos(angle.x)));
-    //right = normalize(v3(sin(angle.x - PI/2.0), 0, cos(angle.x - PI/2.0)));
-    //up = normalize(cross(right, forward));
-
     {
         if input_state.w || input_state.up    do position += forward * dt * speed;
         if input_state.s || input_state.down  do position -= forward * dt * speed;
@@ -57,7 +51,7 @@ update :: proc(using camera: ^FPS_Camera, dt: f32, input_state: Input_State, asp
         if input_state.q                      do position += up * dt * speed;
     }
 
-    //view = look_at(position, normalize(position + forward), normalize(up)); 
+    view = mul(view, translate_matrix4(position));
 }
 
 rotate_matrix :: proc(rotation: Vector3) -> Matrix4 {
