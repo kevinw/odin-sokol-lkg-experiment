@@ -30,18 +30,13 @@ tcstring :: proc(s: string) -> cstring do return strings.clone_to_cstring(s, con
 tprint :: fmt.tprint;
 
 r_get_text_width :: proc(text: []u8) -> i32 {
+    using mu_atlas;
+
     res:i32 = 0;
-    for _ in text {
-        res += 10; // TODO
+    for ch in text {
+        res += atlas[ATLAS_FONT + cast(mu.Icon)ch].w;
     }
     return res;
-    /*
-    res:i32 = 0;
-    for p = &text[0]; p^ != nil && len--; p++ {
-        res += atlas[ATLAS_FONT + (unsigned char)*p].w;
-    }
-    return res;
-    */
 }
 
 mu_label :: proc(ctx: ^mu.Context, s: string) {

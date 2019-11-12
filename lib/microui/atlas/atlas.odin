@@ -903,6 +903,7 @@ atlas := [200]mu.Rect {
 };
 
 init :: proc() {
+    // TODO: improve this
     atlas[ATLAS_FONT+cast(mu.Icon)32] = { 84, 68, 2, 17 };
     atlas[ATLAS_FONT+cast(mu.Icon)33] = { 39, 68, 3, 17 };
     atlas[ATLAS_FONT+cast(mu.Icon)34] = { 114, 51, 5, 17 };

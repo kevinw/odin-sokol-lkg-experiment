@@ -170,16 +170,16 @@ mu_ctx: mu.Context;
 
 /* microui callbacks */
 text_width_cb :: proc "c" (font: mu.Font, _text: cstring, _byte_len: i32) -> i32 {
-    text := _text;
     byte_len := _byte_len;
 
     if byte_len == -1 {
-        byte_len = cast(i32)len(text);
+        byte_len = cast(i32)len(_text);
     }
 
-    text_slice:[]u8 = mem.slice_ptr(cast(^u8)&text, cast(int)byte_len);
+    if byte_len == 0 do return 0;
 
-    return r_get_text_width(text_slice);
+    slice := mem.slice_ptr(cast(^u8)_text, cast(int)byte_len);
+    return r_get_text_width(slice);
 }
 
 text_height_cb :: proc "c" (font: mu.Font) -> i32 {
