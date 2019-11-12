@@ -39,7 +39,7 @@ update :: proc(using camera: ^FPS_Camera, dt: f32, input_state: Input_State, asp
     view = rotate_matrix(Vector3{angle.y, angle.x, 0});
 
     right   = v3(view[0][0], view[1][0], view[2][0]);
-    up      = v3(view[0][1], view[1][1], view[1][2]);
+    up      = v3(view[0][1], view[1][1], view[2][1]);
     forward = v3(view[0][2], view[1][2], view[2][2]);
 
     view = mul(view, translate_matrix4(position));
