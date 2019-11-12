@@ -48,16 +48,19 @@ Pipeline_Cache_Params :: struct {
 SCENE_INVALID_INDEX :: -1;
 SCENE_MAX_PIPELINES :: 16;
 
+@private
 safe_cast_i16 :: inline proc(n: $T) -> i16 {
     assert(n < bits.I16_MAX);
     return cast(i16)n;
 }
 
+@private
 optional_i16_offset :: proc(ptr: ^$T, base: ^T) -> i16 {
     if ptr == nil do return -1; // TODO: not sure keeping an index here is the right thing to do
     return safe_cast_i16(mem.ptr_sub(ptr, base));
 }
 
+@private
 gltf_parse :: proc(bytes: []u8, path_root: string) {
     options := cgltf.Options{};
     gltf:^cgltf.Data;
@@ -197,7 +200,6 @@ gltf_parse :: proc(bytes: []u8, path_root: string) {
     // parse meshes
     //
     {
-        meshes := mem.slice_ptr(gltf.meshes, gltf.meshes_count);
         for _, i in meshes {
             gltf_mesh := &meshes[i];
             append(&state.scene.meshes, Mesh {});
@@ -248,6 +250,7 @@ gltf_parse :: proc(bytes: []u8, path_root: string) {
     }
 }
 
+@private
 build_transform_for_gltf_node :: proc(gltf: ^cgltf.Data, node: ^cgltf.Node) -> Matrix4 {
     parent_tform := identity(Matrix4);
     if node.parent != nil {
@@ -275,6 +278,7 @@ build_transform_for_gltf_node :: proc(gltf: ^cgltf.Data, node: ^cgltf.Node) -> M
     return tform;
 }
 
+@private
 rotate_matrix4x4_quat :: proc(q_x, q_y, q_z, q_w: f32) -> Matrix4x4 {
     // thanks Unity decompiled
 
@@ -302,6 +306,7 @@ rotate_matrix4x4_quat :: proc(q_x, q_y, q_z, q_w: f32) -> Matrix4x4 {
 }
 
 // creates a vertex buffer bind slot mapping for a specific GLTF primitive
+@private
 create_vertex_buffer_mapping_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Primitive) -> Vertex_Buffer_Mapping {
     buf_map: Vertex_Buffer_Mapping;
     for i in 0..<sg.MAX_SHADERSTAGE_BUFFERS {
@@ -328,6 +333,7 @@ create_vertex_buffer_mapping_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim:
     return buf_map;
 }
 
+@private
 create_sg_layout_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Primitive, vbuf_map: ^Vertex_Buffer_Mapping) -> sg.Layout_Desc {
     assert(prim.attributes_count <= sg.MAX_VERTEX_ATTRIBUTES);
     layout: sg.Layout_Desc = { };
@@ -355,6 +361,7 @@ create_sg_layout_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Prim
 // Create a unique sokol-gfx pipeline object for GLTF primitive (aka submesh),
 // maintains a cache of shared, unique pipeline objects. Returns an index
 // into state.scene.pipelines
+@private
 create_sg_pipeline_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Primitive, vbuf_map: ^Vertex_Buffer_Mapping) -> i32 {
     assert(gltf != nil, "gtlf data cannot be nil");
     assert(prim != nil, "prim cannot be null");
@@ -397,7 +404,7 @@ create_sg_pipeline_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Pr
             },
             rasterizer = {
                 cull_mode = .BACK,
-                face_winding = .CW,
+                face_winding = .CCW,
                 sample_count = MSAA_SAMPLE_COUNT,
             }
         }));
@@ -408,6 +415,7 @@ create_sg_pipeline_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Pr
 }
 
 
+@private
 gltf_buffer_fetch_callback :: proc "c" (response: ^sfetch.Response) {
     if response.dispatched {
         sfetch.bind_buffer(response.handle, sfetch_buffers[response.channel][response.lane][:]);
@@ -424,6 +432,7 @@ gltf_buffer_fetch_callback :: proc "c" (response: ^sfetch.Response) {
     }
 }
 
+@private
 gltf_image_fetch_callback :: proc "c" (response: ^sfetch.Response) {
     user_data := cast(^GLTF_Image_Fetch_Userdata)response.user_data;
     if response.dispatched {
@@ -443,6 +452,7 @@ gltf_image_fetch_callback :: proc "c" (response: ^sfetch.Response) {
     //free(user_data.full_uri); // TODO: crashes, because no context in proc "C" ? maybe?
 }
 
+@private
 create_sg_buffers_for_gltf_buffer :: proc(gltf_buffer_index: int, bytes: []u8) {
     for buf, i in state.scene.buffers {
         p := &state.creation_params.buffers[i];
@@ -457,6 +467,7 @@ create_sg_buffers_for_gltf_buffer :: proc(gltf_buffer_index: int, bytes: []u8) {
     }
 }
 
+@private
 create_sg_images_for_gltf_image :: proc(gltf_image_index: int, image_type: Image_Type, bytes: []u8) {
     for _, i in state.scene.images {
         p := &state.creation_params.images[i];
