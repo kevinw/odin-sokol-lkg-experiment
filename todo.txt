@@ -1,3 +1,5 @@
+shader_meta needs a cleanup. at the very least, start with package-per-shader?
+    or should we just go immediately for a more late-binding approach?
 goals: make it very easy to say "this value lerps to this other value"
 iq's warp https://www.iquilezles.org/www/articles/warp/warp.htm?utm_source=share&utm_medium=ios_app&utm_name=iossmf
 try sokol compute shaders

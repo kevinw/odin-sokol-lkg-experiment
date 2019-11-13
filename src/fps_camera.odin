@@ -29,7 +29,7 @@ init :: proc(using Camera: ^FPS_Camera) {
 }
 
 update :: proc(using camera: ^FPS_Camera, dt: f32, input_state: Input_State, aspect: f32) {
-    if input_state.right_mouse {
+    if input_state.right_mouse || input_state.r {
         move_x, move_y: i32 = 0, 0;
         sapp.get_relative_mouse(&move_x, &move_y);
         angle += v2(move_x, move_y) * mouse_speed;

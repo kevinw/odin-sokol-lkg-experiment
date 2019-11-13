@@ -17,11 +17,13 @@ import "core:math/bits"
 using import "core:math"
 using import "core:math/linalg"
 
+import "gizmos"
+
 import shader_meta "./shader_meta";
 
+draw_mesh := false;
+
 ANIM_CURVE_WIP :: false;
-
-
 WINDOW_WIDTH :: 1280;
 WINDOW_HEIGHT :: 720;
 
@@ -34,7 +36,7 @@ sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 
 Input_State :: struct {
 	right, left, up, down: bool,
-	w, a, s, d, q, e: bool,
+	w, a, s, d, q, e, r: bool,
     left_mouse, right_mouse: bool,
 }
 
@@ -105,6 +107,7 @@ state: struct {
 	pip:         sg.Pipeline,
     mu_pip:      sg.Pipeline,
     line_rendering_pipeline: sg.Pipeline,
+    gizmo_rendering_pipeline: sg.Pipeline,
     mu_atlas_img: sg.Image,
 
     font_normal_data: [256 * 1024]u8, // TODO: use a smaller buffer and the streaming capability of sokol-fetch
@@ -139,9 +142,11 @@ state: struct {
 
     auto_rotate: bool,
     mouse: Mouse_State,
+
 };
 
-position := Vector3 {};
+gizmos_ctx: gizmos.Context;
+
 last_ticks: u64 = 0;
 
 do_print :i32 = 0;
@@ -187,13 +192,16 @@ text_height_cb :: proc "c" (font: mu.Font) -> i32 {
 }
 
 v3_any :: proc(x: $A, y: $B, z: $C) -> Vector3 { return Vector3 { cast(f32)x, cast(f32)y, cast(f32)z }; }
+v4_any :: proc(x: $A, y: $B, z: $C, w: $D) -> Vector4 { return Vector4 { cast(f32)x, cast(f32)y, cast(f32)z, cast(f32)w }; }
 v3_empty :: proc() -> Vector3 { return Vector3 {}; }
+v4_empty :: proc() -> Vector4 { return Vector4 {}; }
 v3_slice :: proc(slice: []f32) -> Vector3 {
     assert(len(slice) >= 3);
     return Vector3 { slice[0], slice[1], slice[2] };
 }
 
 v3 :: proc { v3_any, v3_empty, v3_slice };
+v4 :: proc { v4_any, v4_empty };
 sub :: proc(v1, v2: Vector3) -> Vector3 {
     return Vector3 { v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
 }
@@ -202,6 +210,23 @@ DEG_TO_RAD :: PI / 180.0;
 deg2rad :: inline proc(f: $T) -> T { return f * DEG_TO_RAD; }
 
 delta := v3(-1.92, -0.07, 1.52);
+
+render_gizmos :: proc(mesh: ^gizmos.Mesh) {
+    // TODO: this is mega slow, just pass index buffers to a sg_pipeline and be done with it.
+    sgl.begin_triangles();
+    for _, t in mesh.triangles {
+        tri := &mesh.triangles[t];
+        for i in 0..<3 {
+            index := tri[i];
+            //if index < cast(u32)len(mesh.vertices){
+                using v := &mesh.vertices[index];
+                sgl.v3f_c4f(position.x, position.y, position.z, color.r, color.g, color.b, color.a);
+            //}
+        }
+
+    }
+    defer sgl.end();
+}
 
 init_callback :: proc "c" () {
     text.vertex_elems = make([dynamic]f32);
@@ -226,6 +251,9 @@ init_callback :: proc "c" () {
     basisu.setup();
 
     init(&state.fps_camera);
+
+    gizmos_ctx.render = render_gizmos;
+    gizmos.init(&gizmos_ctx);
 
     r_init();
     mu.init(&mu_ctx);
@@ -340,6 +368,19 @@ init_callback :: proc "c" () {
     // make line rendering pipeline
     {
         state.line_rendering_pipeline = sgl.make_pipeline({
+            depth_stencil = {
+                depth_write_enabled = true,
+                depth_compare_func = sg.Compare_Func.LESS_EQUAL,
+            },
+            rasterizer = {
+                sample_count = MSAA_SAMPLE_COUNT,
+            },
+        });
+    }
+
+    // make gizmo rendering pipeline
+    {
+        state.gizmo_rendering_pipeline = sgl.make_pipeline({
             depth_stencil = {
                 depth_write_enabled = true,
                 depth_compare_func = sg.Compare_Func.LESS_EQUAL,
@@ -506,19 +547,9 @@ frame_callback :: proc "c" () {
 
     if !_did_load do return;
 
-	v := Vector3 {};
-    {
-        using input_state;
-        if d || right do v.x -= 1.0;
-        if a || left do v.x += 1.0;
-        if w || up do v.y -= 1.0;
-        if s || down do v.y += 1.0;
-    }
-
     dt := cast(f32)elapsed_seconds;
 
-	if v.x != 0 do position.x += v.x * dt;
-	if v.y != 0 do position.y += v.y * dt;
+    gizmos.update(&gizmos_ctx);
 
     //
     // update scene
@@ -597,7 +628,7 @@ frame_callback :: proc "c" () {
     mu_render(sapp.width(), sapp.height()); // note; this just pushes commands to a queue. r_draw below actually does the draw calls
 
     // DRAW MESH
-    {
+    if draw_mesh {
         using state.scene;
         for _, node_index in nodes {
             node := &nodes[node_index];
@@ -662,6 +693,19 @@ frame_callback :: proc "c" () {
                 sg.draw(cast(int)prim.base_element, cast(int)prim.num_elements, 1);
             }
         }
+    }
+
+    // DRAW GIZMOS
+    {
+        using sgl;
+        defaults();
+        push_pipeline();
+        defer pop_pipeline();
+        load_pipeline(state.gizmo_rendering_pipeline);
+        matrix_mode_projection();
+        matrix_mode_modelview();
+        load_matrix(&state.view_proj[0][0]);
+        gizmos.draw(&gizmos_ctx);
     }
 
     // DRAW SDF TEXT
@@ -750,6 +794,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
 			case .D: d = true;
             case .Q: q = true;
             case .E: e = true;
+            case .R: r = true;
 		}
 	}
 
@@ -766,6 +811,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
 			case .D: d = false;
             case .Q: q = false;
             case .E: e = false;
+            case .R: r = false;
 		}
 	}
 }

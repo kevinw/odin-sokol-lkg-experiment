@@ -5,6 +5,7 @@ set SHDC=sokol-shdc --slang hlsl5 --input
 set OPT_LEVEL=0
 
 preprocess.exe &&^
+%SHDC% gizmos.glsl --output src/shader_meta/gizmos.odin && ^
 %SHDC% shadertoy.glsl --output src/shader_meta/shadertoy.odin && ^
 %SHDC% sdf_text.glsl --output src/shader_meta/sdf_text.odin && ^
 %SHDC% cgltf_sapp.glsl --output src/shader_meta/cgltf_sapp.odin && ^
