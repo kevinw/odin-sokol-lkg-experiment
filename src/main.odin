@@ -21,7 +21,7 @@ import "gizmos"
 
 import shader_meta "./shader_meta";
 
-draw_mesh := false;
+draw_mesh := true;
 
 ANIM_CURVE_WIP :: false;
 WINDOW_WIDTH :: 1280;
@@ -102,6 +102,7 @@ Node :: struct {
 };
 
 state: struct {
+    xform_a: gizmos.Transform,
 	pass_action: sg.Pass_Action,
 	bind:        sg.Bindings,
 	pip:         sg.Pipeline,
@@ -199,8 +200,9 @@ v3_slice :: proc(slice: []f32) -> Vector3 {
     assert(len(slice) >= 3);
     return Vector3 { slice[0], slice[1], slice[2] };
 }
+v3_from_v4 :: proc(v4: Vector4) -> Vector3 do return { v4.x, v4.y, v4.z };
 
-v3 :: proc { v3_any, v3_empty, v3_slice };
+v3 :: proc { v3_any, v3_empty, v3_slice, v3_from_v4 };
 v4 :: proc { v4_any, v4_empty };
 sub :: proc(v1, v2: Vector3) -> Vector3 {
     return Vector3 { v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
@@ -229,6 +231,12 @@ render_gizmos :: proc(mesh: ^gizmos.Mesh) {
 }
 
 init_callback :: proc "c" () {
+    state.xform_a = {
+        position = {0, 0, 0},
+        orientation = {0, 0, 0, 1}, // TODO: identity quat?
+        scale = {1, 1, 1},
+    };
+
     text.vertex_elems = make([dynamic]f32);
     text.tex_elems = make([dynamic]f32);
 
@@ -549,7 +557,29 @@ frame_callback :: proc "c" () {
 
     dt := cast(f32)elapsed_seconds;
 
-    gizmos.update(&gizmos_ctx);
+    {
+        using state.fps_camera;
+        mouse_ray := screen_to_world_ray(&state.fps_camera, state.mouse.pos);
+        gizmos.update(&gizmos_ctx, {
+            mouse_left = input_state.left_mouse,
+            // TODO: more hotkeys
+            ray_origin = mouse_ray.origin,
+            ray_direction = mouse_ray.direction,
+            cam = {
+                yfov = fov,
+                near_clip = near,
+                far_clip = far,
+                position = position,
+                orientation = Vector4{angle.x, angle.y, 0, 1}, // TOOD: get quaternion from FPS_Camera
+            }
+        });
+
+        if gizmos.xform("first-example-gizmo", &gizmos_ctx, &state.xform_a) {
+            //fmt.println("gizmo hovered");
+            //if (xform_a != xform_a_last) std::cout << get_local_time_ns() << " - " << "First Gizmo Changed..." << std::endl;
+            //xform_a_last = xform_a;
+        }
+    }
 
     //
     // update scene
