@@ -11,8 +11,6 @@ editor_settings : struct {
 };
 
 
-//@tweak grid_offset := Vector3 {0, 0, num * 0.5};
-
 grid :: proc(y: f32, frame_count: u32) {
     using editor_settings;
 
