@@ -1,8 +1,7 @@
 package gizmos;
 
 using import "core:fmt"
-using import "core:math"
-using import "core:math/linalg"
+using import "../math"
 
 @private INF:f32: 99999999999999;
 
@@ -151,15 +150,6 @@ Renderable :: struct {
 
 mesh_components: [cast(int)Interact.Last]Mesh_Component;
 
-m3x2 :: inline proc(a, b: Vector3) -> Matrix3x2 {
-    return Matrix3x2 {
-        { a[0], b[0] },
-        { a[1], b[1] },
-        { a[2], b[3] }
-    };
-    //return Matrix2x3 { cast([3]f32)(&a[0])^, cast([3]f32)(&b[0])^, };
-}
-
 make_box_geometry :: proc(min_bounds, max_bounds: Vector3) -> Mesh {
     a, b := min_bounds, max_bounds;
     mesh : Mesh;
@@ -199,7 +189,7 @@ make_lathed_geometry :: proc(
         angle:f32 = (f32(cast(int)i % slices) * TAU / cast(f32)slices) + (TAU/8);
         rot := arm1 * cos(angle) + arm2 * sin(angle);
 
-        mat : Matrix2x3;
+        mat : [2][3]f32;
         mat[0] = (^[3]f32)(&axis)^;
         mat[1] = (^[3]f32)(&rot)^;
 
@@ -472,7 +462,7 @@ position_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, 
     };
 
     model_matrix:Matrix4 = matrix(p);
-    model_matrix = mul(model_matrix, scale_matrix4(identity(Matrix4), v3(draw_scale)));
+    model_matrix = mul(model_matrix, mat4_scale(identity(Matrix4), v3(draw_scale)));
 
     gizmos[id] = gizmo;
 

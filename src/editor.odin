@@ -1,7 +1,7 @@
 package main
 
 import sgl "sokol:sokol_gl"
-using import "core:math/linalg"
+using import "math"
 
 @tweak
 editor_settings : struct {

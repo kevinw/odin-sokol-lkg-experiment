@@ -10,7 +10,7 @@ import "core:intrinsics"
 import "core:fmt"
 import "core:mem"
 using import "core:runtime"
-using import "core:math/linalg"
+using import "math"
 
 DEFAULT_BUFFER_SIZE :: 200;
 

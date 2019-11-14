@@ -13,9 +13,8 @@ import "core:os"
 import "core:strings"
 import "core:mem"
 import "core:fmt"
+using import "math"
 import "core:math/bits"
-using import "core:math"
-using import "core:math/linalg"
 
 import "gizmos"
 

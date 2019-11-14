@@ -1,9 +1,8 @@
 package main;
 
 import "core:fmt"
-using import "core:math/linalg"
-import "core:math/bits"
 import "core:mem"
+import "core:math/bits"
 import "core:strings"
 import sg "sokol:sokol_gfx"
 import sfetch "sokol:sokol_fetch"
@@ -11,6 +10,7 @@ import "../lib/cgltf"
 import "../lib/basisu"
 import "./shader_meta"
 import "shared:odin-stb/stbi"
+using import "math"
 
 VERBOSE :: false;
 

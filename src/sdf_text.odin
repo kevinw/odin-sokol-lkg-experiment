@@ -8,7 +8,7 @@ import "core:mem"
 import "shared:odin-stb/stbi"
 import shader_meta "./shader_meta"
 import "core:encoding/json"
-using import "core:math/linalg"
+using import "math"
 
 SDF_Text_Metrics :: struct {
     family: string,

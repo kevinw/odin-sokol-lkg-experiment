@@ -1,10 +1,9 @@
 package main
 
-import sg "sokol:sokol_gfx"
 import sapp "sokol:sokol_app"
 import sgl "sokol:sokol_gl"
 import mu "../lib/microui"
-using import "core:math/linalg"
+using import "math"
 import "core:fmt"
 
 bezier_interp :: inline proc(t: f32, start, control_1, control_2, end: Vector2) -> Vector2 {

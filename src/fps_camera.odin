@@ -1,8 +1,6 @@
 package main
 
-import "core:fmt"
-using import "core:math/linalg"
-using import "core:math"
+using import "math"
 import sapp "sokol:sokol_app"
 
 FPS_Camera :: struct {
@@ -54,7 +52,7 @@ update :: proc(using camera: ^FPS_Camera, dt: f32, input_state: Input_State, asp
     if input_state.right_mouse || input_state.r {
         move_x, move_y: i32 = 0, 0;
         sapp.get_relative_mouse(&move_x, &move_y);
-        angle += v2(move_x, move_y) * mouse_speed;
+        angle += Vector2{cast(f32)move_x, cast(f32)move_y} * mouse_speed;
     }
 
     proj = perspective(deg2rad(fov), aspect, near, far);

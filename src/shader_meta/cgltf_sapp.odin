@@ -1,7 +1,7 @@
 package shader_meta;
 
 import sg "sokol:sokol_gfx"
-using import "core:math/linalg"
+using import "../math"
 
 /*
     #version:1# (machine generated, don't edit!)
