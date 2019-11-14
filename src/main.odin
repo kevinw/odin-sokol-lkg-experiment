@@ -37,6 +37,7 @@ Input_State :: struct {
 	right, left, up, down: bool,
 	w, a, s, d, q, e, r: bool,
     left_mouse, right_mouse: bool,
+    left_alt, left_shift: bool,
 }
 
 input_state := Input_State {};
@@ -127,7 +128,7 @@ state: struct {
         pipelines: [dynamic]sg.Pipeline,
     },
 
-    fps_camera: FPS_Camera,
+    camera: Camera,
     view_proj: Matrix4,
 
     placeholders: struct { white, normal, black: sg.Image },
@@ -257,7 +258,8 @@ init_callback :: proc "c" () {
 
     basisu.setup();
 
-    init(&state.fps_camera);
+    init_camera(&state.camera, true, 60, sapp.width(), sapp.height());
+    state.camera.position = {0, 0.77, 2.40};
 
     gizmos_ctx.render = render_gizmos;
     gizmos.init(&gizmos_ctx);
@@ -481,10 +483,10 @@ debug_window :: proc(ctx: ^mu.Context) {
 
             mu.label(ctx, "camera eye pos:");
 
-            mu_vector(ctx, &state.fps_camera.position, -20, 20);
+            mu_vector(ctx, &state.camera.position, -20, 20);
 
             mu_layout_row(ctx, { 40, -1 }, 0);
-            mu.label(ctx, "fov:"); mu.slider(ctx, &state.fps_camera.fov, 1, 200);
+            mu.label(ctx, "fov:"); mu.slider(ctx, &state.camera.size, 1, 200);
 
             mu.label(ctx, "print"); mu.checkbox(ctx, &do_print, "");
             mu.label(ctx, "tween"); mu_checkbox(ctx, &do_tween, "tween");
@@ -557,24 +559,22 @@ frame_callback :: proc "c" () {
     dt := cast(f32)elapsed_seconds;
 
     {
-        using state.fps_camera;
-        mouse_ray := screen_to_world_ray(&state.fps_camera, state.mouse.pos);
+        mouse_ray := worldspace_ray(&state.camera, state.mouse.pos);
         gizmos.update(&gizmos_ctx, {
             mouse_left = input_state.left_mouse,
             // TODO: more hotkeys
             ray_origin = mouse_ray.origin,
             ray_direction = mouse_ray.direction,
             cam = {
-                yfov = fov,
-                near_clip = near,
-                far_clip = far,
-                position = position,
-                orientation = Vector4{angle.x, angle.y, 0, 1}, // TOOD: get quaternion from FPS_Camera
+                yfov = state.camera.size,
+                near_clip = state.camera.near_plane,
+                far_clip = state.camera.far_plane,
+                position = state.camera.position,
+                orientation = transmute(Vector4)state.camera.rotation,
             }
         });
 
         if gizmos.xform("first-example-gizmo", &gizmos_ctx, &state.xform_a) {
-            //fmt.println("gizmo hovered");
             //if (xform_a != xform_a_last) std::cout << get_local_time_ns() << " - " << "First Gizmo Changed..." << std::endl;
             //xform_a_last = xform_a;
         }
@@ -596,9 +596,11 @@ frame_callback :: proc "c" () {
     }
 
     // update camera
-    aspect := cast(f32)sapp.width() / cast(f32)sapp.height();
-    update(&state.fps_camera, dt, input_state, aspect);
-    state.view_proj = mul(state.fps_camera.proj, state.fps_camera.view);
+    do_camera_movement(&state.camera, input_state, dt, 2.0, 4.0, 1.0);
+
+    proj := construct_projection_matrix(&state.camera);
+    view := construct_view_matrix(&state.camera);
+    state.view_proj = mul(proj, view);
 
     //
     // MICROUI
@@ -664,7 +666,7 @@ frame_callback :: proc "c" () {
             vs_params := shader_meta.vs_params {
                 model = mul(state.root_transform, node.transform),
                 view_proj = state.view_proj,
-                eye_pos = state.fps_camera.position,
+                eye_pos = state.camera.position,
             };
             mesh := &meshes[node.mesh];
             for i in 0..<mesh.num_primitives {
@@ -824,6 +826,8 @@ event_callback :: proc "c" (event: ^sapp.Event) {
             case .Q: q = true;
             case .E: e = true;
             case .R: r = true;
+            case .LEFT_ALT: left_alt = true;
+            case .LEFT_SHIFT: left_shift = true;
 		}
 	}
 
@@ -841,6 +845,8 @@ event_callback :: proc "c" (event: ^sapp.Event) {
             case .Q: q = false;
             case .E: e = false;
             case .R: r = false;
+            case .LEFT_ALT: left_alt = false;
+            case .LEFT_SHIFT: left_shift = false;
 		}
 	}
 }
