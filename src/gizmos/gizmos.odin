@@ -157,9 +157,13 @@ draw :: proc(using ctx: ^Context) {
     if did_create do return;
     did_create = true;
 
-    arrow_points := [?]Vector2 { { 0.25, 0 }, { 0.25, 0.05 },{ 1, 0.05 },{ 1, 0.10 },{ 1.2, 0 } };
-    mace_points  := [?]Vector2 { { 0.25, 0 }, { 0.25, 0.05 },{ 1, 0.05 },{ 1, 0.1 },{ 1.25, 0.1 }, { 1.25, 0 } };
-    ring_points  := [?]Vector2 { { +0.025, 1 },{ -0.025, 1 },{ -0.025, 1 },{ -0.025, 1.1 },{ -0.025, 1.1 },{ +0.025, 1.1 },{ +0.025, 1.1 },{ +0.025, 1 } };
+    T :: 0.05; // Arrow thickness
+    arrow_points := [?]Vector2 { { 0.25, 0 }, { 0.25, T * .5 },{ 1, T * .5 },{ 1, T },{ 1.2, 0 } };
+
+    mace_points  := [?]Vector2 { { 0.25, 0 }, { 0.25, T * .5 },{ 1, T * .5 },{ 1, T },{ 1.25, T }, { 1.25, 0 } };
+
+    R :: 0.015;
+    ring_points  := [?]Vector2 { { +R, 1 },{ -R, 1 },{ -R, 1 },{ -R, 1.1 },{ -R, 1.1 },{ +R, 1.1 },{ +R, 1.1 },{ +R, 1 } };
 
     m := &mesh_components;
 
