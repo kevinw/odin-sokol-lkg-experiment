@@ -67,6 +67,7 @@ Vector4 :: Vec4;
 Matrix4 :: Mat4;
 Matrix4x4 :: Mat4;
 
+Ray :: struct { origin, direction: Vec3 }
 
 QUAT_IDENTITY := Quat{x = 0, y = 0, z = 0, w = 1};
 

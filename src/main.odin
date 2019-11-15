@@ -39,7 +39,7 @@ sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 
 Input_State :: struct {
 	right, left, up, down: bool,
-	w, a, s, d, q, e, r, t, g: bool,
+	w, a, s, d, q, e, r, t, g, l: bool,
     left_mouse, right_mouse: bool,
     left_ctrl, left_alt, left_shift: bool,
 }
@@ -578,8 +578,8 @@ frame_callback :: proc "c" () {
             hotkey_translate = input_state.t,
             hotkey_rotate = input_state.r,
             hotkey_scale = input_state.s,
-            ray_origin = mouse_ray.origin,
-            ray_direction = mouse_ray.direction,
+            hotkey_local = input_state.l,
+            ray = mouse_ray,
             cam = {
                 yfov = size,
                 near_clip = near_plane,
@@ -847,6 +847,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
             case .R: r = true;
             case .G: g = true;
             case .T: t = true;
+            case .L: l = true;
             case .LEFT_ALT: left_alt = true;
             case .LEFT_CONTROL: left_ctrl = true;
             case .LEFT_SHIFT: left_shift = true;
@@ -869,6 +870,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
             case .R: r = false;
             case .G: g = false;
             case .T: t = false;
+            case .L: l = false;
             case .LEFT_ALT: left_alt = false;
             case .LEFT_CONTROL: left_ctrl = false;
             case .LEFT_SHIFT: left_shift = false;

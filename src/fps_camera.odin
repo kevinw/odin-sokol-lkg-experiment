@@ -28,8 +28,6 @@ init :: proc(using Camera: ^FPS_Camera) {
     far = 1000.0;
 }
 
-Ray :: struct { origin, direction: Vector3 }
-
 screen_to_world_ray :: proc(using cam: ^FPS_Camera, pixel: Vector2) -> Ray {
     viewport_x0:f32= 0; // TODO
     viewport_y0:f32= 0; // TODO

@@ -13,8 +13,6 @@ using import "../math"
 @private V3_ZERO := Vector3 {0, 0, 0};
 @private translate_x_arrow, translate_y_arrow:Mesh_Component;
 
-Ray :: struct { origin, direction: Vector3 }
-
 Context :: struct {
     draw_list: [dynamic]Renderable,
     render: proc(mesh: ^Mesh),
@@ -43,7 +41,7 @@ Application_State :: struct {
     mouse_left, hotkey_translate, hotkey_rotate, hotkey_scale, hotkey_local, hotkey_ctrl: bool,
     screenspace_scale, snap_translation, snap_scale, snap_rotation: f32,
     viewport_size: Vector2,
-    ray_origin, ray_direction: Vector3,
+    ray: Ray,
     cam: Camera_Parameters,
 };
 
@@ -228,7 +226,7 @@ orientation_gizmo :: proc(using ctx: ^Context, name: string, center: Vector3, or
     {
         updated_state := Interact.None;
 
-        ray := detransform(p, Ray{ active_state.ray_origin, active_state.ray_direction });
+        ray := detransform(p, active_state.ray);
         detransform(draw_scale, &ray);
         best_t := INF;
         t:f32;
@@ -285,7 +283,8 @@ orientation_gizmo :: proc(using ctx: ^Context, name: string, center: Vector3, or
         yDir := cross(zDir, xDir);
 
         // Ad-hoc geometry
-        arrow_points := [?]Vector2 { { 0.0, 0. },{ 0.0, 0.05 },{ 0.8, 0.05 },{ 0.9, 0.10 },{ 1.0, 0 } };
+        T :: 0.05;
+        arrow_points := [?]Vector2 { { 0, 0 }, { 0, T*.5 }, { 0.8, T*.5 }, { 0.9, T }, { 1, 0 } };
         geo := make_lathed_geometry(yDir, xDir, zDir, 32, arrow_points[:]);
 
         r := Renderable {
@@ -337,7 +336,7 @@ scale_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, cen
 
     {
         updated_state := Interact.None;
-        ray := detransform(p, Ray { active_state.ray_origin, active_state.ray_direction });
+        ray := detransform(p, active_state.ray);
         detransform(draw_scale, &ray);
         best_t := INF;
         t : f32;
@@ -389,7 +388,7 @@ position_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, 
 
     {
         updated_state := Interact.None;
-        ray := detransform(p, Ray{ active_state.ray_origin, active_state.ray_direction });
+        ray := detransform(p, active_state.ray);
         detransform(draw_scale, &ray);
 
         best_t:f32 = INF; // TODO: odin's infinity?
@@ -471,7 +470,7 @@ plane_translation_dragger :: proc(using ctx: ^Context, interaction: ^Interaction
 
     // Define the plane to contain the original position of the object
     plane_point := interaction.original_position;
-    r := Ray { active_state.ray_origin, active_state.ray_direction };
+    r := active_state.ray;
 
     // If an intersection exists between the ray and the plane, place the object at that point
     denom := dot(r.direction, plane_normal);
@@ -492,7 +491,7 @@ axis_rotation_dragger :: proc(using ctx: ^Context, gizmo: ^Interaction_State, ax
     original_pose := Transform { gizmo.original_position, start_orientation, Vector3{1,1,1} };
     the_axis := transform_vector(original_pose, axis);
     the_plane := v4(the_axis, -dot(the_axis, gizmo.click_offset));
-    r := Ray { active_state.ray_origin, active_state.ray_direction };
+    r := active_state.ray;
 
     t: f32;
     if !intersect_ray_plane(r, the_plane, &t) do return;
@@ -527,7 +526,7 @@ axis_scale_dragger :: proc(using ctx: ^Context, interaction: ^Interaction_State,
     if active_state.mouse_left {
         // Define the plane to contain the original position of the object
         plane_point := center;
-        ray := Ray { active_state.ray_origin, active_state.ray_direction };
+        ray := active_state.ray;
 
         // If an intersection exists between the ray and the plane, place the object at that point
         denom := vec_dot(ray.direction, plane_normal);
