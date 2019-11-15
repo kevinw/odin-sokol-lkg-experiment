@@ -16,7 +16,11 @@ import "core:fmt"
 using import "math"
 import "core:math/bits"
 
-import "gizmos"
+when EDITOR {
+    import "gizmos"
+}
+
+EDITOR :: true;
 
 import shader_meta "./shader_meta";
 
@@ -35,17 +39,12 @@ sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 
 Input_State :: struct {
 	right, left, up, down: bool,
-	w, a, s, d, q, e, r: bool,
+	w, a, s, d, q, e, r, t, g: bool,
     left_mouse, right_mouse: bool,
-    left_alt, left_shift: bool,
+    left_ctrl, left_alt, left_shift: bool,
 }
 
 input_state := Input_State {};
-
-Mouse_State :: struct {
-    pos: Vector2,
-}
-
 
 // per-material texture indices into scene.images for metallic material
 Metallic_Images :: struct {
@@ -117,7 +116,6 @@ state: struct {
     shaders: struct {
         metallic: sg.Shader,
     },
-    root_transform: Matrix4,
     scene: struct {
         buffers: [dynamic]sg.Buffer,
         images: [dynamic]sg.Image,
@@ -142,8 +140,7 @@ state: struct {
     },
 
     auto_rotate: bool,
-    mouse: Mouse_State,
-
+    mouse: struct { pos: Vector2, }
 };
 
 gizmos_ctx: gizmos.Context;
@@ -464,6 +461,9 @@ debug_window :: proc(ctx: ^mu.Context) {
 
         @static show_tweaks: i32 = 1;
         if mu.header(ctx, &show_tweaks, "tweaks") {
+            mu_label(ctx, "xform");
+            mu_struct_ti(ctx, "xform", &state.xform_a, type_info_of(type_of(state.xform_a)));
+
             when len(all_tweakables) == 0 {
                 mu.label(ctx, "no tweaks");
             } else {
@@ -558,34 +558,39 @@ frame_callback :: proc "c" () {
 
     dt := cast(f32)elapsed_seconds;
 
-    {
+    when EDITOR {
         mouse_ray := worldspace_ray(&state.camera, state.mouse.pos);
+        using state.camera;
         gizmos.update(&gizmos_ctx, {
             mouse_left = input_state.left_mouse,
+            hotkey_ctrl = input_state.left_ctrl,
+            hotkey_translate = input_state.t,
+            hotkey_rotate = input_state.r,
+            hotkey_scale = input_state.s,
             // TODO: more hotkeys
             ray_origin = mouse_ray.origin,
             ray_direction = mouse_ray.direction,
             cam = {
-                yfov = state.camera.size,
-                near_clip = state.camera.near_plane,
-                far_clip = state.camera.far_plane,
-                position = state.camera.position,
-                orientation = transmute(Vector4)state.camera.rotation,
+                yfov = size,
+                near_clip = near_plane,
+                far_clip = far_plane,
+                position = position,
+                orientation = transmute(Vector4)rotation,
             }
         });
 
-        if gizmos.xform("first-example-gizmo", &gizmos_ctx, &state.xform_a) {
-            //if (xform_a != xform_a_last) std::cout << get_local_time_ns() << " - " << "First Gizmo Changed..." << std::endl;
-            //xform_a_last = xform_a;
+        using state;
+        if gizmos.xform(&gizmos_ctx, "first-example-gizmo", &xform_a) {
+            // hovered or changed
         }
     }
 
     //
     // update scene
     //
-    state.root_transform = state.auto_rotate ? rotate_matrix4(Vector3{0, 1, 0}, cast(f32)now_seconds) : identity(Matrix4);
 
     // every other second, scrub through curve, pausing at the end for the other second
+    /*
     if do_tween {
         time := cast(f32)(now_seconds * .3);
         int_part, r := math.modf(time);
@@ -594,6 +599,7 @@ frame_callback :: proc "c" () {
         vv := evaluate(&test_curve, r);
         state.root_transform = scale_matrix4(state.root_transform, Vector3{ vv.x, vv.y, r });
     }
+    */
 
     // update camera
     do_camera_movement(&state.camera, input_state, dt, 2.0, 4.0, 1.0);
@@ -664,7 +670,7 @@ frame_callback :: proc "c" () {
         for _, node_index in nodes {
             node := &nodes[node_index];
             vs_params := shader_meta.vs_params {
-                model = mul(state.root_transform, node.transform),
+                model = mul(gizmos.matrix(state.xform_a), node.transform),
                 view_proj = state.view_proj,
                 eye_pos = state.camera.position,
             };
@@ -727,7 +733,7 @@ frame_callback :: proc "c" () {
     }
 
     // DRAW GIZMOS
-    {
+    when EDITOR {
         using sgl;
         defaults();
         push_pipeline();
@@ -758,8 +764,8 @@ frame_callback :: proc "c" () {
         sg.apply_pipeline(text.pipeline);
         sg.apply_bindings(text.bind);
 
-        sg.apply_uniforms(sg.Shader_Stage.VS, shader_meta.SLOT_sdf_vs_uniforms, &vs_uniforms, size_of(shader_meta.sdf_vs_uniforms));
-        sg.apply_uniforms(sg.Shader_Stage.FS, shader_meta.SLOT_sdf_fs_uniforms, &fs_uniforms, size_of(shader_meta.sdf_fs_uniforms));
+        sg.apply_uniforms(.VS, shader_meta.SLOT_sdf_vs_uniforms, &vs_uniforms, size_of(shader_meta.sdf_vs_uniforms));
+        sg.apply_uniforms(.FS, shader_meta.SLOT_sdf_fs_uniforms, &fs_uniforms, size_of(shader_meta.sdf_fs_uniforms));
 
         num_verts := len(text.vertex_elems) / 2;
         sg.draw(0, num_verts, 1);
@@ -781,6 +787,8 @@ cleanup :: proc "c" () {
 
 event_callback :: proc "c" (event: ^sapp.Event) {
     switch event.type {
+        case .RESIZED:
+            camera_target_resized(&state.camera, cast(f32)sapp.width(), cast(f32)sapp.height());
         case .MOUSE_DOWN:
             set_capture(sapp.win32_get_hwnd());
 
@@ -826,7 +834,10 @@ event_callback :: proc "c" (event: ^sapp.Event) {
             case .Q: q = true;
             case .E: e = true;
             case .R: r = true;
+            case .G: g = true;
+            case .T: t = true;
             case .LEFT_ALT: left_alt = true;
+            case .LEFT_CONTROL: left_ctrl = true;
             case .LEFT_SHIFT: left_shift = true;
 		}
 	}
@@ -845,7 +856,10 @@ event_callback :: proc "c" (event: ^sapp.Event) {
             case .Q: q = false;
             case .E: e = false;
             case .R: r = false;
+            case .G: g = false;
+            case .T: t = false;
             case .LEFT_ALT: left_alt = false;
+            case .LEFT_CONTROL: left_ctrl = false;
             case .LEFT_SHIFT: left_shift = false;
 		}
 	}

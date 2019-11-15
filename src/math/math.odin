@@ -70,12 +70,12 @@ Matrix4x4 :: Mat4;
 
 QUAT_IDENTITY := Quat{x = 0, y = 0, z = 0, w = 1};
 
-sqr_magnitude :: inline proc(a: $T/[$N]$E) -> f32 do return dot(a, a);
-magnitude :: inline proc(a: $T/[$N]$E) -> f32 do return sqrt(dot(a, a));
+sqr_magnitude :: inline proc "contextless" (a: $T/[$N]$E) -> f32 do return dot(a, a);
+magnitude :: inline proc "contextless" (a: $T/[$N]$E) -> f32 do return sqrt(dot(a, a));
 
-move_towards :: proc{move_towards_vec, move_towards_f32};
+move_towards :: proc {move_towards_vec, move_towards_f32};
 
-move_towards_vec :: proc(a, b: $T/[$N]$E, step: f32) -> T {
+move_towards_vec :: proc "contextless" (a, b: $T/[$N]$E, step: f32) -> T {
 	direction := b - a;
 	mag := magnitude(direction);
 
@@ -86,7 +86,7 @@ move_towards_vec :: proc(a, b: $T/[$N]$E, step: f32) -> T {
 	return a + direction / mag * step;
 }
 
-move_towards_f32 :: proc(a, b: f32, step: f32) -> f32 {
+move_towards_f32 :: proc "contextless" (a, b: f32, step: f32) -> f32 {
 	result := a;
 	if a > b {
 		result -= step;
@@ -105,7 +105,7 @@ move_towards_f32 :: proc(a, b: f32, step: f32) -> f32 {
 }
 
 
-rotate_vec2_degrees :: proc(vec: Vec2, degrees: f32) -> Vec2 {
+rotate_vec2_degrees :: proc "contextless" (vec: Vec2, degrees: f32) -> Vec2 {
 	s := sin(to_radians(degrees));
 	c := cos(to_radians(degrees));
 
@@ -116,7 +116,7 @@ rotate_vec2_degrees :: proc(vec: Vec2, degrees: f32) -> Vec2 {
 
 	return Vec2{x, y};
 }
-rotate_vector :: proc(v: Vec3, k: Vec3, _theta: f32) -> Vec3 {
+rotate_vector :: proc "contextless" (v: Vec3, k: Vec3, _theta: f32) -> Vec3 {
 	theta := _theta;
 	theta = to_radians(theta);
     cos_theta := cos(theta);
@@ -128,7 +128,7 @@ rotate_vector :: proc(v: Vec3, k: Vec3, _theta: f32) -> Vec3 {
 
 
 
-project :: inline proc(vec, normal: $T/[$N]$E) -> T {
+project :: inline proc "contextless" (vec, normal: $T/[$N]$E) -> T {
     num := dot(normal, normal);
     if (num < F32_EPSILON) {
         return T{};
@@ -140,7 +140,7 @@ project :: inline proc(vec, normal: $T/[$N]$E) -> T {
 
 
 
-clamp :: inline proc(_a, min, max: f32) -> f32 {
+clamp :: inline proc "contextless" (_a, min, max: f32) -> f32 {
 	a := _a;
 	if a < min do a = min;
 	if a > max do a = max;
@@ -152,7 +152,7 @@ clamp :: inline proc(_a, min, max: f32) -> f32 {
 
 
 
-remap :: proc(x: $T, a, b, c, d: T) -> T {
+remap :: proc "contextless" (x: $T, a, b, c, d: T) -> T {
     return c * (cast(T)1 - (x - a)/(b - a)) + d * ((x - a)/(b - a));
 }
 
@@ -163,16 +163,16 @@ remap :: proc(x: $T, a, b, c, d: T) -> T {
 
 
 
-sqr :: inline proc(x: $T) -> T {
+sqr :: inline proc "contextless" (x: $T) -> T {
 	return x * x;
 }
 
-distance :: inline proc(x, y: $T/[$N]$E) -> E {
+distance :: inline proc "contextless" (x, y: $T/[$N]$E) -> E {
 	sqr_dist := sqr_distance(x, y);
 	return sqrt(sqr_dist);
 }
 
-sqr_distance :: inline proc(x, y: $T/[$N]$E) -> E {
+sqr_distance :: inline proc "contextless" (x, y: $T/[$N]$E) -> E {
 	diff := x - y;
 	sum: E;
 	for i in 0..<N {
@@ -181,7 +181,7 @@ sqr_distance :: inline proc(x, y: $T/[$N]$E) -> E {
 	return sum;
 }
 
-minv :: inline proc(args: ..$T) -> T {
+minv :: inline proc "contextless" (args: ..$T) -> T {
 	assert(len(args) > 0);
 	current := args[0];
 	for arg in args {
@@ -193,7 +193,7 @@ minv :: inline proc(args: ..$T) -> T {
 	return current;
 }
 
-maxv :: inline proc(args: ..$T) -> T {
+maxv :: inline proc "contextless" (args: ..$T) -> T {
 	assert(len(args) > 0);
 	current := args[0];
 	for arg in args {
@@ -204,13 +204,13 @@ maxv :: inline proc(args: ..$T) -> T {
 	return current;
 }
 
-degrees_to_vector :: inline proc(degrees: f32) -> Vec2 {
+degrees_to_vector :: inline proc "contextless" (degrees: f32) -> Vec2 {
 	radians := to_radians(degrees);
 	vec := Vec2{cos(radians), sin(radians)};
 	return vec;
 }
 
-translate :: proc(m_: Mat4, v: Vec3) -> Mat4 {
+translate :: proc "contextless" (m_: Mat4, v: Vec3) -> Mat4 {
 	m := m_;
 	m[3][0] += v[0];
 	m[3][1] += v[1];
@@ -228,26 +228,26 @@ translate :: proc(m_: Mat4, v: Vec3) -> Mat4 {
 
 
 
-quaternion_forward :: inline proc(quat: Quat) -> Vec3 {
+quaternion_forward :: inline proc "contextless" (quat: Quat) -> Vec3 {
 	return quat_mul_vec3(quat, {0, 0, -1});
 }
-quaternion_back :: inline proc(quat: Quat) -> Vec3 {
+quaternion_back :: inline proc "contextless" (quat: Quat) -> Vec3 {
 	return -quaternion_forward(quat);
 }
-quaternion_right :: inline proc(quat: Quat) -> Vec3 {
+quaternion_right :: inline proc "contextless" (quat: Quat) -> Vec3 {
 	return quat_mul_vec3(quat, {1, 0, 0});
 }
-quaternion_left :: inline proc(quat: Quat) -> Vec3 {
+quaternion_left :: inline proc "contextless" (quat: Quat) -> Vec3 {
 	return -quaternion_right(quat);
 }
-quaternion_up :: inline proc(quat: Quat) -> Vec3 {
+quaternion_up :: inline proc "contextless" (quat: Quat) -> Vec3 {
 	return quat_mul_vec3(quat, {0, 1, 0});
 }
-quaternion_down :: inline proc(quat: Quat) -> Vec3 {
+quaternion_down :: inline proc "contextless" (quat: Quat) -> Vec3 {
 	return -quaternion_up(quat);
 }
 
-degrees_to_quaternion :: proc(v: Vec3) -> Quat {
+degrees_to_quaternion :: proc "contextless" (v: Vec3) -> Quat {
 	qx := axis_angle(Vec3{1,0,0}, to_radians(v.x));
 	qy := axis_angle(Vec3{0,1,0}, to_radians(v.y));
 	qz := axis_angle(Vec3{0,0,1}, to_radians(v.z));
@@ -257,7 +257,7 @@ degrees_to_quaternion :: proc(v: Vec3) -> Quat {
 	return orientation;
 }
 
-direction_to_quaternion :: proc(v: Vec3) -> Quat {
+direction_to_quaternion :: proc "contextless" (v: Vec3) -> Quat {
 	assert(length(v) != 0);
 	angle : f32 = cast(f32)atan2(cast(f64)v.x, cast(f64)v.z); // Note: I expected atan2(z,x) but OP reported success with atan2(x,z) instead! Switch around if you see 90° off.
 	qx : f32 = 0;
@@ -268,7 +268,7 @@ direction_to_quaternion :: proc(v: Vec3) -> Quat {
 }
 
 // note(josh): rotates the vector by the quaternion
-quat_mul_vec3 :: proc(quat: Quat, vec: Vec3) -> Vec3 {
+quat_mul_vec3 :: proc "contextless" (quat: Quat, vec: Vec3) -> Vec3 {
 	num := quat.x * 2;
 	num2 := quat.y * 2;
 	num3 := quat.z * 2;
@@ -288,7 +288,7 @@ quat_mul_vec3 :: proc(quat: Quat, vec: Vec3) -> Vec3 {
 	return result;
 }
 
-slerp :: proc(q1_: Quat, q2: Quat, t: f32) -> Quat {
+slerp :: proc "contextless" (q1_: Quat, q2: Quat, t: f32) -> Quat {
 	q1 := q1_;
 	d := dot(q1, q2);
 	if d < 0 {
@@ -315,7 +315,7 @@ slerp :: proc(q1_: Quat, q2: Quat, t: f32) -> Quat {
 	return Quat{x, y, z, w};
 }
 
-acos :: proc(x: f32) -> f32 {
+acos :: proc "contextless" (x: f32) -> f32 {
 	// todo(josh): this approximation has a potential error of about 10 degrees according to stack overflow, maybe look into a more accurate implementation
 	// return (-0.69813170079773212 * x * x - 0.87266462599716477) * x + 1.5707963267948966;
 
@@ -325,7 +325,7 @@ acos :: proc(x: f32) -> f32 {
 	return (8*(c+(2-a)/c)-(b+(2-2*x)/b))/6;
 }
 
-atan2 :: proc(y, x: f64) -> f64 {
+atan2 :: proc "contextless" (y, x: f64) -> f64 {
     // special cases
     switch {
     case is_nan(y) || is_nan(x):
@@ -364,11 +364,11 @@ atan2 :: proc(y, x: f64) -> f64 {
     return q;
 }
 
-// is_inf :: proc(f: f64, sign: int) -> bool {
+// is_inf :: proc "contextless" (f: f64, sign: int) -> bool {
 //     return sign >= 0 && f >= max(f64) || sign <= 0 && f < -max(f64);
 // }
 
-copysign :: proc(x, y: f64) -> f64 {
+copysign :: proc "contextless" (x, y: f64) -> f64 {
     s_ign :: 1 << 63;
     a := transmute(u64)x;
     //b := transmute(u64)y;
@@ -376,7 +376,7 @@ copysign :: proc(x, y: f64) -> f64 {
 }
 
 // xatan evaluates a series valid in the range [0, 0.66].
-xatan :: proc(x: f64) -> f64 {
+xatan :: proc "contextless" (x: f64) -> f64 {
 	P0 :: -8.750608600031904122785e-01;
 	P1 :: -1.615753718733365076637e+01;
 	P2 :: -7.500855792314704667340e+01;
@@ -396,7 +396,7 @@ xatan :: proc(x: f64) -> f64 {
 
 // satan reduces its argument (known to be positive)
 // to the range [0, 0.66] and calls xatan.
-satan :: proc(x: f64) -> f64 {
+satan :: proc "contextless" (x: f64) -> f64 {
 	Morebits := 6.123233995736765886130e-17; // pi/2 = PIO2 + Morebits
 	Tan3pio8 := 2.41421356237309504880;      // tan(3*pi/8)
 
@@ -415,7 +415,7 @@ satan :: proc(x: f64) -> f64 {
 //      Atan(±0) = ±0
 //      Atan(±Inf) = ±Pi/2
 
-atan :: proc(x: f64) -> f64 {
+atan :: proc "contextless" (x: f64) -> f64 {
 	if x == 0 {
 		return x;
 	}
@@ -427,7 +427,7 @@ atan :: proc(x: f64) -> f64 {
 
 
 
-mat4_inverse :: proc(m: Mat4) -> Mat4 {
+mat4_inverse :: proc "contextless" (m: Mat4) -> Mat4 {
 	o: Mat4;
 
 	sf00 := m[2][2] * m[3][3] - m[3][2] * m[2][3];
@@ -764,13 +764,13 @@ norm0 :: proc(v: $T/[$N]$E) -> T {
 
 
 
-identity :: proc($T: typeid/[$N][N]$E) -> T {
+identity :: proc "contextless" ($T: typeid/[$N][N]$E) -> T {
 	m: T;
 	for i in 0..<N do m[i][i] = E(1);
 	return m;
 }
 
-transpose :: proc(m: $M/[$N][N]f32) -> M {
+transpose :: proc "contextless" (m: $M/[$N][N]f32) -> M {
 	for j in 0..<N {
 		for i in 0..<N {
 			m[i][j], m[j][i] = m[j][i], m[i][j];
@@ -779,7 +779,7 @@ transpose :: proc(m: $M/[$N][N]f32) -> M {
 	return m;
 }
 
-mat3_mul :: proc(a, b: Mat3) -> Mat3 {
+mat3_mul :: proc "contextless" (a, b: Mat3) -> Mat3 {
 	c: Mat3;
 	for j in 0..<3 {
 		for i in 0..<3 {
@@ -791,7 +791,7 @@ mat3_mul :: proc(a, b: Mat3) -> Mat3 {
 	return c;
 }
 
-mat4_mul :: proc(a, b: Mat4) -> Mat4 {
+mat4_mul :: proc "contextless" (a, b: Mat4) -> Mat4 {
 	c: Mat4;
 	for j in 0..<4 {
 		for i in 0..<4 {
@@ -804,7 +804,7 @@ mat4_mul :: proc(a, b: Mat4) -> Mat4 {
 	return c;
 }
 
-mat4_mul_vec4 :: proc(m: Mat4, v: Vec4) -> Vec4 {
+mat4_mul_vec4 :: proc "contextless" (m: Mat4, v: Vec4) -> Vec4 {
 	return Vec4{
 		m[0][0]*v[0] + m[1][0]*v[1] + m[2][0]*v[2] + m[3][0]*v[3],
 		m[0][1]*v[0] + m[1][1]*v[1] + m[2][1]*v[2] + m[3][1]*v[3],
@@ -883,7 +883,7 @@ mat4_mul_vec4 :: proc(m: Mat4, v: Vec4) -> Vec4 {
 // }
 
 
-mat4_translate :: proc(v: Vec3) -> Mat4 {
+mat4_translate :: proc "contextless" (v: Vec3) -> Mat4 {
 	m := identity(Mat4);
 	m[3][0] = v[0];
 	m[3][1] = v[1];
@@ -892,7 +892,7 @@ mat4_translate :: proc(v: Vec3) -> Mat4 {
 	return m;
 }
 
-mat4_rotate :: proc(v: Vec3, angle_radians: f32) -> Mat4 {
+mat4_rotate :: proc "contextless" (v: Vec3, angle_radians: f32) -> Mat4 {
 	c := cos(angle_radians);
 	s := sin(angle_radians);
 
@@ -919,7 +919,7 @@ mat4_rotate :: proc(v: Vec3, angle_radians: f32) -> Mat4 {
 	return rot;
 }
 
-mat4_scale_vec3 :: proc(m: Mat4, v: Vec3) -> Mat4 {
+mat4_scale_vec3 :: proc "contextless" (m: Mat4, v: Vec3) -> Mat4 {
 	mm := m;
 	mm[0][0] *= v[0];
 	mm[1][1] *= v[1];
@@ -927,7 +927,7 @@ mat4_scale_vec3 :: proc(m: Mat4, v: Vec3) -> Mat4 {
 	return mm;
 }
 
-mat4_scale_f32 :: proc(m: Mat4, s: f32) -> Mat4 {
+mat4_scale_f32 :: proc "contextless" (m: Mat4, s: f32) -> Mat4 {
 	mm := m;
 	mm[0][0] *= s;
 	mm[1][1] *= s;
@@ -938,7 +938,7 @@ mat4_scale_f32 :: proc(m: Mat4, s: f32) -> Mat4 {
 mat4_scale :: proc{mat4_scale_vec3, mat4_scale_f32};
 
 
-look_at :: proc(eye, centre, up: Vec3) -> Mat4 {
+look_at :: proc "contextless" (eye, centre, up: Vec3) -> Mat4 {
 	f := norm(centre - eye);
 	s := norm(cross(f, up));
 	u := cross(s, f);
@@ -951,7 +951,7 @@ look_at :: proc(eye, centre, up: Vec3) -> Mat4 {
 	};
 }
 
-perspective :: proc(fovy, aspect, near, far: f32) -> Mat4 {
+perspective :: proc "contextless" (fovy, aspect, near, far: f32) -> Mat4 {
 	m: Mat4;
 	tan_half_fovy := tan(0.5 * fovy);
 
@@ -964,7 +964,7 @@ perspective :: proc(fovy, aspect, near, far: f32) -> Mat4 {
 }
 
 
-ortho3d :: proc(left, right, bottom, top, near, far: f32) -> Mat4 {
+ortho3d :: proc "contextless" (left, right, bottom, top, near, far: f32) -> Mat4 {
 	m := identity(Mat4);
 	m[0][0] = +2.0 / (right - left);
 	m[1][1] = +2.0 / (top - bottom);
@@ -978,11 +978,11 @@ ortho3d :: proc(left, right, bottom, top, near, far: f32) -> Mat4 {
 
 // Quaternion operations
 
-conj :: proc(q: Quat) -> Quat {
+conj :: proc "contextless" (q: Quat) -> Quat {
 	return Quat{-q.x, -q.y, -q.z, q.w};
 }
 
-quat_mul :: proc(q0, q1: Quat) -> Quat {
+quat_mul :: proc "contextless" (q0, q1: Quat) -> Quat {
 	d: Quat;
 	d.x = q0.w * q1.x + q0.x * q1.w + q0.y * q1.z - q0.z * q1.y;
 	d.y = q0.w * q1.y - q0.x * q1.z + q0.y * q1.w + q0.z * q1.x;
@@ -991,32 +991,32 @@ quat_mul :: proc(q0, q1: Quat) -> Quat {
 	return d;
 }
 
-quat_mulf :: proc(q: Quat, f: f32) -> Quat { return Quat{q.x*f, q.y*f, q.z*f, q.w*f}; }
-quat_divf :: proc(q: Quat, f: f32) -> Quat { return Quat{q.x/f, q.y/f, q.z/f, q.w/f}; }
+quat_mulf :: proc "contextless" (q: Quat, f: f32) -> Quat { return Quat{q.x*f, q.y*f, q.z*f, q.w*f}; }
+quat_divf :: proc "contextless" (q: Quat, f: f32) -> Quat { return Quat{q.x/f, q.y/f, q.z/f, q.w/f}; }
 
-quat_div     :: proc(q0, q1: Quat) -> Quat { return mul(q0, quat_inverse(q1)); }
-quat_inverse :: proc(q: Quat) -> Quat { return div(conj(q), dot(q, q)); }
-quat_dot     :: proc(q0, q1: Quat) -> f32 { return q0.x*q1.x + q0.y*q1.y + q0.z*q1.z + q0.w*q1.w; }
+quat_div     :: proc "contextless" (q0, q1: Quat) -> Quat { return mul(q0, quat_inverse(q1)); }
+quat_inverse :: proc "contextless" (q: Quat) -> Quat { return div(conj(q), dot(q, q)); }
+quat_dot     :: proc "contextless" (q0, q1: Quat) -> f32 { return q0.x*q1.x + q0.y*q1.y + q0.z*q1.z + q0.w*q1.w; }
 
-quat_norm :: proc(q: Quat) -> Quat {
+quat_norm :: proc "contextless" (q: Quat) -> Quat {
 	m := sqrt(dot(q, q));
 	return div(q, m);
 }
 
-axis_angle :: proc(axis: Vec3, angle_radians: f32) -> Quat {
+axis_angle :: proc "contextless" (axis: Vec3, angle_radians: f32) -> Quat {
 	v := norm(axis) * sin(0.5*angle_radians);
 	w := cos(0.5*angle_radians);
 	return Quat{v.x, v.y, v.z, w};
 }
 
-euler_angles :: proc(pitch, yaw, roll: f32) -> Quat {
+euler_angles :: proc "contextless" (pitch, yaw, roll: f32) -> Quat {
 	p := axis_angle(Vec3{1, 0, 0}, pitch);
 	y := axis_angle(Vec3{0, 1, 0}, yaw);
 	r := axis_angle(Vec3{0, 0, 1}, roll);
 	return mul(mul(y, p), r);
 }
 
-quat_to_mat4 :: proc(q: Quat) -> Mat4 {
+quat_to_mat4 :: proc "contextless" (q: Quat) -> Mat4 {
 	a := quat_norm(q);
 	xx := a.x*a.x; yy := a.y*a.y; zz := a.z*a.z;
 	xy := a.x*a.y; xz := a.x*a.z; yz := a.y*a.z;

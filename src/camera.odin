@@ -20,13 +20,17 @@ Camera :: struct {
     position: Vec3,
     rotation: Quat,
 
-    pixel_width: f32,
-    pixel_height: f32,
-    aspect: f32,
+    pixel_width, pixel_height, aspect: f32,
 
     //draw_mode: gpu.Draw_Mode,
 
     //framebuffer: Framebuffer,
+}
+
+camera_target_resized :: proc(camera: ^Camera, pixel_width, pixel_height: f32) {
+    camera.pixel_width = cast(f32)pixel_width;
+    camera.pixel_height = cast(f32)pixel_height;
+    camera.aspect = camera.pixel_width / camera.pixel_height;
 }
 
 worldspace_ray :: proc(using camera: ^Camera, screen_pt: Vector2) -> Ray {
