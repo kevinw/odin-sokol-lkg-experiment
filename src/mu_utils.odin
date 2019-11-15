@@ -326,11 +326,10 @@ mu_struct_ti :: proc(ctx: ^mu.Context, name: string, data: rawptr, ti: ^Type_Inf
     }
 
     input_int :: proc(ctx: ^mu.Context, name: string, val: ^i32) -> mu.Res {
-        s := "TODO:input_int";
+        s := tprint(val^);
         res:mu.Res;
-        // TODO:name
-        mu.textbox(ctx, &s[0], cast(i32)len(s));
-        //TODO: res
+        if mu.textbox(ctx, &s[0], cast(i32)len(s)) {
+        }
         return res;
     }
 

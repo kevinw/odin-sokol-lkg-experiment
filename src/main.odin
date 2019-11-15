@@ -217,14 +217,19 @@ render_gizmos :: proc(mesh: ^gizmos.Mesh) {
         tri := &mesh.triangles[t];
         for i in 0..<3 {
             index := tri[i];
-            //if index < cast(u32)len(mesh.vertices){
-                using v := &mesh.vertices[index];
-                sgl.v3f_c4f(position.x, position.y, position.z, color.r, color.g, color.b, color.a);
-            //}
+            using v := &mesh.vertices[index];
+            assert(!math.is_nan(position.x));
+            assert(!math.is_nan(position.y));
+            assert(!math.is_nan(position.z));
+            assert(!math.is_nan(color.r));
+            assert(!math.is_nan(color.g));
+            assert(!math.is_nan(color.b));
+            assert(!math.is_nan(color.a));
+            sgl.v3f_c4f(position.x, position.y, position.z, color.r, color.g, color.b, color.a);
         }
 
     }
-    defer sgl.end();
+    sgl.end();
 }
 
 init_callback :: proc "c" () {
@@ -248,8 +253,8 @@ init_callback :: proc "c" () {
 	});
 
     sgl.setup({
-        max_vertices = 5000,
-        max_commands = 50,
+        max_vertices = 50000,
+        max_commands = 300,
         pipeline_pool_size = 5,
     });
 
@@ -361,7 +366,6 @@ init_callback :: proc "c" () {
         state.pip = sg.make_pipeline({
             shader = sg.make_shader(shader_meta.shadertoy_shader_desc()^),
             label = "shadertoy-pipeline",
-            primitive_type = .TRIANGLES,
             layout = {
                 attrs = {
                     shader_meta.ATTR_vs_st_position = {format = .FLOAT3},
@@ -387,10 +391,17 @@ init_callback :: proc "c" () {
     // make gizmo rendering pipeline
     {
         state.gizmo_rendering_pipeline = sgl.make_pipeline({
+            blend = {
+                enabled = true,
+                src_factor_rgb = sg.Blend_Factor.SRC_ALPHA,
+                dst_factor_rgb = sg.Blend_Factor.ONE_MINUS_SRC_ALPHA,
+            },
+            /*
             depth_stencil = {
                 depth_write_enabled = true,
                 depth_compare_func = sg.Compare_Func.LESS_EQUAL,
             },
+            */
             rasterizer = {
                 sample_count = MSAA_SAMPLE_COUNT,
             },
@@ -567,7 +578,6 @@ frame_callback :: proc "c" () {
             hotkey_translate = input_state.t,
             hotkey_rotate = input_state.r,
             hotkey_scale = input_state.s,
-            // TODO: more hotkeys
             ray_origin = mouse_ray.origin,
             ray_direction = mouse_ray.direction,
             cam = {
@@ -734,15 +744,16 @@ frame_callback :: proc "c" () {
 
     // DRAW GIZMOS
     when EDITOR {
-        using sgl;
-        defaults();
-        push_pipeline();
-        defer pop_pipeline();
-        load_pipeline(state.gizmo_rendering_pipeline);
-        matrix_mode_projection();
-        matrix_mode_modelview();
-        load_matrix(&state.view_proj[0][0]);
-        gizmos.draw(&gizmos_ctx);
+        {
+            using sgl;
+            defaults();
+            push_pipeline();
+            defer pop_pipeline();
+            load_pipeline(state.gizmo_rendering_pipeline);
+            matrix_mode_modelview();
+            load_matrix(&state.view_proj[0][0]);
+            gizmos.draw(&gizmos_ctx);
+        }
     }
 
     // DRAW SDF TEXT

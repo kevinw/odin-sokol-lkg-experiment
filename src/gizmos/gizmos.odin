@@ -8,6 +8,8 @@ using import "../math"
 @private V3_ONE  := Vector3 {1, 1, 1};
 @private WHITE   := Vector4 {1, 1, 1, 1};
 @private RED     := Vector4 {1, 0, 0, 1};
+@private GREEN   := Vec4 { 0, 1, 0, 1 };
+@private BLUE    := Vec4 { 0, 0, 1, 1 };
 @private V3_ZERO := Vector3 {0, 0, 0};
 @private translate_x_arrow, translate_y_arrow:Mesh_Component;
 
@@ -200,11 +202,7 @@ make_box_geometry :: proc(min_bounds, max_bounds: Vector3) -> Mesh {
     return mesh;
 }
 
-make_lathed_geometry :: proc(
-    verbose: bool,
-    _axis, arm1, arm2: Vector3,
-    slices: int, points: []Vector2, eps:f32 = 0) -> Mesh
-{
+make_lathed_geometry :: proc(_axis, arm1, arm2: Vector3, slices: int, points: []Vector2, eps:f32 = 0) -> Mesh {
     axis := _axis;
 
     mesh: Mesh;
@@ -254,19 +252,22 @@ update :: proc(using ctx: ^Context, state: Application_State) {
     clear(&draw_list);
 }
 
+min_vec :: proc (a, b: Vec3) -> Vec3 do return {min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)};
+max_vec :: proc (a, b: Vec3) -> Vec3 do return {max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)};
+
 _super_mesh: Mesh;
 draw :: proc(using ctx: ^Context) {
     if ctx.render == nil do return;
 
-    //r: ^Mesh = &_super_mesh;
-    //clear_mesh(r);
-
-    r:Mesh;
+    //r:Mesh;
+    r: ^Mesh = &_super_mesh;
+    clear_mesh(r);
 
     for _, i in draw_list {
         m := &draw_list[i];
 
         num_verts := u32(len(r.vertices));
+        
         for _, vert_index in m.mesh.vertices {
             v := m.mesh.vertices[vert_index];
             v.color = m.color;
@@ -277,7 +278,7 @@ draw :: proc(using ctx: ^Context) {
             append(&r.triangles, tri + num_verts);
         }
     }
-    ctx.render(&r);
+    ctx.render(r);
 
     last_state = active_state;
 }
@@ -294,21 +295,21 @@ draw :: proc(using ctx: ^Context) {
     m := &mesh_components;
 
     using Interact;
-    m[Translate_X]   = { make_lathed_geometry(true, { 1,0,0 },{ 0,1,0 },{ 0,0,1 }, 16, arrow_points[:]), { 1,0.5,0.5, 1 }, { 1,0,0, 1 } };
-    m[Translate_Y]   = { make_lathed_geometry(false, { 0,1,0 },{ 0,0,1 },{ 1,0,0 }, 16, arrow_points[:]), { 0.5,1,0.5, 1 }, { 0,1,0, 1 } };
-    m[Translate_Z]   = { make_lathed_geometry(false, { 0,0,1 },{ 1,0,0 },{ 0,1,0 }, 16, arrow_points[:]), { 0.5,0.5,1, 1 }, { 0,0,1, 1 } };
+    m[Translate_X]   = { make_lathed_geometry({ 1,0,0 },{ 0,1,0 },{ 0,0,1 }, 16, arrow_points[:]), { 1,0.5,0.5, 1 }, RED };
+    m[Translate_Y]   = { make_lathed_geometry({ 0,1,0 },{ 0,0,1 },{ 1,0,0 }, 16, arrow_points[:]), { 0.5,1,0.5, 1 }, GREEN };
+    m[Translate_Z]   = { make_lathed_geometry({ 0,0,1 },{ 1,0,0 },{ 0,1,0 }, 16, arrow_points[:]), { 0.5,0.5,1, 1 }, BLUE };
 
     m[Translate_YZ]  = { make_box_geometry({ -0.01,0.25,0.25 },{ 0.01,0.75,0.75 }), { 0.5,1,1, 0.5 }, { 0,1,1, 0.6 } };
     m[Translate_ZX]  = { make_box_geometry({ 0.25,-0.01,0.25 },{ 0.75,0.01,0.75 }), { 1,0.5,1, 0.5 }, { 1,0,1, 0.6 } };
     m[Translate_XY]  = { make_box_geometry({ 0.25,0.25,-0.01 },{ 0.75,0.75,0.01 }), { 1,1,0.5, 0.5 }, { 1,1,0, 0.6 } };
     m[Translate_XYZ] = { make_box_geometry({ -0.05,-0.05,-0.05 },{ 0.05,0.05,0.05 }),{ 0.9, 0.9, 0.9, 0.25 },{ 1,1,1, 0.35 } };
 
-    m[Rotate_X]      = { make_lathed_geometry(false, { 1,0,0 },{ 0,1,0 },{ 0,0,1 }, 32, ring_points[:], 0.003), { 1, 0.5, 0.5, 1 }, { 1, 0, 0, 1 } };
-    m[Rotate_Y]      = { make_lathed_geometry(false, { 0,1,0 },{ 0,0,1 },{ 1,0,0 }, 32, ring_points[:], -0.003), { 0.5,1,0.5, 1 }, { 0,1,0, 1 } };
-    m[Rotate_Z]      = { make_lathed_geometry(false, { 0,0,1 },{ 1,0,0 },{ 0,1,0 }, 32, ring_points[:]), { 0.5,0.5,1, 1 }, { 0,0,1, 1 } };
-    m[Scale_X]       = { make_lathed_geometry(false, { 1,0,0 },{ 0,1,0 },{ 0,0,1 }, 16, mace_points[:]),{ 1,0.5,0.5, 1 },{ 1,0,0, 1 } };
-    m[Scale_Y]       = { make_lathed_geometry(false, { 0,1,0 },{ 0,0,1 },{ 1,0,0 }, 16, mace_points[:]),{ 0.5,1,0.5, 1 },{ 0,1,0, 1 } };
-    m[Scale_Z]       = { make_lathed_geometry(false, { 0,0,1 },{ 1,0,0 },{ 0,1,0 }, 16, mace_points[:]),{ 0.5,0.5,1, 1 },{ 0,0,1, 1 } };
+    m[Rotate_X]      = { make_lathed_geometry({ 1,0,0 },{ 0,1,0 },{ 0,0,1 }, 32, ring_points[:], 0.003), { 1, 0.5, 0.5, 1 }, RED };
+    m[Rotate_Y]      = { make_lathed_geometry({ 0,1,0 },{ 0,0,1 },{ 1,0,0 }, 32, ring_points[:], -0.003), { 0.5,1,0.5, 1 }, GREEN };
+    m[Rotate_Z]      = { make_lathed_geometry({ 0,0,1 },{ 1,0,0 },{ 0,1,0 }, 32, ring_points[:]), { 0.5,0.5,1, 1 }, BLUE };
+    m[Scale_X]       = { make_lathed_geometry({ 1,0,0 },{ 0,1,0 },{ 0,0,1 }, 16, mace_points[:]),{ 1,0.5,0.5, 1 }, RED };
+    m[Scale_Y]       = { make_lathed_geometry({ 0,1,0 },{ 0,0,1 },{ 1,0,0 }, 16, mace_points[:]),{ 0.5,1,0.5, 1 }, GREEN };
+    m[Scale_Z]       = { make_lathed_geometry({ 0,0,1 },{ 1,0,0 },{ 0,1,0 }, 16, mace_points[:]),{ 0.5,0.5,1, 1 } ,BLUE };
 }
 
 init :: proc(using ctx: ^Context) {
@@ -360,7 +361,7 @@ orientation_gizmo :: proc(using ctx: ^Context, name: string, center: Vector3, or
 
     // interaction_mode will only change on clicked
     gizmo := gizmos[id];
-    gizmos[id] = gizmo;
+    defer gizmos[id] = gizmo;
 
     if has_clicked do gizmo.interaction_mode = .None;
 
@@ -441,7 +442,7 @@ orientation_gizmo :: proc(using ctx: ^Context, name: string, center: Vector3, or
 
         // Ad-hoc geometry
         arrow_points := [?]Vector2 { { 0.0, 0. },{ 0.0, 0.05 },{ 0.8, 0.05 },{ 0.9, 0.10 },{ 1.0, 0 } };
-        geo := make_lathed_geometry(false, yDir, xDir, zDir, 32, arrow_points[:]);
+        geo := make_lathed_geometry(yDir, xDir, zDir, 32, arrow_points[:]);
 
         r := Renderable {
             mesh = geo,
