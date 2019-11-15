@@ -33,58 +33,6 @@ Transform :: struct {
     scale: Vector3,
 }
 
-transform_coord :: proc(transform: Matrix4, coord: Vector3) -> Vector3 {
-    r := mul(transform, v4(coord, 1));
-    return v3(r) / r.w;
-}
-
-transform_ray :: proc(using p: Transform, r: Ray) -> Ray do return { transform_point(p, r.origin), transform_vector(p, r.direction) };
-detransform_ray :: proc(using p: Transform, r: Ray) -> Ray do return { detransform_point(p, r.origin), detransform_vector(p, r.direction) };
-detransform_scale_ray:: proc(scale: f32, r: ^Ray) { r.origin /= scale; r.direction /= scale; }
-transform_scale_ray :: proc(scale: f32, r: ^Ray) { r.origin *= scale; r.direction *= scale; }
-
-transform :: proc { transform_ray, transform_scale_ray };
-detransform :: proc { detransform_ray, detransform_scale_ray };
-
-transform_vector_transform :: proc(using t: Transform, vec: Vector3) -> Vector3 do return qrot(orientation, vec * scale);
-transform_point :: proc(using t: Transform, p: Vector3) -> Vector3 do return position + transform_vector(t, p);
-detransform_point :: proc(using t: Transform, p: Vector3) -> Vector3 do return detransform_vector(t, p - position);
-detransform_vector :: proc(using t: Transform, vec: Vector3) -> Vector3 do return qrot(qinv(orientation), vec) / scale;
-
-transform_vector_matrix :: proc(transform_matrix: Matrix4, vector: Vector3) -> Vector3 do return v3(mul(transform_matrix, v4(vector, 0)));
-
-transform_vector :: proc { transform_vector_transform, transform_vector_matrix };
-
-length2 :: inline proc(a: Vector4) -> f32 do return dot(a, a);
-qconj :: inline proc(q: Vector4) -> Vector4 do return {-q.x,-q.y,-q.z,q.w};
-qinv :: inline proc(q: Vector4) -> Vector4 do return qconj(q)/length2(q);
-qxdir :: inline proc(q: Vector4) -> Vector3 do return {q.w*q.w+q.x*q.x-q.y*q.y-q.z*q.z, (q.x*q.y+q.z*q.w)*2, (q.z*q.x-q.y*q.w)*2};
-qydir :: inline proc(q: Vector4) -> Vector3 do return {(q.x*q.y-q.z*q.w)*2, q.w*q.w-q.x*q.x+q.y*q.y-q.z*q.z, (q.y*q.z+q.x*q.w)*2};
-qzdir :: inline proc(q: Vector4) -> Vector3 do return {(q.z*q.x+q.y*q.w)*2, (q.y*q.z-q.x*q.w)*2, q.w*q.w-q.x*q.x-q.y*q.y+q.z*q.z};
-qrot :: inline proc(q: Vector4, v: Vector3) -> Vector3 do return qxdir(q)*v.x + qydir(q)*v.y + qzdir(q)*v.z;
-qmul :: inline proc(a, b: Vector4) -> Vector4 do return {a.x*b.w+a.w*b.x+a.y*b.z-a.z*b.y, a.y*b.w+a.w*b.y+a.z*b.x-a.x*b.z, a.z*b.w+a.w*b.z+a.x*b.y-a.y*b.x, a.w*b.w-a.x*b.x-a.y*b.y-a.z*b.z};
-
-v4 :: inline proc(v: Vector3, w: f32) -> Vector4 do return Vector4 { v.x, v.y, v.z, w };
-v3_scalar :: inline proc(scalar: f32) -> Vector3 do return Vector3 { scalar, scalar, scalar };
-v3_v4 :: inline proc(v: Vector4) -> Vector3 do return Vector3 { v.x, v.y, v.z };
-v3 :: proc { v3_scalar, v3_v4 };
-
-matrix :: proc(using t: Transform) -> Matrix4 {
-    return {
-        auto_cast v4(qxdir(orientation) * scale.x, 0),
-        auto_cast v4(qydir(orientation) * scale.y, 0),
-        auto_cast v4(qzdir(orientation) * scale.z, 0),
-        auto_cast v4(position, 1)
-    };
-}
-
-flush_to_zero :: proc(v: ^Vector3) {
-    EPS :: 0.02;
-    inline for i in 0..len(v) {
-        if abs(v[i]) < EPS do v[i] = 0;
-    }
-}
-
 Camera_Parameters :: struct {
     yfov, near_clip, far_clip: f32,
     position: Vector3,
@@ -126,20 +74,6 @@ Geo_Vertex :: struct {
     color: Vector4,
 };
 
-@private v_vector4 :: inline proc(position: Vector4) -> Geo_Vertex {
-    geo_vertex: Geo_Vertex;
-    geo_vertex.position = {position.x, position.y, position.z};
-    return geo_vertex;
-}
-
-@private v_vector3 :: inline proc(position: Vector3) -> Geo_Vertex {
-    geo_vertex: Geo_Vertex;
-    geo_vertex.position = position;
-    return geo_vertex;
-}
-
-v :: proc { v_vector3, v_vector4 };
-
 Mesh :: struct {
     vertices: [dynamic]Geo_Vertex,
     triangles: [dynamic][3]u32,
@@ -174,71 +108,6 @@ Renderable :: struct {
 }
 
 mesh_components: [cast(int)Interact.Last]Mesh_Component;
-
-make_box_geometry :: proc(min_bounds, max_bounds: Vector3) -> Mesh {
-    a, b := min_bounds, max_bounds;
-    mesh : Mesh;
-    mesh.vertices = {
-        { { a.x, a.y, a.z }, { -1,0,0 }, WHITE }, { { a.x, a.y, b.z }, { -1,0,0 }, WHITE },
-        { { a.x, b.y, b.z }, { -1,0,0 }, WHITE }, { { a.x, b.y, a.z }, { -1,0,0 }, WHITE },
-        { { b.x, a.y, a.z }, { +1,0,0 }, WHITE }, { { b.x, b.y, a.z }, { +1,0,0 }, WHITE },
-        { { b.x, b.y, b.z }, { +1,0,0 }, WHITE }, { { b.x, a.y, b.z }, { +1,0,0 }, WHITE },
-        { { a.x, a.y, a.z }, { 0,-1,0 }, WHITE }, { { b.x, a.y, a.z }, { 0,-1,0 }, WHITE },
-        { { b.x, a.y, b.z }, { 0,-1,0 }, WHITE }, { { a.x, a.y, b.z }, { 0,-1,0 }, WHITE },
-        { { a.x, b.y, a.z }, { 0,+1,0 }, WHITE }, { { a.x, b.y, b.z }, { 0,+1,0 }, WHITE },
-        { { b.x, b.y, b.z }, { 0,+1,0 }, WHITE }, { { b.x, b.y, a.z }, { 0,+1,0 }, WHITE },
-        { { a.x, a.y, a.z }, { 0,0,-1 }, WHITE }, { { a.x, b.y, a.z }, { 0,0,-1 }, WHITE },
-        { { b.x, b.y, a.z }, { 0,0,-1 }, WHITE }, { { b.x, a.y, a.z }, { 0,0,-1 }, WHITE },
-        { { a.x, a.y, b.z }, { 0,0,+1 }, WHITE }, { { b.x, a.y, b.z }, { 0,0,+1 }, WHITE },
-        { { b.x, b.y, b.z }, { 0,0,+1 }, WHITE }, { { a.x, b.y, b.z }, { 0,0,+1 }, WHITE },
-    };
-
-    mesh.triangles = {
-        { 0,1,2 },   { 0,2,3 },   { 4,5,6 },
-        { 4,6,7 },   { 8,9,10 },  { 8,10,11 },
-        { 12,13,14 },{ 12,14,15 },{ 16,17,18 },
-        { 16,18,19 },{ 20,21,22 },{ 20,22,23 }
-    };
-    return mesh;
-}
-
-make_lathed_geometry :: proc(_axis, arm1, arm2: Vector3, slices: int, points: []Vector2, eps:f32 = 0) -> Mesh {
-    axis := _axis;
-
-    mesh: Mesh;
-    for i in 0..cast(u32)slices {
-        angle:f32 = (f32(cast(int)i % slices) * TAU / cast(f32)slices) + (TAU/8);
-        rot := arm1 * cos(angle) + arm2 * sin(angle);
-
-        mat : [2][3]f32;
-        mat[0] = (^[3]f32)(&axis)^;
-        mat[1] = (^[3]f32)(&rot)^;
-
-        for p in points {
-            append(&mesh.vertices, v(Vector3{
-                mat[0].x * p.x + mat[1].x * p.y,
-                mat[0].y * p.x + mat[1].y * p.y,
-                mat[0].z * p.x + mat[1].z * p.y,
-            }));
-        }
-
-        if i > 0 {
-            num_points := u32(len(points));
-
-            for j in 1..<num_points {
-                i0, i1, i2, i3:u32 = (i - 1) * num_points + (j - 1),
-                                     (i - 0) * num_points + (j - 1),
-                                     (i - 0) * num_points + (j - 0),
-                                     (i - 1) * num_points + (j - 0);
-
-                append(&mesh.triangles, [3]u32 { i0, i1, i2 });
-                append(&mesh.triangles, [3]u32 { i0, i2, i3 });
-            }
-        }
-    }
-    compute_normals(&mesh);
-    return mesh;
-}
 
 compute_normals :: proc(mesh: ^Mesh) {
     // TODO
@@ -317,19 +186,6 @@ init :: proc(using ctx: ^Context) {
     local_toggle = true;
 }
 
-hash_fnv1a :: proc(str: string) -> u32 {
-    fnv1aBase32:u32: 0x811C9DC5;
-    fnv1aPrime32:u32: 0x01000193;
-
-    result:u32 = fnv1aBase32;
-    for c in str {
-        result ~= cast(u32)c;
-        result *= fnv1aPrime32;
-    }
-
-    return result;
-}
-
 xform :: proc(using ctx: ^Context, name: string, t: ^Transform) -> bool {
     activated := false;
 
@@ -406,29 +262,13 @@ orientation_gizmo :: proc(using ctx: ^Context, name: string, center: Vector3, or
         gizmo.active = false;
     }
 
-    model_matrix := matrix(p);
-    scaleMatrix := mat4_scale(identity(Mat4), v3(draw_scale));
-    model_matrix = mul(model_matrix, scaleMatrix);
+    model_matrix := mat4_scale(matrix(p), v3(draw_scale));
 
     one := [?]Interact { gizmo.interaction_mode };
     all := [?]Interact { .Rotate_X, .Rotate_Y, .Rotate_Z };
 
-    draw_interactions: []Interact = local_toggle && gizmo.interaction_mode != .None ? one[:] : all[:];
-
-    for c in draw_interactions {
-        r := Renderable {
-            mesh = clone(&mesh_components[c].mesh), // @Leak
-            color = c == gizmo.interaction_mode ? mesh_components[c].base_color : mesh_components[c].highlight_color
-        };
-
-        for _, index in r.mesh.vertices {
-            v := &r.mesh.vertices[index];
-            v.position = transform_coord(model_matrix, v.position); // transform local coordinates into worldspace
-            v.normal = transform_vector(model_matrix, v.normal);
-        }
-
-        append(&draw_list, r);
-    }
+    interactions: []Interact = local_toggle && gizmo.interaction_mode != .None ? one[:] : all[:];
+    _draw_interactions(ctx, &gizmo, interactions, model_matrix);
 
     // For non-local transformations, we only present one rotation ring 
     // and draw an arrow from the center of the gizmo to indicate the degree of rotation
@@ -464,70 +304,72 @@ orientation_gizmo :: proc(using ctx: ^Context, name: string, center: Vector3, or
 
 }
 
-scale_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, center: Vector3, scale: ^Vector3)
-{
+_draw_interactions :: proc(using ctx: ^Context, gizmo: ^Interaction_State, interactions: []Interact, model_matrix: Mat4) {
+    for c in interactions {
+        r := Renderable {
+            mesh = clone(&mesh_components[c].mesh), // @Leak
+            color = c == gizmo.interaction_mode ? mesh_components[c].base_color : mesh_components[c].highlight_color
+        };
+
+        for _, index in r.mesh.vertices {
+            v := &r.mesh.vertices[index];
+            v.position = transform_coord(model_matrix, v.position); // transform local coordinates into worldspace
+            v.normal = transform_vector(model_matrix, v.normal);
+        }
+
+        append(&draw_list, r);
+    }
 }
 
-// This will calculate a scale constant based on the number of screenspace pixels passed as pixel_scale.
-scale_screenspace :: proc(using ctx: ^Context, position: Vector3, pixel_scale: f32) -> f32
-{
-    dist:f32 = length(position - active_state.cam.position);
-    return tan(active_state.cam.yfov) * dist * (pixel_scale / active_state.viewport_size.y);
-}
+scale_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, center: Vector3, scale: ^Vector3) {
+    p := Transform { center, orientation, Vector3 { 1, 1, 1 } };
+    draw_scale := (active_state.screenspace_scale > 0) ? scale_screenspace(ctx, p.position, active_state.screenspace_scale) : 1;
+    id := hash_fnv1a(name);
 
-// The only purpose of this is readability: to reduce the total column width of the intersect(...) statements in every gizmo
-intersect :: proc(using ctx: ^Context, r: Ray, i: Interact, t: ^f32, best_t: f32) -> bool
-{
-    if intersect_ray_mesh(r, &mesh_components[i].mesh, t) && t^ < best_t do return true;
-    return false;
-}
+    gizmo := gizmos[id];
+    defer gizmos[id] = gizmo;
 
-intersect_ray_mesh :: proc(ray: Ray, mesh: ^Mesh, hit_t: ^f32) -> bool {
-    best_t := INF;
-    t:f32;
-    best_tri:i32= -1;
-    for tri, tri_index in mesh.triangles {
-        if intersect_ray_triangle(ray, mesh.vertices[tri[0]].position, mesh.vertices[tri[1]].position, mesh.vertices[tri[2]].position, &t) && t < best_t {
-            best_t = t;
-            best_tri = i32(tri_index);
+    if has_clicked do gizmo.interaction_mode = .None;
+
+    {
+        updated_state := Interact.None;
+        ray := detransform(p, Ray { active_state.ray_origin, active_state.ray_direction });
+        detransform(draw_scale, &ray);
+        best_t := INF;
+        t : f32;
+        if intersect(ctx, ray, .Scale_X, &t, best_t) { updated_state = .Scale_X; best_t = t; }
+        if intersect(ctx, ray, .Scale_Y, &t, best_t) { updated_state = .Scale_Y; best_t = t; }
+        if intersect(ctx, ray, .Scale_Z, &t, best_t) { updated_state = .Scale_Z; best_t = t; }
+
+        if has_clicked {
+            gizmo.interaction_mode = updated_state;
+            if gizmo.interaction_mode != .None {
+                transform(draw_scale, &ray);
+                gizmo.original_scale = scale^;
+                gizmo.click_offset = transform_point(p, ray.origin + ray.direction*t);
+                gizmo.active = true;
+            }
+            else {
+                gizmo.active = false;
+            }
         }
     }
-    if best_tri == -1 do return false;
-    if hit_t != nil do hit_t^ = best_t;
-    return true;
-}
 
-intersect_ray_plane :: proc(ray: Ray, plane: Vector4, hit_t: ^f32) -> bool {
-    denom := dot(v3(plane), ray.direction);
-    if abs(denom) == 0 do return false;
-    if hit_t != nil do hit_t^ = -dot(plane, v4(ray.origin, 1)) / denom;
-    return true;
-}
+    if has_released {
+        gizmo.interaction_mode = .None;
+        gizmo.active = false;
+    }
 
-intersect_ray_triangle :: proc(ray: Ray, v0: Vector3, v1: Vector3, v2: Vector3, hit_t: ^f32) -> bool
-{
-    e1 := v1 - v0;
-    e2 := v2 - v0;
-    h := cross(ray.direction, e2);
+    if gizmo.active {
+        switch (gizmo.interaction_mode) {
+            case .Scale_X: axis_scale_dragger(ctx, &gizmo, { 1,0,0 }, center, scale, active_state.hotkey_ctrl);
+            case .Scale_Y: axis_scale_dragger(ctx, &gizmo, { 0,1,0 }, center, scale, active_state.hotkey_ctrl);
+            case .Scale_Z: axis_scale_dragger(ctx, &gizmo, { 0,0,1 }, center, scale, active_state.hotkey_ctrl);
+        }
+    }
 
-    a := dot(e1, h);
-    if abs(a) == 0 do return false;
-
-    f:f32 = 1.0 / a;
-    s := ray.origin - v0;
-    u := f * dot(s, h);
-    if u < 0 || u > 1 do return false;
-
-    q := cross(s, e1);
-    v := f * dot(ray.direction, q);
-    if v < 0 || u + v > 1 do return false;
-
-    t := f * dot(e2, q);
-    if t < 0 do return false;
-
-    if hit_t != nil do hit_t^ = t;
-
-    return true;
+    draw_interactions := [?]Interact { .Scale_X, .Scale_Y, .Scale_Z, };
+    _draw_interactions(ctx, &gizmo, draw_interactions[:], mat4_scale(matrix(p), v3(draw_scale)));
 }
 
 position_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, position: ^Vector3) {
@@ -539,9 +381,7 @@ position_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, 
     defer gizmos[id] = gizmo;
 
     // interaction_mode will only change on clicked
-    if has_clicked {
-        gizmo.interaction_mode = .None;
-    }
+    if has_clicked do gizmo.interaction_mode = .None;
 
     {
         updated_state := Interact.None;
@@ -575,7 +415,7 @@ position_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, 
  
     axes: [3]Vector3;
     if local_toggle do axes = { qxdir(p.orientation), qydir(p.orientation), qzdir(p.orientation) };
-    else do axes = { { 1, 0, 0 },{ 0, 1, 0 },{ 0, 0, 1 } };
+    else do axes = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
 
     if gizmo.active {
         position^ += gizmo.click_offset;
@@ -602,22 +442,7 @@ position_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, 
         .Translate_XYZ
     };
 
-    model_matrix := mul(matrix(p), mat4_scale(identity(Matrix4), v3(draw_scale)));
-
-    for c in draw_interactions {
-        r := Renderable {
-            mesh = clone(&mesh_components[c].mesh),
-            color = c == gizmo.interaction_mode ? mesh_components[c].base_color : mesh_components[c].highlight_color
-        };
-
-        for _, index in r.mesh.vertices {
-            v := &r.mesh.vertices[index];
-            v.position = transform_coord(model_matrix, v.position); // transform local coordinates into worldspace
-            v.normal = transform_vector(model_matrix, v.normal);
-        }
-
-        append(&draw_list, r);
-    }
+    _draw_interactions(ctx, &gizmo, draw_interactions[:], mat4_scale(matrix(p), v3(draw_scale)));
 }
 
 @private
@@ -687,20 +512,35 @@ axis_rotation_dragger :: proc(using ctx: ^Context, gizmo: ^Interaction_State, ax
     }
 }
 
-rotation_quat :: proc(axis: Vector3, angle: f32) -> Vector4 do return v4(axis*sin(angle/2), cos(angle/2));
-make_rotation_quat_axis_angle :: proc(axis: Vector3, angle: f32) -> Vector4 do return v4(axis * sin(angle / 2), cos(angle / 2));
+@private
+axis_scale_dragger :: proc(using ctx: ^Context, interaction: ^Interaction_State, axis, center: Vector3, scale: ^Vector3, uniform: bool) {
+    if !active_state.mouse_left do return;
 
-make_rotation_quat_between_vectors_snapped :: proc (from, to: Vector3, angle: f32) -> Vector4 {
-    a := norm(from);
-    b := norm(to);
-    snappedAcos := floor(acos(dot(a, b)) / angle) * angle;
-    return make_rotation_quat_axis_angle(norm(cross(a, b)), snappedAcos);
-}
+    plane_tangent := cross(axis, center - active_state.cam.position);
+    plane_normal := cross(axis, plane_tangent);
 
-snap :: proc(value: Vector3, snap: f32) -> Vector3
-{
-    if snap > 0 {
-        return Vector3 { floor(value.x / snap), floor(value.y / snap), floor(value.z / snap) } * snap;
+    distance:Vector3;
+    if active_state.mouse_left {
+        // Define the plane to contain the original position of the object
+        plane_point := center;
+        ray := Ray { active_state.ray_origin, active_state.ray_direction };
+
+        // If an intersection exists between the ray and the plane, place the object at that point
+        denom := vec_dot(ray.direction, plane_normal);
+        if abs(denom) == 0 do return;
+
+        t := vec_dot(plane_point - ray.origin, plane_normal) / denom;
+        if t < 0 do return;
+
+        distance = ray.origin + ray.direction * t;
     }
-    return value;
+
+    offset_on_axis := (distance - interaction.click_offset) * axis;
+    flush_to_zero(&offset_on_axis);
+    new_scale := interaction.original_scale + offset_on_axis;
+
+    if uniform do scale^ = v3(clamp(dot(distance, new_scale), 0.01, 1000));
+    else do scale^ = Vec3 { clamp(new_scale.x, 0.01, 1000), clamp(new_scale.y, 0.01, 1000), clamp(new_scale.z, 0.01, 1000) };
+    if active_state.snap_scale != 0 do scale^ = snap(scale^, active_state.snap_scale);
 }
+
