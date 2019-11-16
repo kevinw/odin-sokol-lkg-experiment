@@ -16,11 +16,16 @@ import "core:fmt"
 using import "math"
 import "core:math/bits"
 
+when STACK_TRACES {
+    import "stacktrace"
+}
+
 when EDITOR {
     import "gizmos"
 }
 
 EDITOR :: true;
+STACK_TRACES :: true;
 
 import shader_meta "./shader_meta";
 
@@ -888,10 +893,16 @@ check_sizes :: proc() {
 */
 
 main :: proc() {
-	os.exit(run_app());
+    // install a stacktrace handler for asserts
+    when STACK_TRACES do context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
+
+	//os.exit(run_app());
+
+    main_mrt();
 }
 
 run_app :: proc() -> int {
+
 	return sapp.run({
 		init_cb      = init_callback,
 		frame_cb     = frame_callback,
