@@ -2,10 +2,9 @@ package main
 
 MSAA_SAMPLES :: 1;
 
-NUM_VIEWS :: 16;
+NUM_VIEWS :: 45;
 
 import "core:os"
-import "core:fmt"
 using import "math"
 using import "shader_meta"
 
@@ -293,7 +292,7 @@ mrt_frame :: proc "c" () {
         sg.draw(0, 4, 1);
         sg.apply_pipeline(dbg_pip);
         for i in 0..<NUM_VIEWS {
-            S :: 50;
+            S :: 17;
             sg.apply_viewport(i * S, 0, S, S, false);
             debug_uniforms := DebugUniforms { tex_slice = cast(f32)i };
             sg.apply_uniforms(.FS, SLOT_DebugUniforms, &debug_uniforms, size_of(debug_uniforms));

@@ -7,7 +7,7 @@
 
 // shaders for offscreen-pass rendering
 @vs vs_offscreen
-#define NUM_VIEWS 16
+#define NUM_VIEWS 45
 
 #extension GL_ARB_shader_viewport_layer_array : require
 
@@ -18,22 +18,26 @@ uniform Offscreen_Params {
 in vec4 pos;
 in float bright0;
 
-out float bright;
+out vec3 bright;
 
 void main() {
     gl_Layer = gl_InstanceID;
     gl_Position = mvps[gl_Layer] * pos;
-    bright = bright0;
+    bright = vec3(
+        mod(gl_Layer / NUM_VIEWS, 1.0),
+        mod(mod(gl_Layer + 10, NUM_VIEWS) / NUM_VIEWS, 1.0),
+        mod(mod(gl_Layer + 20, NUM_VIEWS) / NUM_VIEWS, 1.0)
+    );
 }
 @end
 
 @fs fs_offscreen
-in float bright;
+in vec3 bright;
 
 layout(location=0) out vec4 frag_color_0;
 
 void main() {
-    frag_color_0 = vec4(bright, bright, bright, 1.0);
+    frag_color_0 = vec4(bright, 1.0);
 }
 @end
 
@@ -58,19 +62,20 @@ void main() {
 @end
 
 @fs fs_fsq
-#define NUM_VIEWS 16
+#define NUM_VIEWS 45
 uniform sampler2DArray tex0;
 
 in vec2 uv;
 out vec4 frag_color;
 
 void main() {
-
     frag_color = vec4(0, 0, 0, 1.0);
+
     for (int slice = 0; slice < NUM_VIEWS; ++slice) {
-        vec3 c = texture(tex0, vec3(uv, slice)).xyz;
-        frag_color.xyz += c;
+        frag_color.xyz += texture(tex0, vec3(uv, slice)).xyz;
     }
+
+    frag_color.xyz /= float(NUM_VIEWS);
 }
 @end
 
