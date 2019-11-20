@@ -292,7 +292,7 @@ mrt_frame :: proc "c" () {
         sg.draw(0, 4, 1);
         sg.apply_pipeline(dbg_pip);
         for i in 0..<NUM_VIEWS {
-            S :: 17;
+            S := cast(int)floor(cast(f32)sapp.width() / cast(f32)NUM_VIEWS);
             sg.apply_viewport(i * S, 0, S, S, false);
             debug_uniforms := DebugUniforms { tex_slice = cast(f32)i };
             sg.apply_uniforms(.FS, SLOT_DebugUniforms, &debug_uniforms, size_of(debug_uniforms));

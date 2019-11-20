@@ -24,7 +24,7 @@ void main() {
     gl_Layer = gl_InstanceID;
     gl_Position = mvps[gl_Layer] * pos;
     bright = vec3(
-        mod(gl_Layer / NUM_VIEWS, 1.0),
+        mod(mod(gl_Layer + 0,  NUM_VIEWS) / NUM_VIEWS, 1.0),
         mod(mod(gl_Layer + 10, NUM_VIEWS) / NUM_VIEWS, 1.0),
         mod(mod(gl_Layer + 20, NUM_VIEWS) / NUM_VIEWS, 1.0)
     );

@@ -13,6 +13,7 @@ echo Compiling shaders... &&^
 %SHDC% sdf_text.glsl --output %OUT_DIR%/sdf_text.odin && ^
 %SHDC% cgltf_sapp.glsl --output %OUT_DIR%/cgltf_sapp.odin && ^
 %SHDC% mrt_sapp.glsl --output %OUT_DIR%/mrt_sapp.odin && ^
+%SHDC% lenticular.glsl --output %OUT_DIR%/lenticular.odin && ^
 echo Building game... &&^
 odin build src -collection=sokol=../odin-sokol/src -opt=%OPT_LEVEL% -debug -ignore-unknown-attributes
 

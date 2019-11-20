@@ -15,6 +15,8 @@ import "core:fmt"
 using import "math"
 import "core:math/bits"
 
+ON_LKG :: true;
+
 when STACK_TRACES {
     import "stacktrace"
 }
@@ -29,6 +31,8 @@ STACK_TRACES :: true;
 import shader_meta "./shader_meta";
 
 draw_mesh := true;
+draw_quad := false;
+
 
 ANIM_CURVE_WIP :: false;
 WINDOW_WIDTH :: 1280;
@@ -237,6 +241,8 @@ render_gizmos :: proc(mesh: ^gizmos.Mesh) {
 }
 
 init_callback :: proc "c" () {
+    when ON_LKG do move_window(sapp.win32_get_hwnd(), -2560, 0, 2560, 1600, true);
+
     state.xform_a = {
         position = {0, 0, 0},
         orientation = {0, 0, 0, 1}, // TODO: identity quat?
@@ -642,8 +648,6 @@ frame_callback :: proc "c" () {
 
     sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
 
-    draw_quad := true;
-
     // DRAW MOVABLE QUAD
     if draw_quad {
         sg.apply_pipeline(state.pip);
@@ -896,9 +900,9 @@ main :: proc() {
     // install a stacktrace handler for asserts
     when STACK_TRACES do context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
 
-	//os.exit(run_app());
+	os.exit(run_app());
 
-    main_mrt();
+    //main_mrt();
 }
 
 run_app :: proc() -> int {
@@ -912,6 +916,7 @@ run_app :: proc() -> int {
 		height       = WINDOW_HEIGHT,
 		window_title = "testbed",
         sample_count = MSAA_SAMPLE_COUNT,
+        fullscreen   = ON_LKG,
         //high_dpi     = true,
 	});
 }
