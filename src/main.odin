@@ -212,25 +212,6 @@ text_height_cb :: proc "c" (font: mu.Font) -> i32 {
     return r_get_text_height();
 }
 
-v3_any :: proc(x: $A, y: $B, z: $C) -> Vector3 { return Vector3 { cast(f32)x, cast(f32)y, cast(f32)z }; }
-v4_any :: proc(x: $A, y: $B, z: $C, w: $D) -> Vector4 { return Vector4 { cast(f32)x, cast(f32)y, cast(f32)z, cast(f32)w }; }
-v3_empty :: proc() -> Vector3 { return Vector3 {}; }
-v4_empty :: proc() -> Vector4 { return Vector4 {}; }
-v3_slice :: proc(slice: []f32) -> Vector3 {
-    assert(len(slice) >= 3);
-    return Vector3 { slice[0], slice[1], slice[2] };
-}
-v3_from_v4 :: proc(v4: Vector4) -> Vector3 do return { v4.x, v4.y, v4.z };
-
-v3 :: proc { v3_any, v3_empty, v3_slice, v3_from_v4 };
-v4 :: proc { v4_any, v4_empty };
-sub :: proc(v1, v2: Vector3) -> Vector3 {
-    return Vector3 { v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
-}
-
-DEG_TO_RAD :: PI / 180.0;
-deg2rad :: inline proc(f: $T) -> T { return f * DEG_TO_RAD; }
-
 delta := v3(-1.92, -0.07, 1.52);
 
 render_gizmos :: proc(mesh: ^gizmos.Mesh) {
@@ -280,7 +261,7 @@ init_callback :: proc "c" () {
 		d3d11_depth_stencil_view_cb  = sapp.d3d11_get_depth_stencil_view,
 	});
 
-    create_multiview_pass(sapp.width(), sapp.height());
+    create_multiview_pass(sapp.width(), sapp.height(), NUM_VIEWS);
 
     sgl.setup({
         max_vertices = 50000,
@@ -380,12 +361,8 @@ init_callback :: proc "c" () {
 
         C :: 0.6;
         vertices := [?]Vertex{
-            {{+C, +C, +C}, {1.0, 0.0}},
-            {{+C, -C, +C}, {0.0, 1.0}},
-            {{-C, -C, +C}, {0.0, 0.0}},
-            {{-C, -C, +C}, {0.0, 0.0}},
-            {{-C, +C, +C}, {0.0, 0.0}},
-            {{+C, +C, +C}, {1.0, 0.0}},
+            {{+C, +C, +C}, {1.0, 0.0}}, {{+C, -C, +C}, {0.0, 1.0}}, {{-C, -C, +C}, {0.0, 0.0}},
+            {{-C, -C, +C}, {0.0, 0.0}}, {{-C, +C, +C}, {0.0, 0.0}}, {{+C, +C, +C}, {1.0, 0.0}},
         };
 
         state.bind.vertex_buffers[0] = sg.make_buffer({
@@ -407,11 +384,10 @@ init_callback :: proc "c" () {
 
     // make lenticular rendering pipeline
     {
-        Vertex :: [2]f32;
         C :: 1;
-        vertices := [?]Vertex{
-            {-C, -C}, {+C, -C}, {-C, +C},
-            {-C, +C}, {+C, -C}, {+C, +C},
+        vertices := [?][2]f32{
+            {-C, +C}, {+C, +C}, {-C, -C},
+            {-C, -C}, {+C, +C}, {+C, -C},
         };
         state.lenticular_bindings.vertex_buffers[0] = sg.make_buffer({
             label = "lenticular-vertices",
@@ -585,8 +561,9 @@ debug_window :: proc(ctx: ^mu.Context) {
     }
 }
 
-create_multiview_pass :: proc(width, height: int) {
+create_multiview_pass :: proc(width, height, num_views: int) {
     assert(width > 0 && height > 0);
+    fmt.printf("creating offscreen multiview pass (%dx%d) with %d views\n", width, height, num_views);
 
     using state.offscreen;
 
@@ -609,7 +586,7 @@ create_multiview_pass :: proc(width, height: int) {
         sample_count = cast(i32)offscreen_sample_count,
         label = "multiview color image"
     };
-    color_img_desc.layers = NUM_VIEWS;
+    color_img_desc.layers = cast(i32)num_views;
 
     depth_img_desc := color_img_desc; // copy values from color Image_Desc
     depth_img_desc.pixel_format = .DEPTH_STENCIL;
@@ -756,9 +733,10 @@ frame_callback :: proc "c" () {
                 eye_pos = state.camera.position,
             };
 
-            focal_position := Vector3 { 0, 0, 0 };
-            camera_distance := length(state.camera.position - focal_position);
             camera_size:f32 = 5.0;
+            cam_forward := quaternion_forward(state.camera.rotation);
+            focal_position := state.camera.position + norm(cam_forward) * camera_size;
+            camera_distance := length(state.camera.position - focal_position);
 
             for view_i in 0..<LKG_VIEWS {
                 // start at -viewCone * 0.5 and go up to viewCone * 0.5
@@ -768,11 +746,11 @@ frame_callback :: proc "c" () {
                 offset := camera_distance * tan(offset_angle);
 
                 view_matrix := view;
-                view_matrix[3][0] += offset;
+                view_matrix[3][0] -= offset;
 
                 // modify the projection matrix, relative to the camera size and aspect ratio
                 projection_matrix := proj;
-                projection_matrix[2][0] += offset / (camera_size * LKG_ASPECT);
+                projection_matrix[2][0] -= offset / (camera_size * LKG_ASPECT);
 
                 vs_params.view_proj_array[view_i] = mul(projection_matrix, view_matrix);
             }
@@ -856,7 +834,7 @@ frame_callback :: proc "c" () {
             debugTile = cast(i32)foo,
             invView = 1, // TODO
             tile = Vector4{1, 1, NUM_VIEWS, 0},
-            viewPortion = Vector4{0, 0, 0, 0},
+            viewPortion = Vector4{1, 1, 0, 0},
         };
         sg.apply_uniforms(.FS, shader_meta.SLOT_lkg_fs_uniforms, &uniforms, size_of(shader_meta.lkg_fs_uniforms));
         sg.draw(0, 6, 1);
@@ -954,7 +932,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
     switch event.type {
         case .RESIZED:
             camera_target_resized(&state.camera, cast(f32)sapp.width(), cast(f32)sapp.height());
-            create_multiview_pass(sapp.width(), sapp.height());
+            create_multiview_pass(sapp.width(), sapp.height(), NUM_VIEWS);
         case .MOUSE_DOWN:
             set_capture(sapp.win32_get_hwnd());
 

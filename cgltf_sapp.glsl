@@ -7,11 +7,11 @@
 
 
 @vs vs
-#define NUM_VIEWS 32
+#define MAX_VIEWS 32
 #extension GL_ARB_shader_viewport_layer_array : require
 uniform vs_params {
     mat4 model;
-    mat4 view_proj_array[NUM_VIEWS];
+    mat4 view_proj_array[MAX_VIEWS];
     mat4 view_proj;
     vec3 eye_pos;
 };

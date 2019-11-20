@@ -61,3 +61,23 @@ Maybe :: union(T: typeid) {
 getval :: inline proc(m: Maybe($T)) -> (T, bool) {
 	return m.(T);
 }
+
+v3_any :: proc(x: $A, y: $B, z: $C) -> Vector3 { return Vector3 { cast(f32)x, cast(f32)y, cast(f32)z }; }
+v4_any :: proc(x: $A, y: $B, z: $C, w: $D) -> Vector4 { return Vector4 { cast(f32)x, cast(f32)y, cast(f32)z, cast(f32)w }; }
+v3_empty :: proc() -> Vector3 { return Vector3 {}; }
+v4_empty :: proc() -> Vector4 { return Vector4 {}; }
+v3_slice :: proc(slice: []f32) -> Vector3 {
+    assert(len(slice) >= 3);
+    return Vector3 { slice[0], slice[1], slice[2] };
+}
+v3_from_v4 :: proc(v4: Vector4) -> Vector3 do return { v4.x, v4.y, v4.z };
+
+v3 :: proc { v3_any, v3_empty, v3_slice, v3_from_v4 };
+v4 :: proc { v4_any, v4_empty };
+sub :: proc(v1, v2: Vector3) -> Vector3 {
+    return Vector3 { v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
+}
+
+DEG_TO_RAD :: PI / 180.0;
+deg2rad :: inline proc(f: $T) -> T { return f * DEG_TO_RAD; }
+
