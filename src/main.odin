@@ -16,6 +16,11 @@ using import "math"
 import "core:math/bits"
 
 ON_LKG :: true;
+LKG_W :: 2560;
+LKG_H :: 1600;
+LKG_VIEWS :: 32;
+LKG_VIEW_CONE:f32: 0.611; // 35deg in radians
+LKG_ASPECT:f32: cast(f32)LKG_W / cast(f32)LKG_H;
 
 when STACK_TRACES {
     import "stacktrace"
@@ -32,7 +37,9 @@ import shader_meta "./shader_meta";
 
 draw_mesh := true;
 draw_quad := false;
-
+draw_grid_lines := false;
+draw_gizmos := false;
+draw_sdf_text := false;
 
 ANIM_CURVE_WIP :: false;
 WINDOW_WIDTH :: 1280;
@@ -41,7 +48,7 @@ WINDOW_HEIGHT :: 720;
 SFETCH_NUM_CHANNELS :: 1;
 SFETCH_NUM_LANES :: 4;
 MAX_FILE_SIZE :: 10*1024*1024;
-MSAA_SAMPLE_COUNT :: 4;
+MSAA_SAMPLE_COUNT :: 1;
 
 sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 
@@ -109,6 +116,11 @@ Node :: struct {
 };
 
 state: struct {
+    offscreen: struct {
+        pass_desc: sg.Pass_Desc,
+        pass: sg.Pass,
+    },
+
     xform_a: gizmos.Transform,
 	pass_action: sg.Pass_Action,
 	bind:        sg.Bindings,
@@ -117,6 +129,9 @@ state: struct {
     line_rendering_pipeline: sg.Pipeline,
     gizmo_rendering_pipeline: sg.Pipeline,
     mu_atlas_img: sg.Image,
+
+    lenticular_pipeline: sg.Pipeline,
+    lenticular_bindings: sg.Bindings,
 
     font_normal_data: [256 * 1024]u8, // TODO: use a smaller buffer and the streaming capability of sokol-fetch
 
@@ -241,7 +256,10 @@ render_gizmos :: proc(mesh: ^gizmos.Mesh) {
 }
 
 init_callback :: proc "c" () {
-    when ON_LKG do move_window(sapp.win32_get_hwnd(), -2560, 0, 2560, 1600, true);
+    when ON_LKG {
+        // TODO: Get this position, and the size, from the driver.
+        move_window(sapp.win32_get_hwnd(), -LKG_W, 0, LKG_W, LKG_H, true);
+    }
 
     state.xform_a = {
         position = {0, 0, 0},
@@ -261,6 +279,8 @@ init_callback :: proc "c" () {
 		d3d11_render_target_view_cb  = sapp.d3d11_get_render_target_view,
 		d3d11_depth_stencil_view_cb  = sapp.d3d11_get_depth_stencil_view,
 	});
+
+    create_multiview_pass(sapp.width(), sapp.height());
 
     sgl.setup({
         max_vertices = 50000,
@@ -380,6 +400,30 @@ init_callback :: proc "c" () {
                 attrs = {
                     shader_meta.ATTR_vs_st_position = {format = .FLOAT3},
                     shader_meta.ATTR_vs_st_uv = {format = .FLOAT2},
+                },
+            },
+        });
+    }
+
+    // make lenticular rendering pipeline
+    {
+        Vertex :: [2]f32;
+        C :: 1;
+        vertices := [?]Vertex{
+            {-C, -C}, {+C, -C}, {-C, +C},
+            {-C, +C}, {+C, -C}, {+C, +C},
+        };
+        state.lenticular_bindings.vertex_buffers[0] = sg.make_buffer({
+            label = "lenticular-vertices",
+            size = len(vertices)*size_of(vertices[0]),
+            content = &vertices[0],
+        });
+        state.lenticular_pipeline = sg.make_pipeline({
+            shader = sg.make_shader(shader_meta.lenticular_shader_desc()^),
+            label = "lenticular-pipeline",
+            layout = {
+                attrs = {
+                    shader_meta.ATTR_vs_vertPos_data = {format=.FLOAT2},
                 },
             },
         });
@@ -541,6 +585,52 @@ debug_window :: proc(ctx: ^mu.Context) {
     }
 }
 
+create_multiview_pass :: proc(width, height: int) {
+    assert(width > 0 && height > 0);
+
+    using state.offscreen;
+
+    /* destroy previous resource (can be called for invalid id) */
+    sg.destroy_pass(pass);
+    sg.destroy_image(pass_desc.color_attachments[0].image);
+    sg.destroy_image(pass_desc.depth_stencil_attachment.image);
+
+    /* create offscreen rendertarget images and pass */
+    offscreen_sample_count := sg.query_features().msaa_render_targets ? MSAA_SAMPLES : 1;
+    color_img_desc := sg.Image_Desc {
+        render_target = true,
+        type = .ARRAY,
+        width = cast(i32)width,
+        height = cast(i32)height,
+        min_filter = .LINEAR,
+        mag_filter = .LINEAR,
+        wrap_u = .CLAMP_TO_EDGE,
+        wrap_v = .CLAMP_TO_EDGE,
+        sample_count = cast(i32)offscreen_sample_count,
+        label = "multiview color image"
+    };
+    color_img_desc.layers = NUM_VIEWS;
+
+    depth_img_desc := color_img_desc; // copy values from color Image_Desc
+    depth_img_desc.pixel_format = .DEPTH_STENCIL;
+    depth_img_desc.label = "multiview depth image";
+
+    pass_desc = {
+        color_attachments = {
+            0 = { image = sg.make_image(color_img_desc) },
+        },
+        depth_stencil_attachment = {
+            image = sg.make_image(depth_img_desc),
+        },
+        label = "multiview offscreen pass"
+    };
+
+    pass = sg.make_pass(pass_desc);
+
+    /* also need to update the fullscreen-quad texture bindings */
+    state.lenticular_bindings.fs_images[shader_meta.SLOT_screenTex] = pass_desc.color_attachments[0].image;
+}
+
 frame_callback :: proc "c" () {
 
 	//
@@ -646,7 +736,131 @@ frame_callback :: proc "c" () {
     // TODO: write this only when the value changes?
     state.pass_action.colors[0] = {action = .CLEAR, val = {bg[0], bg[1], bg[2], 1}};
 
-    sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
+    // DRAW MESH
+    @static foo:int = 0;
+
+    when !ON_LKG do sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
+
+    if draw_mesh {
+        when ON_LKG {
+            sg.begin_pass(state.offscreen.pass, offscreen_pass_action);
+            defer sg.end_pass();
+        }
+
+        using state.scene;
+        for _, node_index in nodes {
+            node := &nodes[node_index];
+            vs_params := shader_meta.vs_params {
+                model = mul(gizmos.matrix(state.xform_a), node.transform),
+                view_proj = state.view_proj,
+                eye_pos = state.camera.position,
+            };
+
+            focal_position := Vector3 { 0, 0, 0 };
+            camera_distance := length(state.camera.position - focal_position);
+            camera_size:f32 = 5.0;
+
+            for view_i in 0..<LKG_VIEWS {
+                // start at -viewCone * 0.5 and go up to viewCone * 0.5
+                offset_angle := (cast(f32)view_i / (LKG_VIEWS - 1) - 0.5) * LKG_VIEW_CONE;
+
+                // calculate the offset
+                offset := camera_distance * tan(offset_angle);
+
+                view_matrix := view;
+                view_matrix[3][0] += offset;
+
+                // modify the projection matrix, relative to the camera size and aspect ratio
+                projection_matrix := proj;
+                projection_matrix[2][0] += offset / (camera_size * LKG_ASPECT);
+
+                vs_params.view_proj_array[view_i] = mul(projection_matrix, view_matrix);
+            }
+
+            vs_params.view_proj = vs_params.view_proj_array[foo];
+            foo += 1;
+            if foo >= LKG_VIEWS do foo = 0;
+
+            mesh := &meshes[node.mesh];
+            for i in 0..<mesh.num_primitives {
+                prim := &sub_meshes[i + mesh.first_primitive];
+                sg.apply_pipeline(pipelines[prim.pipeline]);
+                bind := sg.Bindings {};
+                for vb_slot in 0..<prim.vertex_buffers.num {
+                    bind.vertex_buffers[vb_slot] = buffers[prim.vertex_buffers.buffer[vb_slot]];
+                }
+                if prim.index_buffer != SCENE_INVALID_INDEX {
+                    bind.index_buffer = buffers[prim.index_buffer];
+                }
+                sg.apply_uniforms(.VS, shader_meta.SLOT_vs_params, &vs_params, size_of(vs_params));
+                sg.apply_uniforms(.FS, shader_meta.SLOT_light_params, &state.point_light, size_of(state.point_light));
+                //if mat.is_metallic {
+                    {
+                        base_color_tex := state.placeholders.white;
+                        metallic_roughness_tex := state.placeholders.white;
+                        normal_tex := state.placeholders.normal;
+                        occlusion_tex := state.placeholders.white;
+                        emissive_tex := state.placeholders.black;
+
+                        if prim.material != -1 {
+                            metallic := &materials[prim.material];
+
+                            sg.apply_uniforms(sg.Shader_Stage.FS,
+                                shader_meta.SLOT_metallic_params,
+                                &metallic.fs_params,
+                                size_of(shader_meta.metallic_params));
+
+                            using metallic.images;
+                            if base_color != -1         && images[base_color].id != 0         do base_color_tex = images[base_color];
+                            if metallic_roughness != -1 && images[metallic_roughness].id != 0 do metallic_roughness_tex = images[metallic_roughness];
+                            if normal != -1             && images[normal].id != 0             do normal_tex = images[normal];
+                            if occlusion != -1          && images[occlusion].id != 0          do occlusion_tex = images[occlusion];
+                            if emissive != -1           && images[emissive].id != 0           do emissive_tex = images[emissive];
+                        }
+
+                        using shader_meta;
+                        bind.fs_images[SLOT_base_color_texture] = base_color_tex;
+                        bind.fs_images[SLOT_metallic_roughness_texture] = metallic_roughness_tex;
+                        bind.fs_images[SLOT_normal_texture] = normal_tex;
+                        bind.fs_images[SLOT_occlusion_texture] = occlusion_tex;
+                        bind.fs_images[SLOT_emissive_texture] = emissive_tex;
+                    }
+                //} else {
+                    //assert(false, "nonmetallic is unimplemented");
+                //}
+
+                sg.apply_bindings(bind);
+
+                assert(prim.num_elements > 0);
+                per_frame_stats.num_elements += cast(u64)prim.num_elements;
+                sg.draw(cast(int)prim.base_element, cast(int)prim.num_elements, LKG_VIEWS);
+            }
+        }
+    }
+
+    when ON_LKG do sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
+
+    // DRAW MULTIVIEW
+    when ON_LKG {
+        sg.apply_pipeline(state.lenticular_pipeline);
+        sg.apply_bindings(state.lenticular_bindings);
+        uniforms := shader_meta.lkg_fs_uniforms {
+            pitch = 354.622314453125,
+            tilt = -0.11419378221035004,
+            center = -0.10679349303245544,
+            subp = 0.0001302083401242271,
+            ri = 0,
+            bi = 2,
+            aspect = LKG_ASPECT,
+            debug = 0,
+            debugTile = cast(i32)foo,
+            invView = 1, // TODO
+            tile = Vector4{1, 1, NUM_VIEWS, 0},
+            viewPortion = Vector4{0, 0, 0, 0},
+        };
+        sg.apply_uniforms(.FS, shader_meta.SLOT_lkg_fs_uniforms, &uniforms, size_of(shader_meta.lkg_fs_uniforms));
+        sg.draw(0, 6, 1);
+    }
 
     // DRAW MOVABLE QUAD
     if draw_quad {
@@ -666,7 +880,7 @@ frame_callback :: proc "c" () {
     }
 
     // DRAW GRID LINES
-    {
+    if draw_grid_lines {
         sgl.defaults();
         sgl.push_pipeline();
         defer sgl.pop_pipeline();
@@ -682,77 +896,9 @@ frame_callback :: proc "c" () {
     }
     mu_render(sapp.width(), sapp.height()); // note; this just pushes commands to a queue. r_draw below actually does the draw calls
 
-    // DRAW MESH
-    if draw_mesh {
-        using state.scene;
-        for _, node_index in nodes {
-            node := &nodes[node_index];
-            vs_params := shader_meta.vs_params {
-                model = mul(gizmos.matrix(state.xform_a), node.transform),
-                view_proj = state.view_proj,
-                eye_pos = state.camera.position,
-            };
-            mesh := &meshes[node.mesh];
-            for i in 0..<mesh.num_primitives {
-                prim := &sub_meshes[i + mesh.first_primitive];
-                sg.apply_pipeline(pipelines[prim.pipeline]);
-                bind := sg.Bindings {};
-                for vb_slot in 0..<prim.vertex_buffers.num {
-                    bind.vertex_buffers[vb_slot] = buffers[prim.vertex_buffers.buffer[vb_slot]];
-                }
-                if prim.index_buffer != SCENE_INVALID_INDEX {
-                    bind.index_buffer = buffers[prim.index_buffer];
-                }
-                sg.apply_uniforms(.VS, shader_meta.SLOT_vs_params, &vs_params, size_of(vs_params));
-                sg.apply_uniforms(.FS, shader_meta.SLOT_light_params, &state.point_light, size_of(state.point_light));
-                //if mat.is_metallic {
-
-                    {
-                        base_color_tex := state.placeholders.white;
-                        metallic_roughness_tex := state.placeholders.white;
-                        normal_tex := state.placeholders.normal;
-                        occlusion_tex := state.placeholders.white;
-                        emissive_tex := state.placeholders.black;
-
-                        if prim.material != -1 {
-                            metallic := &materials[prim.material];
-
-                            sg.apply_uniforms(sg.Shader_Stage.FS,
-                                shader_meta.SLOT_metallic_params,
-                                &metallic.fs_params,
-                                size_of(shader_meta.metallic_params));
-
-                            using metallic.images;
-                            if base_color != -1 && images[base_color].id != 0 do base_color_tex = images[base_color];
-                            if metallic_roughness != -1 && images[metallic_roughness].id != 0 do metallic_roughness_tex = images[metallic_roughness];
-                            if normal != -1 && images[normal].id != 0 do normal_tex = images[normal];
-                            if occlusion != -1 && images[occlusion].id != 0 do occlusion_tex = images[occlusion];
-                            if emissive != -1 && images[emissive].id != 0 do emissive_tex = images[emissive];
-                        }
-
-                        using shader_meta;
-                        bind.fs_images[SLOT_base_color_texture] = base_color_tex;
-                        bind.fs_images[SLOT_metallic_roughness_texture] = metallic_roughness_tex;
-                        bind.fs_images[SLOT_normal_texture] = normal_tex;
-                        bind.fs_images[SLOT_occlusion_texture] = occlusion_tex;
-                        bind.fs_images[SLOT_emissive_texture] = emissive_tex;
-                    }
-                //} else {
-                    //assert(false, "nonmetallic is unimplemented");
-                //}
-
-                sg.apply_bindings(bind);
-
-                assert(prim.num_elements > 0);
-                per_frame_stats.num_elements += cast(u64)prim.num_elements;
-                sg.draw(cast(int)prim.base_element, cast(int)prim.num_elements, 1);
-            }
-        }
-    }
-
     // DRAW GIZMOS
     when EDITOR {
-        {
+        if draw_gizmos {
             using sgl;
             defaults();
             push_pipeline();
@@ -765,7 +911,7 @@ frame_callback :: proc "c" () {
     }
 
     // DRAW SDF TEXT
-    {
+    if draw_sdf_text {
         u_matrix := ortho3d(0, cast(f32)sapp.width(), 0, cast(f32)sapp.height(), -10.0, 10.0);
 
         vs_uniforms := shader_meta.sdf_vs_uniforms {
@@ -808,6 +954,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
     switch event.type {
         case .RESIZED:
             camera_target_resized(&state.camera, cast(f32)sapp.width(), cast(f32)sapp.height());
+            create_multiview_pass(sapp.width(), sapp.height());
         case .MOUSE_DOWN:
             set_capture(sapp.win32_get_hwnd());
 

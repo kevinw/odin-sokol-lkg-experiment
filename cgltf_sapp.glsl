@@ -5,9 +5,13 @@
  */
 @include common.glsl
 
+
 @vs vs
+#define NUM_VIEWS 32
+#extension GL_ARB_shader_viewport_layer_array : require
 uniform vs_params {
     mat4 model;
+    mat4 view_proj_array[NUM_VIEWS];
     mat4 view_proj;
     vec3 eye_pos;
 };
@@ -22,12 +26,15 @@ out vec2 v_uv;
 out vec3 v_eye_pos;
 
 void main() {
+    gl_Layer = gl_InstanceID;
+
     vec4 pos = model * cgltf_position;
     v_pos = pos.xyz / pos.w;
     v_nrm = (model * vec4(normal, 0.0)).xyz;
     v_uv = texcoord;
     v_eye_pos = eye_pos;
-    gl_Position = view_proj * pos;
+
+    gl_Position = view_proj_array[gl_Layer] * pos;
 }
 @end
 

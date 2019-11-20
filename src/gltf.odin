@@ -90,7 +90,6 @@ gltf_parse :: proc(bytes: []u8, path_root: string) {
         }
     }
 
-
     //
     // parse buffers
     //
@@ -370,7 +369,7 @@ create_sg_pipeline_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Pr
         layout = create_sg_layout_for_gltf_primitive(gltf, prim, vbuf_map),
         prim_type = gltf_to_prim_type(prim.type),
         index_type = gltf_to_index_type(prim),
-        alpha = prim.material != nil && prim.material.alpha_mode != cgltf.Alpha_Mode.OPAQUE
+        alpha = prim.material != nil && prim.material.alpha_mode != .OPAQUE
     };
 
     i := 0;
@@ -485,9 +484,9 @@ create_sg_images_for_gltf_image :: proc(gltf_image_index: int, image_type: Image
                 img_desc := sg.Image_Desc {
                     width = x,
                     height = y,
-                    pixel_format = sg.Pixel_Format.RGBA8,
-                    min_filter = sg.Filter.LINEAR,
-                    mag_filter = sg.Filter.LINEAR,
+                    pixel_format = .RGBA8,
+                    min_filter = .LINEAR,
+                    mag_filter = .LINEAR,
                 };
                 img_desc.content.subimage[0][0] = { ptr = res, size = x * y * desired_channels };
                 state.scene.images[i] = sg.make_image(img_desc);
@@ -500,7 +499,6 @@ create_sg_images_for_gltf_image :: proc(gltf_image_index: int, image_type: Image
         }
     }
 }
-
 
 @(private)
 gltf_to_sg_filter :: proc(gltf_filter: i32) -> sg.Filter {

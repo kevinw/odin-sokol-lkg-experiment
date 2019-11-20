@@ -1,5 +1,7 @@
 #version 330 core
 
+@include common.glsl
+
 @fs fs
 in vec2 texCoords;
 out vec4 fragColor;
@@ -20,17 +22,21 @@ uniform lkg_fs_uniforms {
     uniform vec4 aspect;
 
     uniform int debug;
+    uniform int debugTile;
 };
 
-uniform sampler2D screenTex;
+uniform sampler2DArray screenTex;
 
-vec2 texArr(vec3 uvz)
+vec3 texArr(vec3 uvz)
 {
     // decide which section to take from based on the z.
     float z = floor(uvz.z * tile.z);
+    return vec3(uvz.xy, z);
+    /*
     float x = (mod(z, tile.x) + uvz.x) / tile.x;
     float y = (floor(z / tile.x) + uvz.y) / tile.y;
     return vec2(x, y) * viewPortion.xy;
+    */
 }
 
 vec3 clip(vec3 toclip)
@@ -62,7 +68,8 @@ void main()
                 nuv.z = (1.0 - invView) * nuv.z + invView * (1.0 - nuv.z);
                 rgb[i] = texture(screenTex, texArr(nuv));
         }
-        fragColor = vec4(rgb[ri].r, rgb[1].g, rgb[bi].b, 1.0) * (1-debug) + texture(screenTex, texCoords.xy) * debug;
+
+        fragColor = vec4(rgb[ri].r, rgb[1].g, rgb[bi].b, 1.0) * (1-debug) + texture(screenTex, vec3(texCoords.xy, debugTile)) * debug;
 }
 @end
 
