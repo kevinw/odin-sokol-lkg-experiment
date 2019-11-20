@@ -77,9 +77,7 @@ create_offscreen_pass :: proc(width, height: i32) {
         label = "offscreen pass"
     };
 
-    fmt.println("making offscreen pass...");
     offscreen_pass = sg.make_pass(offscreen_pass_desc);
-    fmt.println("...done making offscreen pass.");
 
     /* also need to update the fullscreen-quad texture bindings */
     fsq_bind.fs_images[SLOT_tex0] = offscreen_pass_desc.color_attachments[0].image;
