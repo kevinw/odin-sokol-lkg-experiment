@@ -9,7 +9,6 @@ import mu "../lib/microui"
 import "../lib/basisu"
 
 using import "core:runtime"
-import "core:os"
 import "core:strings"
 import "core:mem"
 import "core:fmt"
@@ -892,6 +891,7 @@ check_sizes :: proc() {
 }
 */
 
+import "core:os"
 main :: proc() {
     // install a stacktrace handler for asserts
     when STACK_TRACES do context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;

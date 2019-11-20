@@ -1,4 +1,7 @@
 a "println" for the screen
+project window
+	- an easy way to sort all project assets by date added.
+	- it's often that i'm importing something and then rigging it up.
 render a framebuffer
 render a quilt
 shadows

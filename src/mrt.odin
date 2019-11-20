@@ -1,14 +1,11 @@
-//------------------------------------------------------------------------------
-//  mrt-sapp.c
-//  Rendering with multi-rendertargets, and recreating render targets
-//  when window size changes.
-//------------------------------------------------------------------------------
-
 package main
 
-MSAA_SAMPLES :: 4;
+MSAA_SAMPLES :: 1;
+
+NUM_VIEWS :: 16;
 
 import "core:os"
+import "core:fmt"
 using import "math"
 using import "shader_meta"
 
@@ -19,6 +16,7 @@ offscreen_pass_desc: sg.Pass_Desc;
 offscreen_pass: sg.Pass;
 offscreen_pip: sg.Pipeline;
 offscreen_bind: sg.Bindings;
+
 fsq_pip: sg.Pipeline;
 fsq_bind: sg.Bindings;
 dbg_pip: sg.Pipeline;
@@ -28,18 +26,12 @@ dbg_bind: sg.Bindings;
 @private offscreen_pass_action := sg.Pass_Action {
     colors = {
         0 = { action = .CLEAR, val = { 0.25, 0.0, 0.0, 1.0 } },
-        1 = { action = .CLEAR, val = { 0.0, 0.25, 0.0, 1.0 } },
-        2 = { action = .CLEAR, val = { 0.0, 0.0, 0.25, 1.0 } }
     }
 };
 
 /* default pass action, no clear needed, since whole screen is overwritten */
 default_pass_action:= sg.Pass_Action {
-    colors = {
-        0 = { action = .DONTCARE },
-        1 = { action = .DONTCARE },
-        2 = { action = .DONTCARE }
-    },
+    colors = { 0 = { action = .DONTCARE }, },
     depth = { action = .DONTCARE },
     stencil = { action = .DONTCARE }
 };
@@ -52,15 +44,14 @@ vertex_t :: struct { x, y, z, b: f32 };
 create_offscreen_pass :: proc(width, height: i32) {
     /* destroy previous resource (can be called for invalid id) */
     sg.destroy_pass(offscreen_pass);
-    for i in 0..<3 {
-        sg.destroy_image(offscreen_pass_desc.color_attachments[i].image);
-    }
+    sg.destroy_image(offscreen_pass_desc.color_attachments[0].image);
     sg.destroy_image(offscreen_pass_desc.depth_stencil_attachment.image);
 
     /* create offscreen rendertarget images and pass */
     offscreen_sample_count := sg.query_features().msaa_render_targets ? MSAA_SAMPLES : 1;
     color_img_desc := sg.Image_Desc {
         render_target = true,
+        type = .ARRAY,
         width = width,
         height = height,
         min_filter = .LINEAR,
@@ -70,26 +61,28 @@ create_offscreen_pass :: proc(width, height: i32) {
         sample_count = cast(i32)offscreen_sample_count,
         label = "color image"
     };
-    depth_img_desc := color_img_desc;
+    color_img_desc.layers = NUM_VIEWS;
+
+    depth_img_desc := color_img_desc; // copy values from color Image_Desc
     depth_img_desc.pixel_format = .DEPTH;
     depth_img_desc.label = "depth image";
+
     offscreen_pass_desc = {
         color_attachments = {
             0 = { image = sg.make_image(color_img_desc) },
-            1 = { image = sg.make_image(color_img_desc) },
-            2 = { image = sg.make_image(color_img_desc) }
         },
         depth_stencil_attachment = {
             image = sg.make_image(depth_img_desc),
         },
         label = "offscreen pass"
     };
+
+    fmt.println("making offscreen pass...");
     offscreen_pass = sg.make_pass(offscreen_pass_desc);
+    fmt.println("...done making offscreen pass.");
 
     /* also need to update the fullscreen-quad texture bindings */
-    for i in 0..<3 {
-        fsq_bind.fs_images[i] = offscreen_pass_desc.color_attachments[i].image;
-    }
+    fsq_bind.fs_images[SLOT_tex0] = offscreen_pass_desc.color_attachments[0].image;
 }
 
 /* listen for window-resize events and recreate offscreen rendertargets */
@@ -183,22 +176,22 @@ mrt_init :: proc "c" () {
                 }
             },
             attrs = {
-                ATTR_vs_offscreen_pos     = { offset=cast(i32)offset_of(vertex_t,x), format=sg.Vertex_Format.FLOAT3 },
-                ATTR_vs_offscreen_bright0 = { offset=cast(i32)offset_of(vertex_t,b), format=sg.Vertex_Format.FLOAT },
+                ATTR_vs_offscreen_pos     = { offset=cast(i32)offset_of(vertex_t,x), format=.FLOAT3 },
+                ATTR_vs_offscreen_bright0 = { offset=cast(i32)offset_of(vertex_t,b), format=.FLOAT },
             }
         },
         shader = offscreen_shd,
-        index_type = sg.Index_Type.UINT16,
+        index_type = .UINT16,
         depth_stencil = {
-            depth_compare_func = sg.Compare_Func.LESS_EQUAL,
+            depth_compare_func = .LESS_EQUAL,
             depth_write_enabled = true
         },
         blend = {
-            color_attachment_count = 3,
-            depth_format = sg.Pixel_Format.DEPTH
+            color_attachment_count = 1,
+            depth_format = .DEPTH
         },
         rasterizer = {
-            cull_mode = sg.Cull_Mode.BACK,
+            cull_mode = .BACK,
             sample_count = MSAA_SAMPLES
         },
         label = "offscreen pipeline"
@@ -227,13 +220,11 @@ mrt_init :: proc "c" () {
     fsq_pip = sg.make_pipeline({
         layout = {
             attrs = {
-                ATTR_vs_fsq_pos = {
-                    format = sg.Vertex_Format.FLOAT2
-                }
+                ATTR_vs_fsq_pos = { format = .FLOAT2 }
             }
         },
         shader = fsq_shd,
-        primitive_type = sg.Primitive_Type.TRIANGLE_STRIP,
+        primitive_type = .TRIANGLE_STRIP,
         rasterizer = { sample_count = MSAA_SAMPLES },
         label = "fullscreen quad pipeline"
     });
@@ -241,32 +232,20 @@ mrt_init :: proc "c" () {
     /* resource bindings to render a fullscreen quad */
     fsq_bind = sg.Bindings {
         vertex_buffers = { 0 = quad_vbuf },
-        fs_images = {
-            SLOT_tex0 = offscreen_pass_desc.color_attachments[0].image,
-            SLOT_tex1 = offscreen_pass_desc.color_attachments[1].image,
-            SLOT_tex2 = offscreen_pass_desc.color_attachments[2].image
-        }
+        fs_images = { SLOT_tex0 = offscreen_pass_desc.color_attachments[0].image }
     };
 
     /* pipeline and resource bindings to render debug-visualization quads */
     dbg_pip = sg.make_pipeline({
-        layout = {
-            attrs = {
-                ATTR_vs_dbg_pos = {
-                    format=sg.Vertex_Format.FLOAT2
-                }
-            }
-        },
-        primitive_type = sg.Primitive_Type.TRIANGLE_STRIP,
+        layout = { attrs = { ATTR_vs_dbg_pos = { format= .FLOAT2 } } },
+        primitive_type = .TRIANGLE_STRIP,
         shader = sg.make_shader(dbg_shader_desc()^),
         rasterizer = { sample_count = MSAA_SAMPLES },
         label = "dbgvis quad pipeline"
     });
 
     dbg_bind = sg.Bindings {
-        vertex_buffers = {
-            0 = quad_vbuf
-        }
+        vertex_buffers = { 0 = quad_vbuf }
         /* images will be filled right before rendering */
     };
 }
@@ -278,40 +257,56 @@ mrt_frame :: proc "c" () {
     view_proj := mul(proj, view);
 
     /* shader parameters */
-    offscreen_params : Offscreen_Params;
-    fsq_params : FSQ_Params;
     rx += 1.0; ry += 2.0;
-    rxm := rotate_matrix4(Vector3{1.0, 0.0, 0.0}, deg2rad(rx));
-    rym := rotate_matrix4(Vector3{0.0, 1.0, 0.0}, deg2rad(ry));
+    rxm := rotate_matrix4(Vector3{1, 0, 0}, deg2rad(rx));
+    rym := rotate_matrix4(Vector3{0, 1, 0}, deg2rad(ry));
+
     model := mul(rxm, rym);
-    offscreen_params.mvp = mul(view_proj, model);
-    fsq_params.offset = Vector2{sin(deg2rad(rx)*0.01)*0.1, sin(deg2rad(ry)*0.01)*0.1};
+
+    mvps := [NUM_VIEWS]Mat4 {};
+    for i in 0..<NUM_VIEWS {
+        angle := cast(f32)i / cast(f32)NUM_VIEWS * 180;
+        mvps[i] = mul(mul(view_proj, model), rotate_matrix4(Vector3{0, 1, 1}, deg2rad(angle)));
+    }
+
+    offscreen_params := Offscreen_Params { mvps = mvps };
+
+    fsq_params := FSQ_Params {
+        offset = Vector2 { sin(deg2rad(rx)*0.01)*0.9, sin(deg2rad(ry)*0.01)*0.9 }
+    };
 
     /* render cube into MRT offscreen render targets */
-    sg.begin_pass(offscreen_pass, offscreen_pass_action);
-    sg.apply_pipeline(offscreen_pip);
-    sg.apply_bindings(offscreen_bind);
-    sg.apply_uniforms(.VS, SLOT_Offscreen_Params, &offscreen_params, size_of(offscreen_params));
-    sg.draw(0, 36, 1);
-    sg.end_pass();
+    {
+        sg.begin_pass(offscreen_pass, offscreen_pass_action);
+        defer sg.end_pass();
 
-    /* render fullscreen quad with the 'composed image', plus 3
-       small debug-view quads */
-    sg.begin_default_pass(default_pass_action, sapp.width(), sapp.height());
-    sg.apply_pipeline(fsq_pip);
-    sg.apply_bindings(fsq_bind);
-    sg.apply_uniforms(.VS, SLOT_FSQ_Params, &fsq_params, size_of(fsq_params));
-    sg.draw(0, 4, 1);
-    sg.apply_pipeline(dbg_pip);
-    for i in 0..<3 {
-        sg.apply_viewport(i*100, 0, 100, 100, false);
-        dbg_bind.fs_images[SLOT_tex] = offscreen_pass_desc.color_attachments[i].image;
-        sg.apply_bindings(dbg_bind);
-        sg.draw(0, 4, 1);
+        sg.apply_pipeline(offscreen_pip);
+        sg.apply_bindings(offscreen_bind);
+        sg.apply_uniforms(.VS, SLOT_Offscreen_Params, &offscreen_params, size_of(offscreen_params));
+        sg.draw(0, 36, NUM_VIEWS);
     }
-    sg.apply_viewport(0, 0, sapp.width(), sapp.height(), false);
-    sg.end_pass();
-    sg.commit();
+
+    /* render fullscreen quad with the 'composed image', plus 3 small debug-view quads */
+   {
+        sg.begin_default_pass(default_pass_action, sapp.width(), sapp.height());
+        sg.apply_pipeline(fsq_pip);
+        sg.apply_bindings(fsq_bind);
+        sg.apply_uniforms(.VS, SLOT_FSQ_Params, &fsq_params, size_of(fsq_params));
+        sg.draw(0, 4, 1);
+        sg.apply_pipeline(dbg_pip);
+        for i in 0..<NUM_VIEWS {
+            S :: 50;
+            sg.apply_viewport(i * S, 0, S, S, false);
+            debug_uniforms := DebugUniforms { tex_slice = cast(f32)i };
+            sg.apply_uniforms(.FS, SLOT_DebugUniforms, &debug_uniforms, size_of(debug_uniforms));
+            dbg_bind.fs_images[SLOT_tex] = offscreen_pass_desc.color_attachments[0].image;
+            sg.apply_bindings(dbg_bind);
+            sg.draw(0, 4, 1);
+        }
+        sg.apply_viewport(0, 0, sapp.width(), sapp.height(), false);
+        sg.end_pass();
+        sg.commit();
+    }
 }
 
 mrt_cleanup :: proc "c" () {
@@ -327,7 +322,7 @@ main_mrt :: proc() {
         width = 800,
         height = 600,
         sample_count = MSAA_SAMPLES,
-        window_title = "MRT Rendering (sokol-app)",
+        window_title = "Render Target Array Slice Rendering",
     }));
 }
 
