@@ -7,6 +7,7 @@ import sfetch "sokol:sokol_fetch"
 import sgl "sokol:sokol_gl"
 import mu "../lib/microui"
 import "../lib/basisu"
+import "core:thread"
 
 using import "core:runtime"
 import "core:strings"
@@ -14,6 +15,7 @@ import "core:mem"
 import "core:fmt"
 using import "math"
 import "core:math/bits"
+import "osc"
 
 ON_LKG :: true;
 LKG_W :: 2560;
@@ -39,7 +41,7 @@ draw_mesh := true;
 draw_quad := false;
 draw_grid_lines := false;
 draw_gizmos := false;
-draw_sdf_text := false;
+draw_sdf_text := true;
 
 ANIM_CURVE_WIP :: false;
 WINDOW_WIDTH :: 1280;
@@ -236,7 +238,16 @@ render_gizmos :: proc(mesh: ^gizmos.Mesh) {
     sgl.end();
 }
 
+
+osc_thread: ^thread.Thread;
+
 init_callback :: proc "c" () {
+    _osc_running = true;
+    osc_thread = thread.create(osc_thread_func);
+    if osc_thread != nil {
+        thread.start(osc_thread);
+    }
+
     when ON_LKG {
         // TODO: Get this position, and the size, from the driver.
         move_window(sapp.win32_get_hwnd(), -LKG_W, 0, LKG_W, LKG_H, true);
@@ -559,6 +570,18 @@ debug_window :: proc(ctx: ^mu.Context) {
 
         }
     }
+}
+
+_osc_running := false;
+
+osc_thread_func :: proc(thread: ^thread.Thread) -> int {
+    fmt.println("in osc thread func");
+    osc.init();
+    for _osc_running {
+        osc.update();
+    }
+    osc.shutdown();
+    return 0;
 }
 
 create_multiview_pass :: proc(width, height, num_views: int) {
@@ -922,6 +945,10 @@ frame_callback :: proc "c" () {
 }
 
 cleanup :: proc "c" () {
+    _osc_running = false;
+    thread.join(osc_thread);
+    osc_thread = nil;
+
     basisu.shutdown();
     sfetch.shutdown();
     sg.shutdown();
@@ -1026,7 +1053,6 @@ main :: proc() {
     when STACK_TRACES do context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
 
 	os.exit(run_app());
-
     //main_mrt();
 }
 
