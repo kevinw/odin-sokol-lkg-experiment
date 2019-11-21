@@ -1,6 +1,8 @@
 package main
 
 import "core:fmt"
+import "core:mem"
+using import "../math"
 
 using import "../socket_wip"
 import tosc "../../lib/tinyosc"
@@ -10,7 +12,15 @@ port :: 8005;
 
 s: Socket = INVALID_SOCKET;
 
-init :: proc() {
+Callbacks :: struct {
+    on_vector2 : proc(name: string, val: Vector2),
+    on_bool : proc(name: string, val: bool),
+};
+
+_cbs : Callbacks;
+
+init :: proc(cbs: Callbacks) {
+    _cbs = cbs;
     data : WSA_Data;
     if err := wsa_startup(make_word(2, 2), &data); err != 0 {
         fmt.eprintln("WSAStartup failed with error:", err);
@@ -36,9 +46,30 @@ init :: proc() {
     }
 }
 
-buf : [1024*1024]u8;
+buf : [1024*3]u8;
 BUFLEN := i32(len(buf));
 buffer := &buf[0];
+
+strlen :: proc(s: ^$T) -> int { // TODO: doesn't this already exist?
+    i := 0;
+    for {
+        val := mem.ptr_offset(s, i);
+        if val^ == 0 do break;
+        i += 1;
+    }
+    return i;
+}
+
+handle_message :: proc(message: ^tosc.Message) {
+    address := string(tosc.get_address(message));
+    format := string(tosc.get_format(message));
+    if format == "ff" {
+        if _cbs.on_vector2 != nil {
+            v2 := Vector2 { tosc.get_next_f32(message), tosc.get_next_f32(message) };
+            _cbs.on_vector2(address, v2);
+        }
+    }
+}
 
 update :: proc() {
     if s == INVALID_SOCKET do return;
@@ -52,19 +83,20 @@ update :: proc() {
         return;
     }
 
+    osc: tosc.Message;
     if tosc.is_bundle(buffer) {
         bundle: tosc.Bundle;
         tosc.parse_bundle(&bundle, buffer, len);
         timetag := tosc.get_timetag(&bundle);
-        osc: tosc.Message;
         for tosc.get_next_message(&bundle, &osc) {
             fmt.println("message received at:", timetag);
-            tosc.print_message(&osc);
+            //tosc.print_message(&osc);
+            handle_message(&osc);
         }
     } else {
-        osc: tosc.Message;
         tosc.parse_message(&osc, buffer, len);
-        tosc.print_message(&osc);
+        //tosc.print_message(&osc);
+        handle_message(&osc);
     }
 }
 

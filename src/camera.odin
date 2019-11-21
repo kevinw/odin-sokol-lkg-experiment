@@ -2,6 +2,7 @@ package main
 
 using import "math"
 import sapp "sokol:sokol_app"
+import "core:fmt"
 
 Camera :: struct {
     is_perspective: bool,
@@ -115,6 +116,13 @@ do_camera_movement :: proc(camera: ^Camera, input_state: Input_State, dt: f32, n
 	if input_state.s { camera.position += back    * speed * dt; }
 	if input_state.a { camera.position += left    * speed * dt; }
 	if input_state.d { camera.position += right   * speed * dt; }
+
+    if input_state.osc_move.x > 0 || input_state.osc_move.y > 0 {
+        fmt.println(input_state.osc_move);
+        OSC_SPEED :: 1;
+        camera.position += right * OSC_SPEED * speed * dt * (input_state.osc_move.x - 0.5);
+        camera.position += up *    OSC_SPEED * speed * dt * (input_state.osc_move.y - 0.5);
+    }
 
 	if input_state.right_mouse {
 		SENSITIVITY :: 0.30;

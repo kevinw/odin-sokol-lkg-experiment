@@ -59,6 +59,7 @@ Input_State :: struct {
 	w, a, s, d, q, e, r, t, g, l: bool,
     left_mouse, right_mouse: bool,
     left_ctrl, left_alt, left_shift: bool,
+    osc_move: Vector2,
 }
 
 input_state := Input_State {};
@@ -576,7 +577,11 @@ _osc_running := false;
 
 osc_thread_func :: proc(thread: ^thread.Thread) -> int {
     fmt.println("in osc thread func");
-    osc.init();
+    osc.init({
+        on_vector2 = proc (addr: string, v2: Vector2) {
+            input_state.osc_move = v2;
+        }
+    });
     for _osc_running {
         osc.update();
     }
@@ -713,6 +718,7 @@ frame_callback :: proc "c" () {
 
     // update camera
     do_camera_movement(&state.camera, input_state, dt, 2.0, 4.0, 1.0);
+    input_state.osc_move = v2(0, 0);
 
     proj := construct_projection_matrix(&state.camera);
     view := construct_view_matrix(&state.camera);
