@@ -1,5 +1,12 @@
 package main
 
+using import "core:runtime"
+import "core:strings"
+import "core:mem"
+import "core:fmt"
+using import "math"
+import "core:math/bits"
+
 import sg "sokol:sokol_gfx"
 import sapp "sokol:sokol_app"
 import stime "sokol:sokol_time"
@@ -7,19 +14,20 @@ import sfetch "sokol:sokol_fetch"
 import sgl "sokol:sokol_gl"
 import mu "../lib/microui"
 import "../lib/basisu"
-import "core:thread"
 
-using import "core:runtime"
-import "core:strings"
-import "core:mem"
-import "core:fmt"
-using import "math"
-import "core:math/bits"
-import "osc"
+OSC :: false;
 
-ON_LKG :: true;
+when OSC {
+    import "osc"
+    import "core:thread"
+}
+
+// TODO: get these from the driver
+LKG_WINDOW_COORDS := [2]i32 { 2560, -145 };
 LKG_W :: 2560;
 LKG_H :: 1600;
+
+ON_LKG :: true;
 LKG_VIEWS :: 32;
 LKG_VIEW_CONE:f32: 0.611; // 35deg in radians
 LKG_ASPECT:f32: cast(f32)LKG_W / cast(f32)LKG_H;
@@ -240,18 +248,45 @@ render_gizmos :: proc(mesh: ^gizmos.Mesh) {
 }
 
 
-osc_thread: ^thread.Thread;
+when OSC {
+    osc_thread: ^thread.Thread;
+
+    _osc_running := false;
+
+    @private
+    osc_thread_func :: proc(thread: ^thread.Thread) -> int {
+        fmt.println("in osc thread func");
+        osc.init({
+            on_vector2 = proc (addr: string, v2: Vector2) {
+                input_state.osc_move = v2;
+            }
+        });
+        for _osc_running {
+            osc.update();
+        }
+        osc.shutdown();
+        return 0;
+    }
+
+    @private
+    stop_osc_thread :: proc() {
+        _osc_running = false;
+        thread.join(osc_thread);
+        osc_thread = nil;
+    }
+}
 
 init_callback :: proc "c" () {
-    _osc_running = true;
-    osc_thread = thread.create(osc_thread_func);
-    if osc_thread != nil {
-        thread.start(osc_thread);
+    when OSC {
+        _osc_running = true;
+        osc_thread = thread.create(osc_thread_func);
+        if osc_thread != nil {
+            thread.start(osc_thread);
+        }
     }
 
     when ON_LKG {
-        // TODO: Get this position, and the size, from the driver.
-        move_window(sapp.win32_get_hwnd(), -LKG_W, 0, LKG_W, LKG_H, true);
+        move_window(sapp.win32_get_hwnd(), LKG_WINDOW_COORDS[0], LKG_WINDOW_COORDS[1], LKG_W, LKG_H, true);
     }
 
     state.xform_a = {
@@ -273,7 +308,7 @@ init_callback :: proc "c" () {
 		d3d11_depth_stencil_view_cb  = sapp.d3d11_get_depth_stencil_view,
 	});
 
-    create_multiview_pass(sapp.width(), sapp.height(), NUM_VIEWS);
+    create_multiview_pass(sapp.width(), sapp.height(), LKG_VIEWS);
 
     sgl.setup({
         max_vertices = 50000,
@@ -573,22 +608,6 @@ debug_window :: proc(ctx: ^mu.Context) {
     }
 }
 
-_osc_running := false;
-
-osc_thread_func :: proc(thread: ^thread.Thread) -> int {
-    fmt.println("in osc thread func");
-    osc.init({
-        on_vector2 = proc (addr: string, v2: Vector2) {
-            input_state.osc_move = v2;
-        }
-    });
-    for _osc_running {
-        osc.update();
-    }
-    osc.shutdown();
-    return 0;
-}
-
 create_multiview_pass :: proc(width, height, num_views: int) {
     assert(width > 0 && height > 0);
     fmt.printf("creating offscreen multiview pass (%dx%d) with %d views\n", width, height, num_views);
@@ -601,7 +620,7 @@ create_multiview_pass :: proc(width, height, num_views: int) {
     sg.destroy_image(pass_desc.depth_stencil_attachment.image);
 
     /* create offscreen rendertarget images and pass */
-    offscreen_sample_count := sg.query_features().msaa_render_targets ? MSAA_SAMPLES : 1;
+    offscreen_sample_count := sg.query_features().msaa_render_targets ? MSAA_SAMPLE_COUNT : 1;
     color_img_desc := sg.Image_Desc {
         render_target = true,
         type = .ARRAY,
@@ -749,7 +768,11 @@ frame_callback :: proc "c" () {
 
     if draw_mesh {
         when ON_LKG {
-            sg.begin_pass(state.offscreen.pass, offscreen_pass_action);
+            sg.begin_pass(state.offscreen.pass, {
+                colors = {
+                    0 = { action = .CLEAR, val = { 0.25, 0.0, 0.0, 1.0 } },
+                }
+            });
             defer sg.end_pass();
         }
 
@@ -862,7 +885,7 @@ frame_callback :: proc "c" () {
             debug = 0,
             debugTile = cast(i32)foo,
             invView = 1, // TODO
-            tile = Vector4{1, 1, NUM_VIEWS, 0},
+            tile = Vector4{1, 1, LKG_VIEWS, 0},
             viewPortion = Vector4{1, 1, 0, 0},
         };
         sg.apply_uniforms(.FS, shader_meta.SLOT_lkg_fs_uniforms, &uniforms, size_of(shader_meta.lkg_fs_uniforms));
@@ -951,10 +974,7 @@ frame_callback :: proc "c" () {
 }
 
 cleanup :: proc "c" () {
-    _osc_running = false;
-    thread.join(osc_thread);
-    osc_thread = nil;
-
+    when OSC do stop_osc_thread();
     basisu.shutdown();
     sfetch.shutdown();
     sg.shutdown();
@@ -965,7 +985,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
     switch event.type {
         case .RESIZED:
             camera_target_resized(&state.camera, cast(f32)sapp.width(), cast(f32)sapp.height());
-            create_multiview_pass(sapp.width(), sapp.height(), NUM_VIEWS);
+            create_multiview_pass(sapp.width(), sapp.height(), LKG_VIEWS);
         case .MOUSE_DOWN:
             set_capture(sapp.win32_get_hwnd());
 
