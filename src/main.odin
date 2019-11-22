@@ -28,7 +28,7 @@ LKG_W :: 2560;
 LKG_H :: 1600;
 
 ON_LKG :: true;
-LKG_VIEWS :: 32;
+LKG_VIEWS :: 45;
 LKG_VIEW_CONE:f32: 0.611; // 35deg in radians
 LKG_ASPECT:f32: cast(f32)LKG_W / cast(f32)LKG_H;
 
@@ -295,9 +295,6 @@ init_callback :: proc "c" () {
         scale = {1, 1, 1},
     };
 
-    text.vertex_elems = make([dynamic]f32);
-    text.tex_elems = make([dynamic]f32);
-
 	sg.setup({
 		mtl_device                   = sapp.metal_get_device(),
 		mtl_renderpass_descriptor_cb = sapp.metal_get_renderpass_descriptor,
@@ -308,7 +305,7 @@ init_callback :: proc "c" () {
 		d3d11_depth_stencil_view_cb  = sapp.d3d11_get_depth_stencil_view,
 	});
 
-    create_multiview_pass(sapp.width(), sapp.height(), LKG_VIEWS);
+    create_multiview_pass(LKG_VIEWS, sapp.framebuffer_size());
 
     sgl.setup({
         max_vertices = 50000,
@@ -608,7 +605,11 @@ debug_window :: proc(ctx: ^mu.Context) {
     }
 }
 
-create_multiview_pass :: proc(width, height, num_views: int) {
+create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: int) {
+    aspect := cast(f32)framebuffer_width / cast(f32)framebuffer_height;
+    width := 400;
+    height := cast(int)(cast(f32)width / aspect);
+
     assert(width > 0 && height > 0);
     fmt.printf("creating offscreen multiview pass (%dx%d) with %d views\n", width, height, num_views);
 
@@ -958,10 +959,8 @@ frame_callback :: proc "c" () {
 
         sg.apply_pipeline(text.pipeline);
         sg.apply_bindings(text.bind);
-
         sg.apply_uniforms(.VS, shader_meta.SLOT_sdf_vs_uniforms, &vs_uniforms, size_of(shader_meta.sdf_vs_uniforms));
         sg.apply_uniforms(.FS, shader_meta.SLOT_sdf_fs_uniforms, &fs_uniforms, size_of(shader_meta.sdf_fs_uniforms));
-
         num_verts := len(text.vertex_elems) / 2;
         sg.draw(0, num_verts, 1);
     }
@@ -985,7 +984,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
     switch event.type {
         case .RESIZED:
             camera_target_resized(&state.camera, cast(f32)sapp.width(), cast(f32)sapp.height());
-            create_multiview_pass(sapp.width(), sapp.height(), LKG_VIEWS);
+            create_multiview_pass(LKG_VIEWS, sapp.framebuffer_size());
         case .MOUSE_DOWN:
             set_capture(sapp.win32_get_hwnd());
 
