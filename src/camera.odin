@@ -93,6 +93,9 @@ init_camera :: proc(camera: ^Camera, is_perspective: bool, size: f32, pixel_widt
 delete_camera :: proc(camera: Camera) {
 }
 
+orbit :: proc(camera: ^Camera, input_state: Input_State, dt: f32) {
+}
+
 do_camera_movement :: proc(camera: ^Camera, input_state: Input_State, dt: f32, normal_speed: f32, fast_speed: f32, slow_speed: f32) {
 	speed := normal_speed;
 

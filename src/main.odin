@@ -14,6 +14,7 @@ import sfetch "sokol:sokol_fetch"
 import sgl "sokol:sokol_gl"
 import mu "../lib/microui"
 import "../lib/basisu"
+import "../lib/hpc"
 
 OSC :: false;
 
@@ -23,14 +24,9 @@ when OSC {
 }
 
 // TODO: get these from the driver
-LKG_WINDOW_COORDS := [2]i32 { 2560, -145 };
-LKG_W :: 2560;
-LKG_H :: 1600;
-
-ON_LKG :: true;
 LKG_VIEWS :: 45;
 LKG_VIEW_CONE:f32: 0.611; // 35deg in radians
-LKG_ASPECT:f32: cast(f32)LKG_W / cast(f32)LKG_H;
+LKG_ASPECT:f32 = 1;
 
 when STACK_TRACES {
     import "stacktrace"
@@ -276,17 +272,23 @@ when OSC {
     }
 }
 
+hp_info: Info_Response;
+hp_connected: bool;
+
 init_callback :: proc "c" () {
+    hp_connected, hp_info = hpc_init(sapp.win32_get_hwnd());
+    if hp_connected {
+        LKG_ASPECT = cast(f32)hp_info.width / cast(f32)hp_info.height;
+    }
+
     when OSC {
         _osc_running = true;
         osc_thread = thread.create(osc_thread_func);
-        if osc_thread != nil {
-            thread.start(osc_thread);
-        }
+        if osc_thread != nil do thread.start(osc_thread);
     }
 
-    when ON_LKG {
-        move_window(sapp.win32_get_hwnd(), LKG_WINDOW_COORDS[0], LKG_WINDOW_COORDS[1], LKG_W, LKG_H, true);
+    if hp_connected {
+        move_window(sapp.win32_get_hwnd(), hp_info.xpos, hp_info.ypos, hp_info.width, hp_info.height, true);
     }
 
     state.xform_a = {
@@ -765,16 +767,15 @@ frame_callback :: proc "c" () {
     // DRAW MESH
     @static foo:int = 0;
 
-    when !ON_LKG do sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
+    if !hp_connected do sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
 
     if draw_mesh {
-        when ON_LKG {
+        if hp_connected {
             sg.begin_pass(state.offscreen.pass, {
                 colors = {
                     0 = { action = .CLEAR, val = { 0.25, 0.0, 0.0, 1.0 } },
                 }
             });
-            defer sg.end_pass();
         }
 
         using state.scene;
@@ -867,12 +868,15 @@ frame_callback :: proc "c" () {
                 sg.draw(cast(int)prim.base_element, cast(int)prim.num_elements, LKG_VIEWS);
             }
         }
+
+        if hp_connected {
+            sg.end_pass();
+        }
     }
 
-    when ON_LKG do sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
+    if hp_connected {
+        sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
 
-    // DRAW MULTIVIEW
-    when ON_LKG {
         sg.apply_pipeline(state.lenticular_pipeline);
         sg.apply_bindings(state.lenticular_bindings);
         uniforms := shader_meta.lkg_fs_uniforms {
@@ -983,6 +987,7 @@ cleanup :: proc "c" () {
 event_callback :: proc "c" (event: ^sapp.Event) {
     switch event.type {
         case .RESIZED:
+            fmt.println("resized", sapp.framebuffer_size());
             camera_target_resized(&state.camera, cast(f32)sapp.width(), cast(f32)sapp.height());
             create_multiview_pass(LKG_VIEWS, sapp.framebuffer_size());
         case .MOUSE_DOWN:
@@ -1073,9 +1078,39 @@ check_sizes :: proc() {
 */
 
 import "core:os"
+
+
 main :: proc() {
+    
+
+    /* 
+    msg := hpc.Message {command = "{\"info\":{}}" };
+    reply := hpc.send_message_blocking(&msg);
+    if (reply.client_error != .NOERROR) {
+        fmt.eprintln("hpc error:", reply.client_error);
+    } else {
+        fmt.printf("HoloPlay Service version: %s\n", reply.version);
+        fmt.printf("%d Looking Glass device%s present.\n", reply.num_devices, (reply.num_devices == 1 ? "" : "s"));
+
+        devices := mem.slice_ptr(reply.devices, cast(int)reply.num_devices);
+        for device in devices {
+            fmt.printf("Device %d:\n", device.index);
+            fmt.printf("\tHardware version: %s\n", device.hardwareVersion);
+            fmt.printf("\tState: %s\n", device.state);
+            fmt.printf("\tHDMI name: %s\n", device.hwid);
+
+            device_state := string(device.state);
+            if strings.contains(device_state, "hidden") || strings.contains(device_state, "ok") {
+            //if (strstr(r.devices[i].state, "hidden") || strstr(r.devices[i].state, "ok"))
+                fmt.printf("\tSerial: %s\n", device.calibration.serial);
+                fmt.printf("\tWindow coordinates: (%d, %d)\n", device.x_pos, device.y_pos);
+            }
+        }
+        hpc.tear_down_message_pipe();
+    }
     // install a stacktrace handler for asserts
     when STACK_TRACES do context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
+    */
 
 	os.exit(run_app());
     //main_mrt();
@@ -1092,7 +1127,7 @@ run_app :: proc() -> int {
 		height       = WINDOW_HEIGHT,
 		window_title = "testbed",
         sample_count = MSAA_SAMPLE_COUNT,
-        fullscreen   = ON_LKG,
+        fullscreen   = true,
         //high_dpi     = true,
 	});
 }

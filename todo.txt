@@ -1,4 +1,6 @@
 a "println" for the screen
+implement a rotation gizmo based on the trackball example here: 
+http://www.songho.ca/opengl/gl_camera.html#example2
 project window
 	- an easy way to sort all project assets by date added.
 	- it's often that i'm importing something and then rigging it up.
