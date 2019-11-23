@@ -14,7 +14,6 @@ import sfetch "sokol:sokol_fetch"
 import sgl "sokol:sokol_gl"
 import mu "../lib/microui"
 import "../lib/basisu"
-import "../lib/hpc"
 
 OSC :: false;
 
