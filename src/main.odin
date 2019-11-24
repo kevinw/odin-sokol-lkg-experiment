@@ -22,10 +22,11 @@ when OSC {
     import "core:thread"
 }
 
-// TODO: get these from the driver
 LKG_VIEWS :: 45;
+LKG_CAMERA_SIZE :f32 = 2.0;
 LKG_VIEW_CONE:f32: 0.611; // 35deg in radians
 LKG_ASPECT:f32 = 1;
+DEFAULT_CAMERA_FOV :f32 = 14.0;
 
 when STACK_TRACES {
     import "stacktrace"
@@ -242,10 +243,8 @@ render_gizmos :: proc(mesh: ^gizmos.Mesh) {
     sgl.end();
 }
 
-
 when OSC {
     osc_thread: ^thread.Thread;
-
     _osc_running := false;
 
     @private
@@ -318,8 +317,8 @@ init_callback :: proc "c" () {
 
     basisu.setup();
 
-    init_camera(&state.camera, true, 60, sapp.width(), sapp.height());
-    state.camera.position = {0, 0.77, 2.40};
+    init_camera(&state.camera, true, DEFAULT_CAMERA_FOV, sapp.width(), sapp.height());
+    state.camera.position = {0, 0.77, 10.40};
 
     gizmos_ctx.render = render_gizmos;
     gizmos.init(&gizmos_ctx);
@@ -610,7 +609,7 @@ debug_window :: proc(ctx: ^mu.Context) {
 
 create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: int) {
     aspect := cast(f32)framebuffer_width / cast(f32)framebuffer_height;
-    width := 400;
+    width := 750;
     height := cast(int)(cast(f32)width / aspect);
 
     assert(width > 0 && height > 0);
@@ -660,7 +659,6 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
 }
 
 frame_callback :: proc "c" () {
-
 	//
 	// TIME
 	//
@@ -668,12 +666,7 @@ frame_callback :: proc "c" () {
     frame_count += 1;
 	current_ticks := stime.now();
 	now_seconds := stime.sec(current_ticks);
-	elapsed_ticks: u64 = ---;
-	if last_ticks == 0 {
-		elapsed_ticks = 0;
-	} else {
-		elapsed_ticks = stime.diff(current_ticks, last_ticks);
-	}
+    elapsed_ticks:u64 = last_ticks == 0 ? 0 : stime.diff(current_ticks, last_ticks);
 	last_ticks = current_ticks;
 	elapsed_seconds := stime.sec(elapsed_ticks);
 
@@ -788,7 +781,7 @@ frame_callback :: proc "c" () {
                 eye_pos = state.camera.position,
             };
 
-            camera_size:f32 = 5.0;
+            camera_size:f32 = LKG_CAMERA_SIZE;
             cam_forward := quaternion_forward(state.camera.rotation);
             focal_position := state.camera.position + norm(cam_forward) * camera_size;
             camera_distance := length(state.camera.position - focal_position);
@@ -880,21 +873,25 @@ frame_callback :: proc "c" () {
 
         sg.apply_pipeline(state.lenticular_pipeline);
         sg.apply_bindings(state.lenticular_bindings);
-        uniforms := shader_meta.lkg_fs_uniforms {
-            pitch = 354.622314453125,
-            tilt = -0.11419378221035004,
-            center = -0.10679349303245544,
-            subp = 0.0001302083401242271,
-            ri = 0,
-            bi = 2,
-            aspect = LKG_ASPECT,
-            debug = 0,
-            debugTile = cast(i32)foo,
-            invView = 1, // TODO
-            tile = Vector4{1, 1, LKG_VIEWS, 0},
-            viewPortion = Vector4{1, 1, 0, 0},
-        };
-        sg.apply_uniforms(.FS, shader_meta.SLOT_lkg_fs_uniforms, &uniforms, size_of(shader_meta.lkg_fs_uniforms));
+        {
+            using hp_info;
+            uniforms := shader_meta.lkg_fs_uniforms {
+                pitch = pitch,
+                tilt = tilt,
+                center = center,
+                subp = subp,
+                ri = cast(i32)ri,
+                bi = cast(i32)bi,
+                invView = invView,
+                aspect = cast(f32)width/cast(f32)height,
+
+                debug = 0,
+                debugTile = cast(i32)foo,
+                tile = Vector4{1, 1, LKG_VIEWS, 0},
+                viewPortion = Vector4{1, 1, 0, 0},
+            };
+            sg.apply_uniforms(.FS, shader_meta.SLOT_lkg_fs_uniforms, &uniforms, size_of(shader_meta.lkg_fs_uniforms));
+        }
         sg.draw(0, 6, 1);
     }
 
@@ -988,7 +985,6 @@ cleanup :: proc "c" () {
 event_callback :: proc "c" (event: ^sapp.Event) {
     switch event.type {
         case .RESIZED:
-            fmt.println("resized", sapp.framebuffer_size());
             camera_target_resized(&state.camera, cast(f32)sapp.width(), cast(f32)sapp.height());
             create_multiview_pass(LKG_VIEWS, sapp.framebuffer_size());
         case .MOUSE_DOWN:
@@ -1080,38 +1076,9 @@ check_sizes :: proc() {
 
 import "core:os"
 
-
 main :: proc() {
-    
-
-    /* 
-    msg := hpc.Message {command = "{\"info\":{}}" };
-    reply := hpc.send_message_blocking(&msg);
-    if (reply.client_error != .NOERROR) {
-        fmt.eprintln("hpc error:", reply.client_error);
-    } else {
-        fmt.printf("HoloPlay Service version: %s\n", reply.version);
-        fmt.printf("%d Looking Glass device%s present.\n", reply.num_devices, (reply.num_devices == 1 ? "" : "s"));
-
-        devices := mem.slice_ptr(reply.devices, cast(int)reply.num_devices);
-        for device in devices {
-            fmt.printf("Device %d:\n", device.index);
-            fmt.printf("\tHardware version: %s\n", device.hardwareVersion);
-            fmt.printf("\tState: %s\n", device.state);
-            fmt.printf("\tHDMI name: %s\n", device.hwid);
-
-            device_state := string(device.state);
-            if strings.contains(device_state, "hidden") || strings.contains(device_state, "ok") {
-            //if (strstr(r.devices[i].state, "hidden") || strstr(r.devices[i].state, "ok"))
-                fmt.printf("\tSerial: %s\n", device.calibration.serial);
-                fmt.printf("\tWindow coordinates: (%d, %d)\n", device.x_pos, device.y_pos);
-            }
-        }
-        hpc.tear_down_message_pipe();
-    }
     // install a stacktrace handler for asserts
     when STACK_TRACES do context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
-    */
 
 	os.exit(run_app());
     //main_mrt();

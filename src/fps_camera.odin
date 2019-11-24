@@ -22,8 +22,8 @@ speed :: 3.0;
 mouse_speed :: 0.6;
 
 init :: proc(using Camera: ^FPS_Camera) {
-    fov = 75;
-    position = v3(0, 1, -2);
+    fov = 14;
+    position = v3(0, 0, -10);
     near = 0.1;
     far = 1000.0;
 }

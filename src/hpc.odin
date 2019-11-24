@@ -53,12 +53,12 @@ hpc_init :: proc(my_hwnd: rawptr) -> (bool, []Display_Info) {
     // Find the LKG driver resource window.
     driver_resource_hwnd := FindWindowW(utf8_to_wstring("GLFW30"), utf8_to_wstring("ResourceWindow"));
 
-    if driver_resource_hwnd != nil {
-        request := Request { {'L', 'K', 'G', '1'}, size_of(Display_Info) };
-        copydata := COPYDATASTRUCT { nil, size_of(Request), &request };
-        hwnd:Hwnd = cast(Hwnd)cast(uintptr)driver_resource_hwnd;
-        SendMessageW(hwnd, WM_COPYDATA, cast(Wparam)cast(uintptr)my_hwnd, cast(Lparam)cast(uintptr)&copydata);
-    }
+    if driver_resource_hwnd == nil do return false, nil;
+
+    request := Request { {'L', 'K', 'G', '1'}, size_of(Display_Info) };
+    copydata := COPYDATASTRUCT { nil, size_of(Request), &request };
+    hwnd:Hwnd = cast(Hwnd)cast(uintptr)driver_resource_hwnd;
+    SendMessageW(hwnd, WM_COPYDATA, cast(Wparam)cast(uintptr)my_hwnd, cast(Lparam)cast(uintptr)&copydata);
 
     return did_receive_calibration, received_device_infos[:num_received_devices];
 }
