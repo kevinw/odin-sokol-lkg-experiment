@@ -271,12 +271,14 @@ when OSC {
     }
 }
 
-hp_info: Info_Response;
+hp_info: Display_Info;
 hp_connected: bool;
 
 init_callback :: proc "c" () {
-    hp_connected, hp_info = hpc_init(sapp.win32_get_hwnd());
+    hp_infos:[]Display_Info;
+    hp_connected, hp_infos = hpc_init(sapp.win32_get_hwnd());
     if hp_connected {
+        hp_info = hp_infos[0];
         LKG_ASPECT = cast(f32)hp_info.width / cast(f32)hp_info.height;
     }
 
