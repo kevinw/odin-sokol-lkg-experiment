@@ -15,7 +15,7 @@ using import "math"
 
 DEFAULT_BUFFER_SIZE :: 200;
 
-font_scale:f32 = 4.5;
+font_scale:f32 = 4.3;
 
 key_map: = [512]u8 {
     sapp.Key_Code.LEFT_SHIFT       = cast(u8)mu.Key.Shift,

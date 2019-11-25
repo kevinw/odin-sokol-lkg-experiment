@@ -270,6 +270,7 @@ init_callback :: proc "c" () {
         using editor_settings;
         lkg_view_cone = 2.51;
         lkg_camera_size = 0.80;
+        subview_w = 700;
         num_views = 45;
         fov = 25.7;
 
@@ -295,7 +296,7 @@ init_callback :: proc "c" () {
 
     state.xform_a = {
         position = {0, 0, 0},
-        orientation = {0, 0, 0, 1}, // TODO: identity quat?
+        orientation = transmute(Vector4)degrees_to_quaternion(v3(180, 0, 0)), // TODO: identity quat?
         scale = {1, 1, 1},
     };
 
@@ -645,7 +646,7 @@ maybe_recreate_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_
 
 calc_lkg_subquilt_size :: proc(framebuffer_width, framebuffer_height: int) -> (i32, i32) {
     aspect := cast(f32)framebuffer_width / cast(f32)framebuffer_height;
-    width := 750;
+    width := max(10, cast(int)editor_settings.subview_w);
     height := cast(int)(cast(f32)width / aspect);
     return cast(i32)width, cast(i32)height;
 }
@@ -783,6 +784,10 @@ frame_callback :: proc "c" () {
     proj := construct_projection_matrix(&state.camera);
     view := construct_view_matrix(&state.camera);
     state.view_proj = mul(proj, view);
+
+    @static x_rotation:f32 = 0;
+    x_rotation += dt * 12.0;
+    xform_a.orientation = transmute(Vector4)degrees_to_quaternion(v3(180, x_rotation, 0));
 
     //
     // MICROUI

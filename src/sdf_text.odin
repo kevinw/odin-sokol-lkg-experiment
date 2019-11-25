@@ -75,7 +75,7 @@ did_load :: proc() {
     using text;
 
     size:f32 = 95.0;
-    create_text("sdf text", size);
+    create_text("hello", size);
 }
 
 create_text :: proc(str: string, size: f32) {

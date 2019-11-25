@@ -7,7 +7,7 @@ using import "math"
 editor_settings : struct {
     lkg_view_cone:f32,   // = 0.611; // 35deg in radians
     lkg_camera_size:f32, // = 6.0: 
-    subview_w: int,
+    subview_w: f32,
     num_views:f32,
     fov: f32,
     grid_offset: Vector3,

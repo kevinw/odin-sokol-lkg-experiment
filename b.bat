@@ -2,7 +2,12 @@
 setlocal
 set PATH=c:\src\fips-deploy\sokol-tools\win64-vstudio-release;%PATH%
 set SHDC=sokol-shdc --slang hlsl5 --input
-set OPT_LEVEL=0
+
+REM set OPT_LEVEL=0
+set OPT_LEVEL=3
+
+set DEBUG_OPT=
+REM set DEBUG_OPT=-debug
 
 set OUT_DIR=src/shader_meta
 
@@ -15,6 +20,6 @@ echo Compiling shaders... &&^
 %SHDC% mrt_sapp.glsl --output %OUT_DIR%/mrt_sapp.odin && ^
 %SHDC% lenticular.glsl --output %OUT_DIR%/lenticular.odin && ^
 echo Building game... &&^
-odin build src -collection=sokol=../odin-sokol/src -opt=%OPT_LEVEL% -debug -ignore-unknown-attributes
+odin build src -collection=sokol=../odin-sokol/src -opt=%OPT_LEVEL% -ignore-unknown-attributes %DEBUG_OPT% 
 
 REM -show-timings -keep-temp-files 
