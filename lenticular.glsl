@@ -31,7 +31,10 @@ vec3 texArr(vec3 uvz)
 {
     // decide which section to take from based on the z.
     float z = floor(uvz.z * tile.z);
-    return vec3(uvz.xy, z);
+
+    vec2 uv2 = uvz.xy;
+    uv2.y = 1.0 - uv2.y;
+    return vec3(uv2, z);
     /*
     float x = (mod(z, tile.x) + uvz.x) / tile.x;
     float y = (floor(z / tile.x) + uvz.y) / tile.y;

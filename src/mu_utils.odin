@@ -7,12 +7,15 @@ import mu "../lib/microui"
 import mu_atlas "../lib/microui/atlas"
 import "core:strings"
 import "core:intrinsics"
+import "core:strconv"
 import "core:fmt"
 import "core:mem"
 using import "core:runtime"
 using import "math"
 
 DEFAULT_BUFFER_SIZE :: 200;
+
+font_scale:f32 = 4.5;
 
 key_map: = [512]u8 {
     sapp.Key_Code.LEFT_SHIFT       = cast(u8)mu.Key.Shift,
@@ -29,14 +32,27 @@ key_map: = [512]u8 {
 tcstring :: proc(s: string) -> cstring do return strings.clone_to_cstring(s, context.temp_allocator);
 tprint :: fmt.tprint;
 
+r_text_width_cb :: proc "c" (font: mu.Font, _text: cstring, _byte_len: i32) -> i32 {
+    byte_len := _byte_len;
+
+    if byte_len == -1 {
+        byte_len = cast(i32)len(_text);
+    }
+
+    if byte_len == 0 do return 0;
+
+    slice := mem.slice_ptr(cast(^u8)_text, cast(int)byte_len);
+    return r_get_text_width(slice);
+}
+
 r_get_text_width :: proc(text: []u8) -> i32 {
     using mu_atlas;
 
-    res:i32 = 0;
+    res:f32 = 0;
     for ch in text {
-        res += atlas[ATLAS_FONT + cast(mu.Icon)ch].w;
+        res += cast(f32)atlas[ATLAS_FONT + cast(mu.Icon)ch].w * font_scale;
     }
-    return res;
+    return cast(i32)res;
 }
 
 mu_label :: proc(ctx: ^mu.Context, s: string) {
@@ -67,8 +83,8 @@ mu_vector :: proc(ctx: ^mu.Context, v: ^$V/[$N]f32, min_val, max_val: f32) -> mu
     return res;
 }
 
-r_get_text_height :: proc() -> i32 {
-    return 18;
+r_get_text_height :: proc "c" (ptr: rawptr) -> i32 {
+    return i32(cast(f32)18 * font_scale);
 }
 
 mu_checkbox_cstring :: proc(ctx: ^mu.Context, val: ^bool, label: cstring = "") {
@@ -159,8 +175,8 @@ r_draw_text :: proc(str: []u8, pos: mu.Vec2, color: mu.Color) {
     dst := mu.Rect { pos.x, pos.y, 0, 0 };
     for ch in str {
         src := mu_atlas.atlas[mu_atlas.ATLAS_FONT + cast(mu.Icon)ch];
-        dst.w = src.w;
-        dst.h = src.h;
+        dst.w = i32(cast(f32)src.w * font_scale);
+        dst.h = i32(cast(f32)src.h * font_scale);
         r_push_quad(dst, src, color);
         dst.x += dst.w;
     }
@@ -181,7 +197,7 @@ r_set_clip_rect :: proc(rect: mu.Rect) {
     sgl.end();
     
     // @Bug nothing draws with this line in. Why?
-    //sgl.scissor_rect(rect.x, rect.y, rect.w, rect.h, true);
+    sgl.scissor_rect(rect.x, rect.y, rect.w, rect.h, true);
 
     sgl.begin_quads();
 }
@@ -325,11 +341,23 @@ mu_struct_ti :: proc(ctx: ^mu.Context, name: string, data: rawptr, ti: ^Type_Inf
         */
     }
 
+    u8_slider :: proc(ctx: ^mu.Context, val: ^u8) -> mu.Res {
+        s := tprint(val^);
+        res:mu.Res;
+        if mu.textbox(ctx, &s[0], cast(i32)len(s)) {
+            res |= mu.Res.Change;
+            fmt.println("Change", s);
+            val^ = cast(u8)strconv.parse_int(s);
+        }
+        return res;
+    }
+
     input_int :: proc(ctx: ^mu.Context, name: string, val: ^i32) -> mu.Res {
         s := tprint(val^);
         res:mu.Res;
         if mu.textbox(ctx, &s[0], cast(i32)len(s)) {
         }
+        val^ = cast(i32)strconv.parse_int(s);
         return res;
     }
 
@@ -343,13 +371,12 @@ mu_struct_ti :: proc(ctx: ^mu.Context, name: string, data: rawptr, ti: ^Type_Inf
                     case 1: new_data := cast(i32)(cast(^i8 )data)^; input_int(ctx, name, &new_data); (cast(^i8 )data)^ = cast(i8 )new_data;
                     case: assert(false, tprint(ti.size));
                 }
-            }
-            else {
+            } else {
                 switch ti.size {
                     case 8: new_data := cast(i32)(cast(^u64)data)^; input_int(ctx, name, &new_data); (cast(^u64)data)^ = cast(u64)new_data;
                     case 4: new_data := cast(i32)(cast(^u32)data)^; input_int(ctx, name, &new_data); (cast(^u32)data)^ = cast(u32)new_data;
                     case 2: new_data := cast(i32)(cast(^u16)data)^; input_int(ctx, name, &new_data); (cast(^u16)data)^ = cast(u16)new_data;
-                    case 1: new_data := cast(i32)(cast(^u8 )data)^; input_int(ctx, name, &new_data); (cast(^u8 )data)^ = cast(u8 )new_data;
+                    case 1: new_data := cast(u8)(cast(^u8 )data)^; u8_slider(ctx, &new_data); (cast(^u8 )data)^ = cast(u8 )new_data;
                     case: assert(false, tprint(ti.size));
                 }
             }

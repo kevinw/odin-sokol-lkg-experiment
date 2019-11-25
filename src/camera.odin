@@ -9,7 +9,7 @@ Camera :: struct {
 
     // orthographic -> size in world units from center of screen to top of screen
     // perspective  -> fov
-    size: f32,
+    using _size_fov: struct #raw_union { size, fov: f32 },
 
     near_plane: f32,
     far_plane:  f32,
@@ -93,7 +93,7 @@ init_camera :: proc(camera: ^Camera, is_perspective: bool, size: f32, pixel_widt
 delete_camera :: proc(camera: Camera) {
 }
 
-orbit :: proc(camera: ^Camera, input_state: Input_State, dt: f32) {
+orbit :: proc(camera: ^Camera, input_state: Input_State, dt: f32, distance: f32) {
 }
 
 do_camera_movement :: proc(camera: ^Camera, input_state: Input_State, dt: f32, normal_speed: f32, fast_speed: f32, slow_speed: f32) {
@@ -128,7 +128,7 @@ do_camera_movement :: proc(camera: ^Camera, input_state: Input_State, dt: f32, n
     }
 
 	if input_state.right_mouse {
-		SENSITIVITY :: 0.30;
+		SENSITIVITY :: 0.17;
 
         move_x, move_y: i32 = 0, 0;
         sapp.get_relative_mouse(&move_x, &move_y);

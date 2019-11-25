@@ -15,16 +15,14 @@ import sgl "sokol:sokol_gl"
 import mu "../lib/microui"
 import "../lib/basisu"
 
-OSC :: false;
+FORCE_2D :: false;
+OSC :: true;
 
 when OSC {
     import "osc"
     import "core:thread"
 }
 
-LKG_VIEWS :: 45;
-LKG_CAMERA_SIZE :f32 = 2.0;
-LKG_VIEW_CONE:f32: 0.611; // 35deg in radians
 LKG_ASPECT:f32 = 1;
 DEFAULT_CAMERA_FOV :f32 = 14.0;
 
@@ -58,6 +56,10 @@ MSAA_SAMPLE_COUNT :: 1;
 
 sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 
+MAXIMUM_VIEWS :: 45; // match shader value
+
+num_views :: proc() -> int do return min(MAXIMUM_VIEWS, max(1, cast(int)editor_settings.num_views));
+
 Input_State :: struct {
 	right, left, up, down: bool,
 	w, a, s, d, q, e, r, t, g, l: bool,
@@ -67,6 +69,12 @@ Input_State :: struct {
 }
 
 input_state := Input_State {};
+
+Change :: struct { val, old_val: any };
+
+Undo_Stack :: struct {
+    changes: [dynamic]Change,
+}
 
 // per-material texture indices into scene.images for metallic material
 Metallic_Images :: struct {
@@ -125,6 +133,7 @@ Node :: struct {
 state: struct {
     offscreen: struct {
         pass_desc: sg.Pass_Desc,
+        color_img_desc: sg.Image_Desc,
         pass: sg.Pass,
     },
 
@@ -202,23 +211,6 @@ window: mu.Container;
 mu_ctx: mu.Context;
 
 /* microui callbacks */
-text_width_cb :: proc "c" (font: mu.Font, _text: cstring, _byte_len: i32) -> i32 {
-    byte_len := _byte_len;
-
-    if byte_len == -1 {
-        byte_len = cast(i32)len(_text);
-    }
-
-    if byte_len == 0 do return 0;
-
-    slice := mem.slice_ptr(cast(^u8)_text, cast(int)byte_len);
-    return r_get_text_width(slice);
-}
-
-text_height_cb :: proc "c" (font: mu.Font) -> i32 {
-    return r_get_text_height();
-}
-
 delta := v3(-1.92, -0.07, 1.52);
 
 render_gizmos :: proc(mesh: ^gizmos.Mesh) {
@@ -265,7 +257,7 @@ when OSC {
     @private
     stop_osc_thread :: proc() {
         _osc_running = false;
-        thread.join(osc_thread);
+        //thread.join(osc_thread);
         osc_thread = nil;
     }
 }
@@ -274,8 +266,18 @@ hp_info: Display_Info;
 hp_connected: bool;
 
 init_callback :: proc "c" () {
+    {
+        using editor_settings;
+        lkg_view_cone = 2.51;
+        lkg_camera_size = 0.80;
+        num_views = 45;
+        fov = 25.7;
+
+    }
+
     hp_infos:[]Display_Info;
     hp_connected, hp_infos = hpc_init(sapp.win32_get_hwnd());
+    if FORCE_2D do hp_connected = false;
     if hp_connected {
         hp_info = hp_infos[0];
         LKG_ASPECT = cast(f32)hp_info.width / cast(f32)hp_info.height;
@@ -307,7 +309,7 @@ init_callback :: proc "c" () {
 		d3d11_depth_stencil_view_cb  = sapp.d3d11_get_depth_stencil_view,
 	});
 
-    create_multiview_pass(LKG_VIEWS, sapp.framebuffer_size());
+    create_multiview_pass(num_views(), sapp.framebuffer_size());
 
     sgl.setup({
         max_vertices = 50000,
@@ -318,15 +320,39 @@ init_callback :: proc "c" () {
     basisu.setup();
 
     init_camera(&state.camera, true, DEFAULT_CAMERA_FOV, sapp.width(), sapp.height());
-    state.camera.position = {0, 0.77, 10.40};
+    state.camera.position = {0, 0.05, 3.90};
 
     gizmos_ctx.render = render_gizmos;
     gizmos.init(&gizmos_ctx);
 
     r_init();
     mu.init(&mu_ctx);
-    mu_ctx.text_width = text_width_cb;
-    mu_ctx.text_height = text_height_cb;
+    mu_ctx._style = {
+        nil,       /* font */
+        { 68, 10 }, /* size */
+        25, 20, 40,   /* padding, spacing, indent */
+        50,         /* title_height */
+        30, 25,      /* scrollbar_size, thumb_size */
+        {
+            { 230, 230, 230, 255 }, /* MU_COLOR_TEXT */
+            { 25,  25,  25,  255 }, /* MU_COLOR_BORDER */
+            { 50,  50,  50,  255 }, /* MU_COLOR_WINDOWBG */
+            { 25,  25,  25,  255 }, /* MU_COLOR_TITLEBG */
+            { 240, 240, 240, 255 }, /* MU_COLOR_TITLETEXT */
+            { 0,   0,   0,   0   }, /* MU_COLOR_PANELBG */
+            { 75,  75,  75,  255 }, /* MU_COLOR_BUTTON */
+            { 95,  95,  95,  255 }, /* MU_COLOR_BUTTONHOVER */
+            { 115, 115, 115, 255 }, /* MU_COLOR_BUTTONFOCUS */
+            { 30,  30,  30,  255 }, /* MU_COLOR_BASE */
+            { 35,  35,  35,  255 }, /* MU_COLOR_BASEHOVER */
+            { 40,  40,  40,  255 }, /* MU_COLOR_BASEFOCUS */
+            { 43,  43,  43,  255 }, /* MU_COLOR_SCROLLBASE */
+            { 30,  30,  30,  255 }  /* MU_COLOR_SCROLLTHUMB */
+        }
+    };
+    mu_ctx.style = &mu_ctx._style;
+    mu_ctx.text_width = r_text_width_cb;
+    mu_ctx.text_height = r_get_text_height;
 
 	stime.setup();
 
@@ -394,7 +420,6 @@ init_callback :: proc "c" () {
     state.placeholders.black = make_image(8, 8, sg.Pixel_Format.RGBA8, pixels[:]);
     for i in 0..<64 do pixels[i] = 0xFFFF7FFF;
     state.placeholders.normal = make_image(8, 8, sg.Pixel_Format.RGBA8, pixels[:]);
-
 
     //
     // make quad rendering pipeline
@@ -531,7 +556,7 @@ init_callback :: proc "c" () {
 debug_window :: proc(ctx: ^mu.Context) {
     if window.inited == {} {
         mu.init_window(ctx, &window, {});
-        window.rect = mu.rect(40, 40, 300, 450);
+        window.rect = mu.rect(40, 40, 600, 850);
     }
 
     window.rect.w = max(window.rect.w, 240);
@@ -548,9 +573,6 @@ debug_window :: proc(ctx: ^mu.Context) {
 
         @static show_tweaks: i32 = 1;
         if mu.header(ctx, &show_tweaks, "tweaks") {
-            mu_label(ctx, "xform");
-            mu_struct_ti(ctx, "xform", &state.xform_a, type_info_of(type_of(state.xform_a)));
-
             when len(all_tweakables) == 0 {
                 mu.label(ctx, "no tweaks");
             } else {
@@ -607,10 +629,29 @@ debug_window :: proc(ctx: ^mu.Context) {
     }
 }
 
-create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: int) {
+maybe_recreate_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: int) {
+    using state.offscreen;
+
+    width, height := calc_lkg_subquilt_size(framebuffer_width, framebuffer_height);
+
+    if cast(i32)num_views == color_img_desc.layers &&
+        color_img_desc.width == width &&
+        color_img_desc.height == height {
+        return;
+    }
+
+    create_multiview_pass(num_views, framebuffer_width, framebuffer_height);
+}
+
+calc_lkg_subquilt_size :: proc(framebuffer_width, framebuffer_height: int) -> (i32, i32) {
     aspect := cast(f32)framebuffer_width / cast(f32)framebuffer_height;
     width := 750;
     height := cast(int)(cast(f32)width / aspect);
+    return cast(i32)width, cast(i32)height;
+}
+
+create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: int) {
+    width, height := calc_lkg_subquilt_size(framebuffer_width, framebuffer_height);
 
     assert(width > 0 && height > 0);
     fmt.printf("creating offscreen multiview pass (%dx%d) with %d views\n", width, height, num_views);
@@ -624,11 +665,11 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
 
     /* create offscreen rendertarget images and pass */
     offscreen_sample_count := sg.query_features().msaa_render_targets ? MSAA_SAMPLE_COUNT : 1;
-    color_img_desc := sg.Image_Desc {
+    color_img_desc = sg.Image_Desc {
         render_target = true,
         type = .ARRAY,
-        width = cast(i32)width,
-        height = cast(i32)height,
+        width = width,
+        height = height,
         min_filter = .LINEAR,
         mag_filter = .LINEAR,
         wrap_u = .CLAMP_TO_EDGE,
@@ -690,6 +731,8 @@ frame_callback :: proc "c" () {
 
     dt := cast(f32)elapsed_seconds;
 
+    maybe_recreate_multiview_pass(num_views(), sapp.framebuffer_size());
+
     when EDITOR {
         mouse_ray := worldspace_ray(&state.camera, state.mouse.pos);
         using state.camera;
@@ -733,6 +776,7 @@ frame_callback :: proc "c" () {
     */
 
     // update camera
+    state.camera.fov = editor_settings.fov;
     do_camera_movement(&state.camera, input_state, dt, 2.0, 4.0, 1.0);
     input_state.osc_move = v2(0, 0);
 
@@ -772,6 +816,8 @@ frame_callback :: proc "c" () {
             });
         }
 
+        _num_views := cast(int)num_views();
+
         using state.scene;
         for _, node_index in nodes {
             node := &nodes[node_index];
@@ -781,14 +827,14 @@ frame_callback :: proc "c" () {
                 eye_pos = state.camera.position,
             };
 
-            camera_size:f32 = LKG_CAMERA_SIZE;
+            camera_size:f32 = editor_settings.lkg_camera_size;
             cam_forward := quaternion_forward(state.camera.rotation);
             focal_position := state.camera.position + norm(cam_forward) * camera_size;
             camera_distance := length(state.camera.position - focal_position);
 
-            for view_i in 0..<LKG_VIEWS {
+            for view_i:int = 0; view_i < _num_views; view_i += 1 {
                 // start at -viewCone * 0.5 and go up to viewCone * 0.5
-                offset_angle := (cast(f32)view_i / (LKG_VIEWS - 1) - 0.5) * LKG_VIEW_CONE;
+                offset_angle := (cast(f32)view_i / (cast(f32)_num_views - 1) - 0.5) * editor_settings.lkg_view_cone;
 
                 // calculate the offset
                 offset := camera_distance * tan(offset_angle);
@@ -805,7 +851,7 @@ frame_callback :: proc "c" () {
 
             vs_params.view_proj = vs_params.view_proj_array[foo];
             foo += 1;
-            if foo >= LKG_VIEWS do foo = 0;
+            if foo >= _num_views do foo = 0;
 
             mesh := &meshes[node.mesh];
             for i in 0..<mesh.num_primitives {
@@ -859,7 +905,7 @@ frame_callback :: proc "c" () {
 
                 assert(prim.num_elements > 0);
                 per_frame_stats.num_elements += cast(u64)prim.num_elements;
-                sg.draw(cast(int)prim.base_element, cast(int)prim.num_elements, LKG_VIEWS);
+                sg.draw(cast(int)prim.base_element, cast(int)prim.num_elements, _num_views);
             }
         }
 
@@ -887,7 +933,7 @@ frame_callback :: proc "c" () {
 
                 debug = 0,
                 debugTile = cast(i32)foo,
-                tile = Vector4{1, 1, LKG_VIEWS, 0},
+                tile = Vector4{1, 1, cast(f32)num_views(), 0},
                 viewPortion = Vector4{1, 1, 0, 0},
             };
             sg.apply_uniforms(.FS, shader_meta.SLOT_lkg_fs_uniforms, &uniforms, size_of(shader_meta.lkg_fs_uniforms));
@@ -986,7 +1032,6 @@ event_callback :: proc "c" (event: ^sapp.Event) {
     switch event.type {
         case .RESIZED:
             camera_target_resized(&state.camera, cast(f32)sapp.width(), cast(f32)sapp.height());
-            create_multiview_pass(LKG_VIEWS, sapp.framebuffer_size());
         case .MOUSE_DOWN:
             set_capture(sapp.win32_get_hwnd());
 
