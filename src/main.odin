@@ -24,7 +24,7 @@ when OSC {
 }
 
 LKG_ASPECT:f32 = 1;
-DEFAULT_CAMERA_FOV :f32 = 14.0;
+DEFAULT_CAMERA_FOV:f32 = 14.0;
 
 when STACK_TRACES {
     import "stacktrace"
@@ -44,6 +44,8 @@ draw_quad := false;
 draw_grid_lines := false;
 draw_gizmos := false;
 draw_sdf_text := true;
+draw_ui := true;
+mesh_rotate_speed:f32 = 12.0;
 
 ANIM_CURVE_WIP :: false;
 WINDOW_WIDTH :: 1280;
@@ -789,7 +791,7 @@ frame_callback :: proc "c" () {
     state.view_proj = mul(proj, view);
 
     @static x_rotation:f32 = 0;
-    //x_rotation += dt * 12.0;
+    x_rotation += dt * mesh_rotate_speed;
 
     {
         using input_state;
@@ -985,7 +987,10 @@ frame_callback :: proc "c" () {
         grid(0, grid_frame_count);
         //sgl.draw();
     }
-    mu_render(sapp.width(), sapp.height()); // note; this just pushes commands to a queue. r_draw below actually does the draw calls
+
+    if draw_ui {
+        mu_render(sapp.width(), sapp.height()); // note; this just pushes commands to a queue. r_draw below actually does the draw calls
+    }
 
     // DRAW GIZMOS
     when EDITOR {
