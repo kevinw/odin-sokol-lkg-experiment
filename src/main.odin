@@ -15,7 +15,7 @@ import sgl "sokol:sokol_gl"
 import mu "../lib/microui"
 import "../lib/basisu"
 
-FORCE_2D :: false;
+FORCE_2D :: true;
 OSC :: true;
 
 when OSC {
@@ -278,6 +278,7 @@ init_callback :: proc "c" () {
 
     hp_infos:[]Display_Info;
     hp_connected, hp_infos = hpc_init(sapp.win32_get_hwnd());
+    if len(hp_infos) == 0 do hp_connected = false;
     if FORCE_2D do hp_connected = false;
     if hp_connected {
         hp_info = hp_infos[0];
@@ -1151,7 +1152,7 @@ run_app :: proc() -> int {
 		height       = WINDOW_HEIGHT,
 		window_title = "testbed",
         sample_count = MSAA_SAMPLE_COUNT,
-        fullscreen   = true,
+        fullscreen   = !FORCE_2D,
         //high_dpi     = true,
 	});
 }
