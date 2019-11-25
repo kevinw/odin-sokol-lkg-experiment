@@ -13,6 +13,7 @@ s: Socket = INVALID_SOCKET;
 
 Callbacks :: struct {
     on_vector2 : proc(name: string, val: Vector2),
+    on_vector3 : proc(name: string, val: Vector3),
     on_bool : proc(name: string, val: bool),
 };
 
@@ -60,13 +61,20 @@ strlen :: proc(s: ^$T) -> int { // TODO: doesn't this already exist?
 }
 
 handle_message :: proc(message: ^tosc.Message) {
-    address := string(tosc.get_address(message));
-    format := string(tosc.get_format(message));
-    if format == "ff" {
-        if _cbs.on_vector2 != nil {
-            v2 := Vector2 { tosc.get_next_f32(message), tosc.get_next_f32(message) };
-            _cbs.on_vector2(address, v2);
-        }
+    using tosc;
+    address := string(get_address(message));
+    format := string(get_format(message));
+    switch format {
+        case "ff":
+            if _cbs.on_vector2 != nil {
+                _cbs.on_vector2(address, Vec2{get_next_f32(message), get_next_f32(message)});
+            }
+        case "fff":
+            if _cbs.on_vector3 != nil {
+                _cbs.on_vector3(address, Vec3{get_next_f32(message), get_next_f32(message), get_next_f32(message)});
+            }
+        case:
+            fmt.println("unhandled format", format);
     }
 }
 
@@ -88,8 +96,6 @@ update :: proc() {
         tosc.parse_bundle(&bundle, buffer, len);
         timetag := tosc.get_timetag(&bundle);
         for tosc.get_next_message(&bundle, &osc) {
-            fmt.println("message received at:", timetag);
-            //tosc.print_message(&osc);
             handle_message(&osc);
         }
     } else {

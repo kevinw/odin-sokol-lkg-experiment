@@ -66,6 +66,7 @@ Input_State :: struct {
     left_mouse, right_mouse: bool,
     left_ctrl, left_alt, left_shift: bool,
     osc_move: Vector2,
+    osc_rotate: Vector3,
 }
 
 input_state := Input_State {};
@@ -243,9 +244,8 @@ when OSC {
     osc_thread_func :: proc(thread: ^thread.Thread) -> int {
         fmt.println("in osc thread func");
         osc.init({
-            on_vector2 = proc (addr: string, v2: Vector2) {
-                input_state.osc_move = v2;
-            }
+            on_vector2 = proc (addr: string, v2: Vector2) { input_state.osc_move = v2; },
+            on_vector3 = proc (addr: string, v3: Vector3) { input_state.osc_rotate = v3; }
         });
         for _osc_running {
             osc.update();
@@ -294,11 +294,13 @@ init_callback :: proc "c" () {
         move_window(sapp.win32_get_hwnd(), hp_info.xpos, hp_info.ypos, hp_info.width, hp_info.height, true);
     }
 
-    state.xform_a = {
-        position = {0, 0, 0},
-        orientation = transmute(Vector4)degrees_to_quaternion(v3(180, 0, 0)), // TODO: identity quat?
-        scale = {1, 1, 1},
-    };
+    {
+        state.xform_a = {
+            position = {0, 0, 0},
+            orientation = transmute(Vector4)degrees_to_quaternion(v3(180, 0, 0)), // TODO: identity quat?
+            scale = {1, 1, 1},
+        };
+    }
 
 	sg.setup({
 		mtl_device                   = sapp.metal_get_device(),
@@ -786,8 +788,12 @@ frame_callback :: proc "c" () {
     state.view_proj = mul(proj, view);
 
     @static x_rotation:f32 = 0;
-    x_rotation += dt * 12.0;
-    xform_a.orientation = transmute(Vector4)degrees_to_quaternion(v3(180, x_rotation, 0));
+    //x_rotation += dt * 12.0;
+
+    {
+        using input_state;
+        xform_a.orientation = transmute(Vector4)degrees_to_quaternion(osc_rotate + v3(180, x_rotation, 0));
+    }
 
     //
     // MICROUI

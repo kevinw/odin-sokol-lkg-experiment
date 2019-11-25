@@ -3,11 +3,11 @@ setlocal
 set PATH=c:\src\fips-deploy\sokol-tools\win64-vstudio-release;%PATH%
 set SHDC=sokol-shdc --slang hlsl5 --input
 
-REM set OPT_LEVEL=0
-set OPT_LEVEL=3
+set OPT_LEVEL=0
+REM set OPT_LEVEL=3
 
-set DEBUG_OPT=
-REM set DEBUG_OPT=-debug
+REM set DEBUG_OPT=
+set DEBUG_OPT=-debug
 
 set OUT_DIR=src/shader_meta
 
