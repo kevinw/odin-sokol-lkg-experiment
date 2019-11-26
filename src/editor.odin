@@ -3,8 +3,7 @@ package main
 import sgl "sokol:sokol_gl"
 using import "math"
 
-@tweak
-editor_settings : struct {
+Editor_Settings :: struct {
     lkg_view_cone:f32,   // = 0.611; // 35deg in radians
     lkg_camera_size:f32, // = 6.0: 
     subview_w: f32,
@@ -13,6 +12,18 @@ editor_settings : struct {
     grid_offset: Vector3,
 };
 
+@tweak
+editor_settings: Editor_Settings;
+
+editor_settings_defaults :: proc() -> Editor_Settings {
+    using e := Editor_Settings {};
+    lkg_view_cone = 2.51;
+    lkg_camera_size = 0.80;
+    subview_w = 700;
+    num_views = 45;
+    fov = 25.7;
+    return e;
+}
 
 grid :: proc(y: f32, frame_count: u32) {
     using editor_settings;

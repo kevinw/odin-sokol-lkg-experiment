@@ -254,15 +254,7 @@ when OSC {
 }
 
 init_callback :: proc "c" () {
-    {
-        using editor_settings;
-        lkg_view_cone = 2.51;
-        lkg_camera_size = 0.80;
-        subview_w = 700;
-        num_views = 45;
-        fov = 25.7;
-
-    }
+    editor_settings = editor_settings_defaults();
 
     hp_infos:[]Display_Info;
     hp_connected, hp_infos = hpc_init(sapp.win32_get_hwnd());
