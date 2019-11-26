@@ -12,7 +12,6 @@
 uniform vs_params {
     mat4 model;
     mat4 view_proj_array[MAX_VIEWS];
-    mat4 view_proj;
     vec3 eye_pos;
 };
 

@@ -3,26 +3,28 @@
 @include common.glsl
 
 @fs fs
+#define FLIP_Y 1
+
 in vec2 texCoords;
 out vec4 fragColor;
 
 // Calibration values
 uniform lkg_fs_uniforms {
-    uniform float pitch;
-    uniform float tilt;
-    uniform float center;
-    uniform float invView;
-    uniform float subp;
-    uniform int ri;
-    uniform int bi;
+    float pitch;
+    float tilt;
+    float center;
+    float invView;
+    float subp;
+    int ri;
+    int bi;
 
     // Quilt settings
-    uniform vec4 tile;
-    uniform vec4 viewPortion;
-    uniform vec4 aspect;
+    vec4 tile;
+    vec4 viewPortion;
+    vec4 aspect;
 
-    uniform int debug;
-    uniform int debugTile;
+    int debug;
+    int debugTile;
 };
 
 uniform sampler2DArray screenTex;
@@ -33,7 +35,9 @@ vec3 texArr(vec3 uvz)
     float z = floor(uvz.z * tile.z);
 
     vec2 uv2 = uvz.xy;
+#ifdef FLIP_Y
     uv2.y = 1.0 - uv2.y;
+#endif
     return vec3(uv2, z);
     /*
     float x = (mod(z, tile.x) + uvz.x) / tile.x;
@@ -72,7 +76,11 @@ void main()
                 rgb[i] = texture(screenTex, texArr(nuv));
         }
 
-        fragColor = vec4(rgb[ri].r, rgb[1].g, rgb[bi].b, 1.0) * (1-debug) + texture(screenTex, vec3(texCoords.xy, debugTile)) * debug;
+        vec2 debugUV = texCoords.xy;
+#ifdef FLIP_Y
+        debugUV.y = 1.0 - debugUV.y;
+#endif
+        fragColor = vec4(rgb[ri].r, rgb[1].g, rgb[bi].b, 1.0) * (1-debug) + texture(screenTex, vec3(debugUV, debugTile)) * debug;
 }
 @end
 

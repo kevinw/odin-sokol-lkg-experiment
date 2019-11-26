@@ -10,9 +10,10 @@ hp_info: Display_Info;
 hp_connected: bool;
 
 num_views :: proc() -> int {
+    if FORCE_2D do return 1;
+
     return min(MAXIMUM_VIEWS, max(1, cast(int)editor_settings.num_views));
 }
-
 
 maybe_recreate_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: int) {
     using state.offscreen;

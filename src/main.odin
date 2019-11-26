@@ -43,7 +43,7 @@ draw_quad := false;
 draw_grid_lines := false;
 draw_gizmos := false;
 draw_sdf_text := true;
-draw_ui := false;
+draw_ui := true;
 mesh_rotate_speed:f32 = 12.0;
 
 ANIM_CURVE_WIP :: false;
@@ -53,7 +53,7 @@ WINDOW_HEIGHT :: 720;
 SFETCH_NUM_CHANNELS :: 1;
 SFETCH_NUM_LANES :: 4;
 MAX_FILE_SIZE :: 10*1024*1024;
-MSAA_SAMPLE_COUNT :: 1;
+MSAA_SAMPLE_COUNT :: 1; // anything > 1 causes an assert in sokol_gfx, prob due to my unfinished Render Target Array changes....
 
 sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 
@@ -692,8 +692,6 @@ frame_callback :: proc "c" () {
     state.pass_action.colors[0] = {action = .CLEAR, val = {bg[0], bg[1], bg[2], 1}};
 
     // DRAW MESH
-    @static foo:int = 0;
-
     if !hp_connected do sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
 
     if draw_mesh {
@@ -712,7 +710,6 @@ frame_callback :: proc "c" () {
             node := &nodes[node_index];
             vs_params := shader_meta.vs_params {
                 model = mul(gizmos.matrix(state.xform_a), node.transform),
-                view_proj = state.view_proj,
                 eye_pos = state.camera.position,
             };
 
@@ -723,7 +720,7 @@ frame_callback :: proc "c" () {
 
             for view_i:int = 0; view_i < _num_views; view_i += 1 {
                 // start at -viewCone * 0.5 and go up to viewCone * 0.5
-                offset_angle := (cast(f32)view_i / (cast(f32)_num_views - 1) - 0.5) * editor_settings.lkg_view_cone;
+                offset_angle := _num_views == 1 ? 0 : (cast(f32)view_i / (cast(f32)_num_views - 1) - 0.5) * editor_settings.lkg_view_cone;
 
                 // calculate the offset
                 offset := camera_distance * tan(offset_angle);
@@ -737,10 +734,6 @@ frame_callback :: proc "c" () {
 
                 vs_params.view_proj_array[view_i] = mul(projection_matrix, view_matrix);
             }
-
-            vs_params.view_proj = vs_params.view_proj_array[foo];
-            foo += 1;
-            if foo >= _num_views do foo = 0;
 
             mesh := &meshes[node.mesh];
             for i in 0..<mesh.num_primitives {
@@ -820,8 +813,8 @@ frame_callback :: proc "c" () {
                 invView = invView,
                 aspect = cast(f32)width/cast(f32)height,
 
-                debug = 0,
-                debugTile = cast(i32)foo,
+                debug = FORCE_2D ? 1 : 0,
+                debugTile = i32(num_views() / 2),
                 tile = Vector4{1, 1, cast(f32)num_views(), 0},
                 viewPortion = Vector4{1, 1, 0, 0},
             };
