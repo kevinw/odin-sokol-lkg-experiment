@@ -1,25 +1,36 @@
-a "println" for the screen
-undo
-implement a rotation gizmo based on the trackball example here: 
-http://www.songho.ca/opengl/gl_camera.html#example2
-project window
-	- an easy way to sort all project assets by date added.
-	- it's often that i'm importing something and then rigging it up.
-render a framebuffer
-render a quilt
-shadows
-sketch out a flowchart for asset generation. do research
-try assimp ? automatically convert textures to basis?
-animation skinning
+
+(A) prioritize this list by using a game idea as a forcing function
+
+    games with depth
+        flying, walking, racing inwards
+        crash bandicoot-style coming outwards
+        battletoads wind tunnel style procgen'd infinite 
+
+        
+
+
+
+asset catalog: shaders, configs, images
+shadow maps
+a set of "println" tools for the screen - temporary message, permanent message with corner
+multiple window support with a scene view - essential for lkg development?
+integrate sokol compute pull request
 shader_meta needs a cleanup. at the very least, start with package-per-shader?
     or should we just go immediately for a more late-binding approach?
-goals: make it very easy to say "this value lerps to this other value"
-iq's warp https://www.iquilezles.org/www/articles/warp/warp.htm?utm_source=share&utm_medium=ios_app&utm_name=iossmf
-try sokol compute shaders
-consider using D3DCOMPILE_OPTIMIZATION_LEVEL0 for debug mode in sokol-"Directs the compiler to use the lowest optimization level. If you set this constant, the compiler might produce slower code but produces the code more quickly. Set this constant when you develop the shader iteratively."
-render a complex mesh
-try compressed textures like the gltf example
-compile dependencies with all optimizations
 
-x get shader globals as a struct, parsed by odin, generating a shader file
-x add capture mouse via SetCapture/ReleaseCapture so that we detect mouse up events outside the window
+undo @editor
+@editor consider a switch to imgui
+remove c runtime dependency from dependencies?
+@editor implement a rotation gizmo based on the trackball example here: http://www.songho.ca/opengl/gl_camera.html#example2
+make it very easy to say "this value lerps to this other value"
+iq's warp https://www.iquilezles.org/www/articles/warp/warp.htm?utm_source=share&utm_medium=ios_app&utm_name=iossmf
+consider using D3DCOMPILE_OPTIMIZATION_LEVEL0 for debug mode in sokol-"Directs the compiler to use the lowest optimization level. If you set this constant, the compiler might produce slower code but produces the code more quickly. Set this constant when you develop the shader iteratively."
+compile dependencies with all optimizations
+project window for assets in project @editor
+
+(C) animation skinning
+(C) sketch out a flowchart for asset generation, research assimp vs other approaches
+
+x render a framebuffer
+x render a quilt
+x render a complex mesh
