@@ -83,5 +83,6 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
 
     /* also need to update the fullscreen-quad texture bindings */
     state.lenticular_bindings.fs_images[shader_meta.SLOT_screenTex] = pass_desc.color_attachments[0].image;
+    state.lenticular_bindings.fs_images[shader_meta.SLOT_depthTex] = pass_desc.depth_stencil_attachment.image;
 }
 

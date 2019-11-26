@@ -14,7 +14,7 @@ import sgl "sokol:sokol_gl"
 import mu "../lib/microui"
 import "../lib/basisu"
 
-FORCE_2D :: false;
+FORCE_2D :: true;
 OSC :: true;
 
 when OSC {
@@ -676,7 +676,7 @@ frame_callback :: proc "c" () {
     //
     // MICROUI
     //
-    { // definition
+    {
         mu.begin(&mu_ctx);
         defer mu.end(&mu_ctx);
         debug_window(&mu_ctx);
@@ -692,16 +692,12 @@ frame_callback :: proc "c" () {
     state.pass_action.colors[0] = {action = .CLEAR, val = {bg[0], bg[1], bg[2], 1}};
 
     // DRAW MESH
-    if !hp_connected do sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
-
     if draw_mesh {
-        if hp_connected {
-            sg.begin_pass(state.offscreen.pass, {
-                colors = {
-                    0 = { action = .CLEAR, val = { 0.25, 0.0, 0.0, 1.0 } },
-                }
-            });
-        }
+        sg.begin_pass(state.offscreen.pass, {
+            colors = {
+                0 = { action = .CLEAR, val = { 0.25, 0.0, 0.0, 1.0 } },
+            }
+        });
 
         _num_views := cast(int)num_views();
 
@@ -791,37 +787,35 @@ frame_callback :: proc "c" () {
             }
         }
 
-        if hp_connected {
-            sg.end_pass();
-        }
+        sg.end_pass();
     }
 
-    if hp_connected {
-        sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
+    sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
 
-        sg.apply_pipeline(state.lenticular_pipeline);
-        sg.apply_bindings(state.lenticular_bindings);
-        {
-            using hp_info;
-            uniforms := shader_meta.lkg_fs_uniforms {
-                pitch = pitch,
-                tilt = tilt,
-                center = center,
-                subp = subp,
-                ri = cast(i32)ri,
-                bi = cast(i32)bi,
-                invView = invView,
-                aspect = cast(f32)width/cast(f32)height,
+    sg.apply_pipeline(state.lenticular_pipeline);
+    sg.apply_bindings(state.lenticular_bindings);
+    {
+        using hp_info;
+        uniforms := shader_meta.lkg_fs_uniforms {
+            pitch = pitch,
+            tilt = tilt,
+            center = center,
+            subp = subp,
+            ri = cast(i32)ri,
+            bi = cast(i32)bi,
+            invView = invView,
+            aspect = cast(f32)width/cast(f32)height,
 
-                debug = FORCE_2D ? 1 : 0,
-                debugTile = i32(num_views() / 2),
-                tile = Vector4{1, 1, cast(f32)num_views(), 0},
-                viewPortion = Vector4{1, 1, 0, 0},
-            };
-            sg.apply_uniforms(.FS, shader_meta.SLOT_lkg_fs_uniforms, &uniforms, size_of(shader_meta.lkg_fs_uniforms));
-        }
-        sg.draw(0, 6, 1);
+            debug = FORCE_2D ? 1 : 0,
+            debug_depth = 0,
+
+            debugTile = i32(num_views() / 2),
+            tile = Vector4{1, 1, cast(f32)num_views(), 0},
+            viewPortion = Vector4{1, 1, 0, 0},
+        };
+        sg.apply_uniforms(.FS, shader_meta.SLOT_lkg_fs_uniforms, &uniforms, size_of(shader_meta.lkg_fs_uniforms));
     }
+    sg.draw(0, 6, 1);
 
     // DRAW MOVABLE QUAD
     if draw_quad {
@@ -876,9 +870,8 @@ frame_callback :: proc "c" () {
 
     // DRAW SDF TEXT
     if draw_sdf_text {
-        draw_text(fmt.tprintf("%f ms per frame", fps_counter.ms_per_frame), 80, v2(10, 80));
-        draw_text("-=-=-", 150, v2(300, 305));
-
+        y:f32 = FORCE_2D ? 60 : 80;
+        draw_text(fmt.tprintf("%f ms per frame", fps_counter.ms_per_frame), y, v2(f32(10), y));
         text_matrix := ortho3d(0, cast(f32)sapp.width(), 0, cast(f32)sapp.height(), -10.0, 10.0);
         sdf_text_render(text_matrix);
     }

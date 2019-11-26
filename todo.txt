@@ -1,22 +1,21 @@
 (A) prioritize this list by using a game idea as a forcing function
-
-    games with depth
-        flying, walking, racing inwards
-        crash bandicoot-style coming outwards
-        battletoads wind tunnel style procgen'd infinite 
-
+games with depth
+    flying, walking, racing inwards
+    crash bandicoot-style coming outwards
+    battletoads wind tunnel style procgen'd infinite 
 depth of field
+@editor use relative mouse movement when dragging sliders
 @qualityOfLife sokol's asserts could trigger a stack trace
 shadow maps
 @editor scene view (both this and shadow maps require similar camera work)
 asset catalog: shaders, configs, images
+@vim make 'float3' typo correct to 'vec3', etc, in glsl files
 a set of "println" tools for the screen - temporary message, permanent message with corner
 multiple window support with a scene view - essential for lkg development?
 integrate sokol compute pull request
 cleanup input/keys array state
 shader_meta needs a cleanup. at the very least, start with package-per-shader?
     or should we just go immediately for a more late-binding approach?
-
 undo @editor
 @editor consider a switch to imgui
 remove c runtime dependency from dependencies?
