@@ -211,20 +211,15 @@ mu_ctx: mu.Context;
 delta := v3(-1.92, -0.07, 1.52);
 
 render_gizmos :: proc(mesh: ^gizmos.Mesh) {
-    // @Speed this is mega slow, just pass index buffers to a sg_pipeline and be done with it.
+    // @Speed just pass index buffers to a sg_pipeline and be done with it.
     sgl.begin_triangles();
     for _, t in mesh.triangles {
         tri := &mesh.triangles[t];
         for i in 0..<3 {
             index := tri[i];
             using v := &mesh.vertices[index];
-            assert(!math.is_nan(position.x));
-            assert(!math.is_nan(position.y));
-            assert(!math.is_nan(position.z));
-            assert(!math.is_nan(color.r));
-            assert(!math.is_nan(color.g));
-            assert(!math.is_nan(color.b));
-            assert(!math.is_nan(color.a));
+            inline for idx in 0..<3 do assert(!math.is_nan(position[idx]));
+            inline for idx in 0..<4 do assert(!math.is_nan(color[idx]));
             sgl.v3f_c4f(position.x, position.y, position.z, color.r, color.g, color.b, color.a);
         }
 
