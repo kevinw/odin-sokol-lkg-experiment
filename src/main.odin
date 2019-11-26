@@ -5,7 +5,6 @@ import "core:strings"
 import "core:mem"
 import "core:fmt"
 using import "math"
-import "core:math/bits"
 
 import sg "sokol:sokol_gfx"
 import sapp "sokol:sokol_app"
@@ -37,14 +36,14 @@ when EDITOR {
 EDITOR :: true;
 STACK_TRACES :: true;
 
-import shader_meta "./shader_meta";
+import "./shader_meta";
 
 draw_mesh := true;
 draw_quad := false;
 draw_grid_lines := false;
 draw_gizmos := false;
 draw_sdf_text := true;
-draw_ui := true;
+draw_ui := false;
 mesh_rotate_speed:f32 = 12.0;
 
 ANIM_CURVE_WIP :: false;
@@ -57,12 +56,6 @@ MAX_FILE_SIZE :: 10*1024*1024;
 MSAA_SAMPLE_COUNT :: 1;
 
 sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
-
-MAXIMUM_VIEWS :: 45; // match shader value
-
-num_views :: proc() -> int {
-    return min(MAXIMUM_VIEWS, max(1, cast(int)editor_settings.num_views));
-}
 
 Input_State :: struct {
 	right, left, up, down: bool,
@@ -212,14 +205,13 @@ bg := [?]f32 { 0.5, 0.7, 1.0 };
 test_curve := Bezier_Curve { 1, 0, 0, 1 };
 
 window: mu.Container;
-
 mu_ctx: mu.Context;
 
 /* microui callbacks */
 delta := v3(-1.92, -0.07, 1.52);
 
 render_gizmos :: proc(mesh: ^gizmos.Mesh) {
-    // TODO: this is mega slow, just pass index buffers to a sg_pipeline and be done with it.
+    // @Speed this is mega slow, just pass index buffers to a sg_pipeline and be done with it.
     sgl.begin_triangles();
     for _, t in mesh.triangles {
         tri := &mesh.triangles[t];
@@ -265,9 +257,6 @@ when OSC {
         osc_thread = nil;
     }
 }
-
-hp_info: Display_Info;
-hp_connected: bool;
 
 init_callback :: proc "c" () {
     {
@@ -523,45 +512,7 @@ init_callback :: proc "c" () {
     //
     // make text rendering pipeline
     //
-    {
-        UV_0 :: 0;
-        UV_1 :: 32767;
-        assert(UV_1 == bits.I16_MAX);
-
-        vertices := [?]Text_Vertex {
-            {{+0.5, +0.5}, {1.0, 1.0}},
-            {{+0.5, -0.5}, {1.0, 0.0}},
-            {{-0.5, -0.5}, {0.0, 0.0}},
-            {{-0.5, -0.5}, {0.0, 0.0}},
-            {{-0.5, +0.5}, {0.0, 1.0}},
-            {{+0.5, +0.5}, {1.0, 1.0}},
-        };
-
-        text.bind.vertex_buffers[0] = sg.make_buffer({
-            size = len(vertices) * size_of(vertices[0]),
-            content = &vertices[0],
-            label = "text-vertices",
-        });
-
-        text.bind.fs_images[shader_meta.SLOT_u_texture] = sg.alloc_image();
-        text.pipeline = sg.make_pipeline({
-            label = "sdf-text-pipeline",
-            shader = sg.make_shader(shader_meta.sdf_text_shader_desc()^),
-            primitive_type = .TRIANGLES,
-            blend = {
-                enabled = true,
-                src_factor_rgb = sg.Blend_Factor.SRC_ALPHA,
-                dst_factor_rgb = sg.Blend_Factor.ONE_MINUS_SRC_ALPHA,
-            },
-            layout = {
-                attrs = {
-                    shader_meta.ATTR_vs_a_pos = {format = .FLOAT2},
-                    shader_meta.ATTR_vs_a_texcoord = {format = .FLOAT2},
-                },
-            },
-        });
-        text.pass_action.colors[0] = {action = .LOAD, val = {1.0, 0.0, 1.0, 1.0}};
-    }
+    sdf_text_init();
 }
 
 debug_window :: proc(ctx: ^mu.Context) {
@@ -640,76 +591,6 @@ debug_window :: proc(ctx: ^mu.Context) {
 
         }
     }
-}
-
-maybe_recreate_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: int) {
-    using state.offscreen;
-
-    width, height := calc_lkg_subquilt_size(framebuffer_width, framebuffer_height);
-
-    if cast(i32)num_views == color_img_desc.layers &&
-        color_img_desc.width == width &&
-        color_img_desc.height == height {
-        return;
-    }
-
-    create_multiview_pass(num_views, framebuffer_width, framebuffer_height);
-}
-
-calc_lkg_subquilt_size :: proc(framebuffer_width, framebuffer_height: int) -> (i32, i32) {
-    aspect := cast(f32)framebuffer_width / cast(f32)framebuffer_height;
-    width := max(10, cast(int)editor_settings.subview_w);
-    height := cast(int)(cast(f32)width / aspect);
-    return cast(i32)width, cast(i32)height;
-}
-
-create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: int) {
-    width, height := calc_lkg_subquilt_size(framebuffer_width, framebuffer_height);
-
-    assert(width > 0 && height > 0);
-    fmt.printf("creating offscreen multiview pass (%dx%d) with %d views\n", width, height, num_views);
-
-    using state.offscreen;
-
-    /* destroy previous resource (can be called for invalid id) */
-    sg.destroy_pass(pass);
-    sg.destroy_image(pass_desc.color_attachments[0].image);
-    sg.destroy_image(pass_desc.depth_stencil_attachment.image);
-
-    /* create offscreen rendertarget images and pass */
-    offscreen_sample_count := sg.query_features().msaa_render_targets ? MSAA_SAMPLE_COUNT : 1;
-    color_img_desc = sg.Image_Desc {
-        render_target = true,
-        type = .ARRAY,
-        width = width,
-        height = height,
-        min_filter = .LINEAR,
-        mag_filter = .LINEAR,
-        wrap_u = .CLAMP_TO_EDGE,
-        wrap_v = .CLAMP_TO_EDGE,
-        sample_count = cast(i32)offscreen_sample_count,
-        label = "multiview color image"
-    };
-    color_img_desc.layers = cast(i32)num_views;
-
-    depth_img_desc := color_img_desc; // copy values from color Image_Desc
-    depth_img_desc.pixel_format = .DEPTH_STENCIL;
-    depth_img_desc.label = "multiview depth image";
-
-    pass_desc = {
-        color_attachments = {
-            0 = { image = sg.make_image(color_img_desc) },
-        },
-        depth_stencil_attachment = {
-            image = sg.make_image(depth_img_desc),
-        },
-        label = "multiview offscreen pass"
-    };
-
-    pass = sg.make_pass(pass_desc);
-
-    /* also need to update the fullscreen-quad texture bindings */
-    state.lenticular_bindings.fs_images[shader_meta.SLOT_screenTex] = pass_desc.color_attachments[0].image;
 }
 
 frame_callback :: proc "c" () {
@@ -1015,26 +896,11 @@ frame_callback :: proc "c" () {
 
     // DRAW SDF TEXT
     if draw_sdf_text {
-        u_matrix := ortho3d(0, cast(f32)sapp.width(), 0, cast(f32)sapp.height(), -10.0, 10.0);
+        draw_text(fmt.tprintf("%f ms per frame", fps_counter.ms_per_frame), 80, v2(10, 80));
+        draw_text("-=-=-", 150, v2(300, 305));
 
-        vs_uniforms := shader_meta.sdf_vs_uniforms {
-            u_matrix = u_matrix,
-            u_texsize = text.texture_size,
-        };
-
-        fs_uniforms := shader_meta.sdf_fs_uniforms {
-            u_color = Vector4{1, 1, 1, 1},
-            u_debug = 0.0,
-            u_gamma = 0.02,
-            u_buffer = cast(f32)(192.0 / 256.0),
-        };
-
-        sg.apply_pipeline(text.pipeline);
-        sg.apply_bindings(text.bind);
-        sg.apply_uniforms(.VS, shader_meta.SLOT_sdf_vs_uniforms, &vs_uniforms, size_of(shader_meta.sdf_vs_uniforms));
-        sg.apply_uniforms(.FS, shader_meta.SLOT_sdf_fs_uniforms, &fs_uniforms, size_of(shader_meta.sdf_fs_uniforms));
-        num_verts := len(text.vertex_elems) / 2;
-        sg.draw(0, num_verts, 1);
+        text_matrix := ortho3d(0, cast(f32)sapp.width(), 0, cast(f32)sapp.height(), -10.0, 10.0);
+        sdf_text_render(text_matrix);
     }
 
     // DRAW UI

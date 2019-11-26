@@ -1,4 +1,3 @@
-
 (A) prioritize this list by using a game idea as a forcing function
 
     games with depth
@@ -6,15 +5,14 @@
         crash bandicoot-style coming outwards
         battletoads wind tunnel style procgen'd infinite 
 
-        
-
-
-
-asset catalog: shaders, configs, images
+depth of field
 shadow maps
+@editor scene view (both this and shadow maps require similar camera work)
+asset catalog: shaders, configs, images
 a set of "println" tools for the screen - temporary message, permanent message with corner
 multiple window support with a scene view - essential for lkg development?
 integrate sokol compute pull request
+cleanup input/keys array state
 shader_meta needs a cleanup. at the very least, start with package-per-shader?
     or should we just go immediately for a more late-binding approach?
 
@@ -34,3 +32,4 @@ project window for assets in project @editor
 x render a framebuffer
 x render a quilt
 x render a complex mesh
+x optimize sdf rendering buffer

@@ -28,7 +28,6 @@ SDF_Text_Chars :: struct {
     pos_y: u16,
 };
 
-
 text: struct {
     pass_action: sg.Pass_Action,
     bind: sg.Bindings,
@@ -39,16 +38,11 @@ text: struct {
     metrics: SDF_Text_Metrics,
 
     vertex_elems: [dynamic]f32,
-    tex_elems: [dynamic]f32,
+    needs_update: bool,
 };
 
 _load_count := 0;
 _did_load := false;
-
-Text_Vertex :: struct #packed {
-    pos: [2]f32,
-    uv: [2]f32,
-};
 
 load_sdf_fonts :: proc() {
     sfetch.send({
@@ -69,53 +63,89 @@ load_sdf_fonts :: proc() {
 did_load :: proc() {
     _load_count += 1;
     if _load_count != 2 do return;
-
     _did_load = true;
-
-    using text;
-
-    size:f32 = 95.0;
-    create_text("hello", size);
 }
 
-create_text :: proc(str: string, size: f32) {
+sdf_text_init :: proc() {
+    using text;
+    bind.fs_images[shader_meta.SLOT_font_atlas] = sg.alloc_image();
+    pipeline = sg.make_pipeline({
+        label = "sdf-text-pipeline",
+        shader = sg.make_shader(shader_meta.sdf_text_shader_desc()^),
+        primitive_type = .TRIANGLES,
+        blend = {
+            enabled = true,
+            src_factor_rgb = .SRC_ALPHA,
+            dst_factor_rgb = .ONE_MINUS_SRC_ALPHA,
+        },
+        layout = {
+            attrs = {
+                shader_meta.ATTR_vs_a_pos = {format = .FLOAT2},
+                shader_meta.ATTR_vs_a_texcoord = {format = .FLOAT2},
+            },
+        },
+    });
+    pass_action.colors[0] = {action = .LOAD, val = {1.0, 0.0, 1.0, 1.0}};
+}
+
+sdf_text_render :: proc(matrix: Matrix4) {
+    vs_uniforms := shader_meta.sdf_vs_uniforms {
+        matrix = matrix,
+        texsize = text.texture_size,
+    };
+
+    fs_uniforms := shader_meta.sdf_fs_uniforms {
+        color = Vector4{1, 1, 1, 1},
+        debug = 0.0,
+        gamma = 0.02,
+        buf = cast(f32)(192.0 / 256.0),
+    };
+
     using text;
 
-    pen := Vector3 {0, 100, 0};
+    if needs_update {
+        sg.update_buffer(bind.vertex_buffers[0], &vertex_elems[0], len(vertex_elems) * size_of(vertex_elems[0]));
+    }
+
+    sg.apply_pipeline(pipeline);
+    sg.apply_bindings(bind);
+    sg.apply_uniforms(.VS, shader_meta.SLOT_sdf_vs_uniforms, &vs_uniforms, size_of(shader_meta.sdf_vs_uniforms));
+    sg.apply_uniforms(.FS, shader_meta.SLOT_sdf_fs_uniforms, &fs_uniforms, size_of(shader_meta.sdf_fs_uniforms));
+    sg.draw(0, len(vertex_elems) / 4, 1);
+
+    if needs_update {
+        clear(&text.vertex_elems); // must happen after the draw call? is the update_buffer not immediate?
+        needs_update = false;
+    }
+}
+
+draw_text :: proc(str: string, size: f32, pos: Vector2) {
+    using text;
+
+    needs_update = true;
+
+    pen := Vector3 {pos.x, pos.y, 0};
 
     buf := strings.make_builder();
     defer strings.destroy_builder(&buf);
+
     for r in str {
         strings.reset_builder(&buf);
         strings.write_rune(&buf, r);
         r_str := strings.to_string(buf);
-
-        draw_glyph(r_str, &pen, size, &vertex_elems, &tex_elems);
+        draw_glyph(r_str, &pen, size, &vertex_elems);
     }
 
-    num_verts := len(vertex_elems) / 2;
-    assert(len(vertex_elems) == num_verts * 2);
-
-    verts := make([]Text_Vertex, num_verts);
-
-    for i in 0..<num_verts { // @Speed just use stride/attribute offsets to prevent this copy
-        j := i * 2;
-        verts[i] = {
-            {vertex_elems[j], vertex_elems[j + 1]},
-            {tex_elems[j], tex_elems[j + 1]},
-        };
+    if text.bind.vertex_buffers[0].id == 0 {
+        text.bind.vertex_buffers[0] = sg.make_buffer({
+            size = cast(i32)(1000 * size_of(vertex_elems[0])),
+            usage = .DYNAMIC,
+            label = "text-glyph-vertices",
+        });
     }
-
-    text.bind.vertex_buffers[0] = sg.make_buffer({
-        size = cast(i32)(len(verts) * size_of(verts[0])),
-        content = &verts[0],
-        label = "text-glyph-vertices",
-    });
-
-    delete(verts);
 }
 
-draw_glyph :: proc(character: string, pen: ^Vector3, size: f32, vertex_elements: ^[dynamic]f32, texture_elements: ^[dynamic]f32) {
+draw_glyph :: proc(character: string, pen: ^Vector3, size: f32, vertex_elements: ^[dynamic]f32) {
     metric, found := text.metrics.chars[character];
     if !found do return;
 
@@ -128,44 +158,38 @@ draw_glyph :: proc(character: string, pen: ^Vector3, size: f32, vertex_elements:
 
     width := cast(f32)metric.width;
     height := cast(f32)metric.height;
-    horiBearingX := cast(f32)metric.horizontal_bearing_x;
-    horiBearingY := cast(f32)metric.horizontal_bearing_y;
-    horiAdvance := cast(f32)metric.horizontal_advance;
-    posX := cast(f32)metric.pos_x;
-    posY := cast(f32)metric.pos_y;
+    h_bearing_x := cast(f32)metric.horizontal_bearing_x;
+    h_bearing_y := cast(f32)metric.horizontal_bearing_y;
+    h_advance := cast(f32)metric.horizontal_advance;
+    pos_x := cast(f32)metric.pos_x;
+    pos_y := cast(f32)metric.pos_y;
 
     if width > 0 && height > 0 {
         width += buffer * 2.0;
         height += buffer * 2.0;
 
-        // Add a quad (= two triangles) per glyph.
-
-        y0 := pen.y - (height - horiBearingY) * scale;
-        y1 := pen.y + (horiBearingY) * scale;
+        y0 := pen.y - (height - h_bearing_y) * scale;
+        y1 := pen.y + (h_bearing_y) * scale;
 
         append(vertex_elements, 
-            (factor * (pen.x + ((horiBearingX - buffer) * scale))), (factor * y0),
-            (factor * (pen.x + ((horiBearingX - buffer + width) * scale))), (factor * y0),
-            (factor * (pen.x + ((horiBearingX - buffer) * scale))), (factor * y1),
+            (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y0),
+            pos_x, pos_y + height,
+            (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y0),
+            pos_x + width, pos_y + height,
+            (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y1),
+            pos_x, pos_y,
 
-            (factor * (pen.x + ((horiBearingX - buffer + width) * scale))), (factor * y0),
-            (factor * (pen.x + ((horiBearingX - buffer) * scale))), (factor * y1),
-            (factor * (pen.x + ((horiBearingX - buffer + width) * scale))), (factor * y1)
-        );
-
-        append(texture_elements,
-            posX, posY + height,
-            posX + width, posY + height,
-            posX, posY,
-
-            posX + width, posY + height,
-            posX, posY,
-            posX + width, posY
+            (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y0),
+            pos_x + width, pos_y + height,
+            (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y1),
+            pos_x, pos_y,
+            (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y1),
+            pos_x + width, pos_y
         );
     }
 
-    // pen.x += Math.ceil(horiAdvance * scale);
-    pen.x = pen.x + horiAdvance * scale;
+    // pen.x += Math.ceil(h_advance * scale);
+    pen.x = pen.x + h_advance * scale;
 }
 
 
@@ -228,10 +252,9 @@ font_normal_loaded :: proc "c" (response: ^sfetch.Response) {
         size = width * height * channels,
     };
 
-    sg.init_image(text.bind.fs_images[shader_meta.SLOT_u_texture], image_desc);
+    sg.init_image(text.bind.fs_images[shader_meta.SLOT_font_atlas], image_desc);
     
     did_load();
-
 }
 
 metrics_from_json :: proc(json_text: []byte) -> SDF_Text_Metrics {

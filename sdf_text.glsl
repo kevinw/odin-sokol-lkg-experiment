@@ -5,38 +5,38 @@ in vec2 a_pos;
 in vec2 a_texcoord;
 
 uniform sdf_vs_uniforms {
-    mat4 u_matrix;
-    vec2 u_texsize;
+    mat4 matrix;
+    vec2 texsize;
 };
 
 out vec2 v_texcoord;
 
 void main() {
-    gl_Position = u_matrix * vec4(a_pos.xy, 0.0, 1);
-    v_texcoord = a_texcoord / u_texsize;
+    gl_Position = matrix * vec4(a_pos.xy, 0.0, 1);
+    v_texcoord = a_texcoord / texsize;
 }
 @end
 
 @fs fs
-uniform sampler2D u_texture;
+uniform sampler2D font_atlas;
 uniform sdf_fs_uniforms {
-    vec4 u_color;
-    float u_buffer;
-    float u_gamma;
-    float u_debug;
+    vec4 color;
+    float buf;
+    float gamma;
+    float debug;
 };
 
 in vec2 v_texcoord;
 out vec4 frag_color;
 
 void main() {
-    float dist = texture(u_texture, v_texcoord).r;
+    float dist = texture(font_atlas, v_texcoord).r;
 
-    if (u_debug > 0.0) {
+    if (debug > 0.0) {
         frag_color = vec4(dist, dist, dist, 1);
     } else {
-        float alpha = smoothstep(u_buffer - u_gamma, u_buffer + u_gamma, dist);
-        frag_color = vec4(u_color.rgb, alpha * u_color.a);
+        float alpha = smoothstep(buf - gamma, buf + gamma, dist);
+        frag_color = vec4(color.rgb, alpha * color.a);
     }
 }
 @end
