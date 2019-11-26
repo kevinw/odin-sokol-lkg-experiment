@@ -6,6 +6,7 @@
         battletoads wind tunnel style procgen'd infinite 
 
 depth of field
+@qualityOfLife sokol's asserts could trigger a stack trace
 shadow maps
 @editor scene view (both this and shadow maps require similar camera work)
 asset catalog: shaders, configs, images
