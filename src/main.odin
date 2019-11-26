@@ -807,7 +807,7 @@ frame_callback :: proc "c" () {
             aspect = cast(f32)width/cast(f32)height,
 
             debug = FORCE_2D ? 1 : 0,
-            debug_depth = 0,
+            debug_depth = 1,
 
             debugTile = i32(num_views() / 2),
             tile = Vector4{1, 1, cast(f32)num_views(), 0},

@@ -3,6 +3,7 @@ games with depth
     flying, walking, racing inwards
     crash bandicoot-style coming outwards
     battletoads wind tunnel style procgen'd infinite 
+shader reloading
 depth of field
 @editor use relative mouse movement when dragging sliders
 @qualityOfLife sokol's asserts could trigger a stack trace

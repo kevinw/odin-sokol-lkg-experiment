@@ -81,7 +81,7 @@ init_camera :: proc(camera: ^Camera, is_perspective: bool, size: f32, pixel_widt
     camera.is_perspective = is_perspective;
     camera.size = size;
     camera.near_plane = 0.01;
-    camera.far_plane = 1000;
+    camera.far_plane = 100;
     camera.position = Vec3{};
     camera.rotation = Quat{0, 0, 0, 1};
     camera.clear_color = {1, 0, 1, 1};

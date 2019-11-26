@@ -84,8 +84,14 @@ void main()
 #endif
 
         vec4 debugColor;
-        if (debug_depth != 0) debugColor = texture(depthTex, vec3(debugUV, debugTile));
-        else debugColor = texture(screenTex, vec3(debugUV, debugTile));
+        if (debug_depth != 0) {
+            float depth = texture(depthTex, vec3(debugUV, debugTile)).r;
+            float VAL = 0.985;
+            depth = clamp(depth - VAL, 0, 1) / (1.0 - VAL);
+            debugColor = vec4(depth.xxx, 1);
+        } else {
+            debugColor = texture(screenTex, vec3(debugUV, debugTile));
+        }
 
         fragColor = vec4(rgb[ri].r, rgb[1].g, rgb[bi].b, 1.0) * (1 - debug) + debugColor * debug;
 }
