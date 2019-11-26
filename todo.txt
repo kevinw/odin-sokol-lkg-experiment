@@ -3,7 +3,7 @@ games with depth
     flying, walking, racing inwards
     crash bandicoot-style coming outwards
     battletoads wind tunnel style procgen'd infinite 
-shader reloading
+shader reloading - see https://github.com/ThisDrunkDane/libbrew/blob/6ecefb232bc5d8d1b71fad706fc0a857da156fb6/catalog/catalog.odin for an example of using ReadDirectoryChangesW in this context
 depth of field
 @editor use relative mouse movement when dragging sliders
 @qualityOfLife sokol's asserts could trigger a stack trace
