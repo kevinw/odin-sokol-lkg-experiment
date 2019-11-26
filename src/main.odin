@@ -15,7 +15,7 @@ import sgl "sokol:sokol_gl"
 import mu "../lib/microui"
 import "../lib/basisu"
 
-FORCE_2D :: true;
+FORCE_2D :: false;
 OSC :: true;
 
 when OSC {
@@ -60,7 +60,9 @@ sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 
 MAXIMUM_VIEWS :: 45; // match shader value
 
-num_views :: proc() -> int do return min(MAXIMUM_VIEWS, max(1, cast(int)editor_settings.num_views));
+num_views :: proc() -> int {
+    return min(MAXIMUM_VIEWS, max(1, cast(int)editor_settings.num_views));
+}
 
 Input_State :: struct {
 	right, left, up, down: bool,
@@ -333,30 +335,33 @@ init_callback :: proc "c" () {
 
     r_init();
     mu.init(&mu_ctx);
-    mu_ctx._style = {
-        nil,       /* font */
-        { 68, 10 }, /* size */
-        25, 20, 40,   /* padding, spacing, indent */
-        50,         /* title_height */
-        30, 25,      /* scrollbar_size, thumb_size */
-        {
-            { 230, 230, 230, 255 }, /* MU_COLOR_TEXT */
-            { 25,  25,  25,  255 }, /* MU_COLOR_BORDER */
-            { 50,  50,  50,  255 }, /* MU_COLOR_WINDOWBG */
-            { 25,  25,  25,  255 }, /* MU_COLOR_TITLEBG */
-            { 240, 240, 240, 255 }, /* MU_COLOR_TITLETEXT */
-            { 0,   0,   0,   0   }, /* MU_COLOR_PANELBG */
-            { 75,  75,  75,  255 }, /* MU_COLOR_BUTTON */
-            { 95,  95,  95,  255 }, /* MU_COLOR_BUTTONHOVER */
-            { 115, 115, 115, 255 }, /* MU_COLOR_BUTTONFOCUS */
-            { 30,  30,  30,  255 }, /* MU_COLOR_BASE */
-            { 35,  35,  35,  255 }, /* MU_COLOR_BASEHOVER */
-            { 40,  40,  40,  255 }, /* MU_COLOR_BASEFOCUS */
-            { 43,  43,  43,  255 }, /* MU_COLOR_SCROLLBASE */
-            { 30,  30,  30,  255 }  /* MU_COLOR_SCROLLTHUMB */
-        }
-    };
-    mu_ctx.style = &mu_ctx._style;
+    if !FORCE_2D {
+        font_scale = 4.3;
+        mu_ctx._style = {
+            nil,       /* font */
+            { 68, 10 }, /* size */
+            25, 20, 40,   /* padding, spacing, indent */
+            50,         /* title_height */
+            30, 25,      /* scrollbar_size, thumb_size */
+            {
+                { 230, 230, 230, 255 }, /* MU_COLOR_TEXT */
+                { 25,  25,  25,  255 }, /* MU_COLOR_BORDER */
+                { 50,  50,  50,  255 }, /* MU_COLOR_WINDOWBG */
+                { 25,  25,  25,  255 }, /* MU_COLOR_TITLEBG */
+                { 240, 240, 240, 255 }, /* MU_COLOR_TITLETEXT */
+                { 0,   0,   0,   0   }, /* MU_COLOR_PANELBG */
+                { 75,  75,  75,  255 }, /* MU_COLOR_BUTTON */
+                { 95,  95,  95,  255 }, /* MU_COLOR_BUTTONHOVER */
+                { 115, 115, 115, 255 }, /* MU_COLOR_BUTTONFOCUS */
+                { 30,  30,  30,  255 }, /* MU_COLOR_BASE */
+                { 35,  35,  35,  255 }, /* MU_COLOR_BASEHOVER */
+                { 40,  40,  40,  255 }, /* MU_COLOR_BASEFOCUS */
+                { 43,  43,  43,  255 }, /* MU_COLOR_SCROLLBASE */
+                { 30,  30,  30,  255 }  /* MU_COLOR_SCROLLTHUMB */
+            }
+        };
+        mu_ctx.style = &mu_ctx._style;
+    }
     mu_ctx.text_width = r_text_width_cb;
     mu_ctx.text_height = r_get_text_height;
 
@@ -562,7 +567,9 @@ init_callback :: proc "c" () {
 debug_window :: proc(ctx: ^mu.Context) {
     if window.inited == {} {
         mu.init_window(ctx, &window, {});
-        window.rect = mu.rect(40, 40, 600, 850);
+        window.rect = FORCE_2D ? 
+            mu.rect(20, 20, 250, 450) :
+            mu.rect(20, 20, 600, 850);
     }
 
     window.rect.w = max(window.rect.w, 240);
