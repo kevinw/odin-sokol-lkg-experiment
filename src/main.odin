@@ -13,8 +13,9 @@ import sfetch "sokol:sokol_fetch"
 import sgl "sokol:sokol_gl"
 import mu "../lib/microui"
 import "../lib/basisu"
+import "./watcher"
 
-FORCE_2D :: true;
+FORCE_2D :: false;
 OSC :: true;
 
 when OSC {
@@ -52,7 +53,8 @@ WINDOW_HEIGHT :: 720;
 
 SFETCH_NUM_CHANNELS :: 1;
 SFETCH_NUM_LANES :: 4;
-MAX_FILE_SIZE :: 10*1024*1024;
+MEGABYTE :: 1024 * 1024;
+MAX_FILE_SIZE :: 10 * MEGABYTE;
 MSAA_SAMPLE_COUNT :: 1; // anything > 1 causes an assert in sokol_gfx, prob due to my unfinished Render Target Array changes....
 
 sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
@@ -60,6 +62,7 @@ sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
 Input_State :: struct {
 	right, left, up, down: bool,
 	w, a, s, d, q, e, r, t, g, l: bool,
+    num_0, num_1, num_2, num_3: bool,
     left_mouse, right_mouse: bool,
     left_ctrl, left_alt, left_shift: bool,
     osc_move: Vector2,
@@ -254,6 +257,8 @@ when OSC {
 }
 
 init_callback :: proc "c" () {
+    watcher._setup_notification("src");
+
     editor_settings = editor_settings_defaults();
 
     hp_infos:[]Display_Info;
@@ -606,6 +611,8 @@ frame_callback :: proc "c" () {
 	// UPDATE
 	//
 
+    if frame_count % 30 == 0 do watcher.handle_changes();
+
     sfetch.dowork();
 
     if !_did_load do return;
@@ -883,6 +890,40 @@ frame_callback :: proc "c" () {
 	sg.commit();
 }
 
+toggle_fullscreen :: proc() {
+    is_fullscreen = !is_fullscreen;
+    fmt.println("toggling fullscreen", is_fullscreen);
+
+    {
+        using win32;
+        hwnd := cast(Hwnd)sapp.win32_get_hwnd();
+
+        x, y, w, h: i32;
+        win_style: u32;
+
+        if is_fullscreen {
+            win_style = WS_POPUP | WS_SYSMENU | WS_VISIBLE;
+            if hp_connected {
+                using hp_info;
+                x, y, w, h = xpos, ypos, width, height;
+            } else {
+                x, y = 0, 0;
+                w, h = get_system_metrics(SM_CXSCREEN), get_system_metrics(SM_CYSCREEN);
+            }
+        } else {
+            x, y = 100, 100;
+            w, h = WINDOW_WIDTH, WINDOW_HEIGHT;
+
+            WS_CLIPSIBLINGS :: 0x04000000;
+            WS_CLIPCHILDREN :: 0x02000000;
+            WS_SIZEBOX      :: 0x00040000;
+            win_style = WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SIZEBOX;
+        }
+        //set_window_long_ptr_w(hwnd, GWL_STYLE, cast(Long_Ptr)win_style);
+        set_window_pos(hwnd, nil, x, y, w, h, SWP_FRAMECHANGED | SWP_NOZORDER);
+    }
+}
+
 cleanup :: proc "c" () {
     when OSC do stop_osc_thread();
     basisu.shutdown();
@@ -943,6 +984,12 @@ event_callback :: proc "c" (event: ^sapp.Event) {
             case .G: g = true;
             case .T: t = true;
             case .L: l = true;
+            case .NUM_0: num_0 = true;
+            case .NUM_1: num_1 = true;
+            case .NUM_2:
+                num_2 = true;
+                toggle_fullscreen();
+            case .NUM_3: num_3 = true;
             case .LEFT_ALT: left_alt = true;
             case .LEFT_CONTROL: left_ctrl = true;
             case .LEFT_SHIFT: left_shift = true;
@@ -966,6 +1013,10 @@ event_callback :: proc "c" (event: ^sapp.Event) {
             case .G: g = false;
             case .T: t = false;
             case .L: l = false;
+            case .NUM_0: num_0 = false;
+            case .NUM_1: num_1 = false;
+            case .NUM_2: num_2 = false;
+            case .NUM_3: num_3 = false;
             case .LEFT_ALT: left_alt = false;
             case .LEFT_CONTROL: left_ctrl = false;
             case .LEFT_SHIFT: left_shift = false;
@@ -973,6 +1024,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
 	}
 }
 
+import "core:sys/win32"
 /*
 check_sizes :: proc() {
     fmt.println("--------odin sizes:");
@@ -992,7 +1044,10 @@ main :: proc() {
     //main_mrt();
 }
 
+is_fullscreen: bool;
+
 run_app :: proc() -> int {
+    is_fullscreen = !FORCE_2D;
 
 	return sapp.run({
 		init_cb      = init_callback,
@@ -1003,7 +1058,7 @@ run_app :: proc() -> int {
 		height       = WINDOW_HEIGHT,
 		window_title = "testbed",
         sample_count = MSAA_SAMPLE_COUNT,
-        fullscreen   = !FORCE_2D,
+        fullscreen   = is_fullscreen,
         //high_dpi     = true,
 	});
 }

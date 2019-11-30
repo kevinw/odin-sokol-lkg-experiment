@@ -5,15 +5,14 @@ games with depth
     battletoads wind tunnel style procgen'd infinite 
 shader reloading - see https://github.com/ThisDrunkDane/libbrew/blob/6ecefb232bc5d8d1b71fad706fc0a857da156fb6/catalog/catalog.odin for an example of using ReadDirectoryChangesW in this context
 depth of field
-@editor use relative mouse movement when dragging sliders
 @qualityOfLife sokol's asserts could trigger a stack trace
 shadow maps
 @editor scene view (both this and shadow maps require similar camera work)
 asset catalog: shaders, configs, images
-@vim make 'float3' typo correct to 'vec3', etc, in glsl files
 a set of "println" tools for the screen - temporary message, permanent message with corner
 multiple window support with a scene view - essential for lkg development?
 integrate sokol compute pull request
+log system with info/debug/warn/error
 cleanup input/keys array state
 shader_meta needs a cleanup. at the very least, start with package-per-shader?
     or should we just go immediately for a more late-binding approach?
@@ -27,8 +26,10 @@ consider using D3DCOMPILE_OPTIMIZATION_LEVEL0 for debug mode in sokol-"Directs t
 compile dependencies with all optimizations
 project window for assets in project @editor
 
+(C) @editor use relative mouse movement when dragging sliders (not needed w/ imgui?)
 (C) animation skinning
 (C) sketch out a flowchart for asset generation, research assimp vs other approaches
+(C) @vim make 'float3' typo correct to 'vec3', etc, in glsl files
 
 x render a framebuffer
 x render a quilt

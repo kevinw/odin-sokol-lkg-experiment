@@ -1,7 +1,6 @@
 package main
 
 import "core:fmt"
-import "core:mem"
 using import "../math"
 
 using import "../socket_wip"
@@ -94,7 +93,7 @@ update :: proc() {
     if tosc.is_bundle(buffer) {
         bundle: tosc.Bundle;
         tosc.parse_bundle(&bundle, buffer, len);
-        timetag := tosc.get_timetag(&bundle);
+        //timetag := tosc.get_timetag(&bundle);
         for tosc.get_next_message(&bundle, &osc) {
             handle_message(&osc);
         }

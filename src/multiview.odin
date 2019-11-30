@@ -40,7 +40,7 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
     width, height := calc_lkg_subquilt_size(framebuffer_width, framebuffer_height);
 
     assert(width > 0 && height > 0);
-    fmt.printf("creating offscreen multiview pass (%dx%d) with %d views\n", width, height, num_views);
+    //fmt.printf("creating offscreen multiview pass (%dx%d) with %d views\n", width, height, num_views);
 
     using state.offscreen;
 
