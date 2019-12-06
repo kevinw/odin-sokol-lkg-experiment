@@ -1,6 +1,5 @@
 package main
 
-import "core:fmt"
 import sg "sokol:sokol_gfx"
 import "./shader_meta";
 

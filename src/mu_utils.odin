@@ -293,7 +293,7 @@ _mu_struct_block_field_end :: proc(ctx: ^mu.Context, name: string) {
 }
 
 push_id_str :: proc(ctx: ^mu.Context, s: string) {
-    mu.push_id(ctx, &s[0], cast(i32)len(s));
+    mu.push_id(ctx, strings.ptr_from_string(s), cast(i32)len(s));
 }
 
 @(deferred_out=_pop_column)
@@ -344,7 +344,7 @@ mu_struct_ti :: proc(ctx: ^mu.Context, name: string, data: rawptr, ti: ^Type_Inf
     u8_slider :: proc(ctx: ^mu.Context, val: ^u8) -> mu.Res {
         s := tprint(val^);
         res:mu.Res;
-        if mu.textbox(ctx, &s[0], cast(i32)len(s)) {
+        if mu.textbox(ctx, strings.ptr_from_string(s), cast(i32)len(s)) {
             res |= mu.Res.Change;
             fmt.println("Change", s);
             val^ = cast(u8)strconv.parse_int(s);
@@ -355,7 +355,7 @@ mu_struct_ti :: proc(ctx: ^mu.Context, name: string, data: rawptr, ti: ^Type_Inf
     input_int :: proc(ctx: ^mu.Context, name: string, val: ^i32) -> mu.Res {
         s := tprint(val^);
         res:mu.Res;
-        if mu.textbox(ctx, &s[0], cast(i32)len(s)) {
+        if mu.textbox(ctx, strings.ptr_from_string(s), cast(i32)len(s)) {
         }
         val^ = cast(i32)strconv.parse_int(s);
         return res;

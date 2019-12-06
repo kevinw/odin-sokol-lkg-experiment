@@ -2,6 +2,7 @@ package main
 
 using import "core:runtime"
 import "core:strings"
+import "core:os"
 import "core:mem"
 import "core:fmt"
 using import "math"
@@ -15,7 +16,7 @@ import mu "../lib/microui"
 import "../lib/basisu"
 import "./watcher"
 
-FORCE_2D :: false;
+FORCE_2D := false;
 OSC :: true;
 
 when OSC {
@@ -187,9 +188,6 @@ gizmos_ctx: gizmos.Context;
 
 last_ticks: u64 = 0;
 
-do_print :i32 = 0;
-do_tween:bool = false;
-
 frame_count:u32;
 fps_counter: struct {
     last_time_secs: f64,
@@ -235,7 +233,7 @@ when OSC {
     _osc_running := false;
 
     @private
-    osc_thread_func :: proc(thread: ^thread.Thread) -> int {
+    osc_thread_func :: proc(thread: ^thread.Thread) {
         fmt.println("in osc thread func");
         osc.init({
             on_vector2 = proc (addr: string, v2: Vector2) { input_state.osc_move = v2; },
@@ -245,7 +243,6 @@ when OSC {
             osc.update();
         }
         osc.shutdown();
-        return 0;
     }
 
     @private
@@ -257,14 +254,20 @@ when OSC {
 }
 
 init_callback :: proc "c" () {
-    watcher._setup_notification("src");
+    watcher._setup_notification(".");
 
+    state.auto_rotate = true;
     editor_settings = editor_settings_defaults();
 
     hp_infos:[]Display_Info;
-    hp_connected, hp_infos = hpc_init(sapp.win32_get_hwnd());
+    hp_connected, hp_infos = hpc_init();
+    fmt.println("HP_CONNECTED", hp_connected);
     if len(hp_infos) == 0 do hp_connected = false;
-    if FORCE_2D do hp_connected = false;
+    if !hp_connected do FORCE_2D = true;
+    if FORCE_2D {
+        //fmt.println("FORCE2D is on");
+        hp_connected = false;
+    }
     if hp_connected {
         hp_info = hp_infos[0];
         LKG_ASPECT = cast(f32)hp_info.width / cast(f32)hp_info.height;
@@ -552,9 +555,6 @@ debug_window :: proc(ctx: ^mu.Context) {
 
             mu_layout_row(ctx, { 40, -1 }, 0);
             mu.label(ctx, "fov:"); mu.slider(ctx, &state.camera.size, 1, 200);
-
-            mu.label(ctx, "print"); mu.checkbox(ctx, &do_print, "");
-            mu.label(ctx, "tween"); mu_checkbox(ctx, &do_tween, "tween");
             mu.label(ctx, "rotate"); mu_checkbox(ctx, &state.auto_rotate, "auto rotate");
 
             for row_index in 0..<4 {
@@ -673,7 +673,7 @@ frame_callback :: proc "c" () {
     state.view_proj = mul(proj, view);
 
     @static x_rotation:f32 = 0;
-    x_rotation += dt * mesh_rotate_speed;
+    if state.auto_rotate do x_rotation += dt * mesh_rotate_speed;
 
     {
         using input_state;
@@ -814,7 +814,7 @@ frame_callback :: proc "c" () {
             aspect = cast(f32)width/cast(f32)height,
 
             debug = FORCE_2D ? 1 : 0,
-            debug_depth = 1,
+            debug_depth = cast(i32)editor_settings.visualize_depth,
 
             debugTile = i32(num_views() / 2),
             tile = Vector4{1, 1, cast(f32)num_views(), 0},
@@ -847,7 +847,6 @@ frame_callback :: proc "c" () {
         sgl.push_pipeline();
         defer sgl.pop_pipeline();
         sgl.load_pipeline(state.line_rendering_pipeline);
-        sgl.matrix_mode_projection();
         sgl.matrix_mode_modelview();
         sgl.load_matrix(&state.view_proj[0][0]);
         grid_frame_count:u32 = 0;
@@ -1025,23 +1024,13 @@ event_callback :: proc "c" (event: ^sapp.Event) {
 }
 
 import "core:sys/win32"
-/*
-check_sizes :: proc() {
-    fmt.println("--------odin sizes:");
-    cgltf.print_sizes();
-    fmt.println("--------c sizes:");
-    cgltf.print_struct_sizes();
-}
-*/
 
-import "core:os"
 
 main :: proc() {
     // install a stacktrace handler for asserts
     when STACK_TRACES do context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
 
 	os.exit(run_app());
-    //main_mrt();
 }
 
 is_fullscreen: bool;

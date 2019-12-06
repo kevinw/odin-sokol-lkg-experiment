@@ -7,6 +7,7 @@ Editor_Settings :: struct {
     lkg_view_cone:f32,   // = 0.611; // 35deg in radians
     lkg_camera_size:f32, // = 6.0: 
     subview_w: f32,
+    visualize_depth: bool,
     num_views:f32,
     fov: f32,
     grid_offset: Vector3,

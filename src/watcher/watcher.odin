@@ -76,10 +76,13 @@ _setup_notification :: proc(path: string) {
         did_init = true;
         sync.mutex_init(&_change_mutex);
     }
+
+    using win32;
+
     cstr := strings.clone_to_cstring(path); defer delete(cstr);
-    dirh := win32.create_file_a(cstr, win32.FILE_GENERIC_READ, win32.FILE_SHARE_READ | win32.FILE_SHARE_DELETE | win32.FILE_SHARE_WRITE, nil, 
-                                win32.OPEN_EXISTING, win32.FILE_FLAG_BACKUP_SEMANTICS, nil);
-    if dirh == win32.INVALID_HANDLE {
+    dirh := create_file_a(cstr, FILE_GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE | FILE_SHARE_WRITE, nil, 
+                                OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nil);
+    if dirh == INVALID_HANDLE {
         fmt.eprintln("Could not open directory at", path);
         return;
     }
@@ -107,29 +110,29 @@ _setup_notification :: proc(path: string) {
         return last_dot != -1 ? str[:last_dot] : str;
     }
 
-    _proc :: proc(thread : ^thread.Thread) -> int {
+    _proc :: proc(thread : ^thread.Thread) {
         using p := cast(^_payload)thread.data;
         defer free(p);
 
         for {
             out : u32;
-            ok := win32.read_directory_changes_w(dir_handle, buf, buf_len, false,
-                                                  win32.FILE_NOTIFY_CHANGE_LAST_WRITE | win32.FILE_NOTIFY_CHANGE_FILE_NAME, 
+            ok := read_directory_changes_w(dir_handle, buf, buf_len, false,
+                                                  FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME, 
                                                   &out, nil, nil);
             if ok {
-                c := cast(^win32.File_Notify_Information)buf;
+                c := cast(^File_Notify_Information)buf;
                 for c != nil {
                     wlen := int(c.file_name_length) / size_of(u16);
                     wstr := &c.file_name[0];
-                    req := win32.wide_char_to_multi_byte(win32.CP_UTF8, 0, 
-                                            win32.Wstring(wstr), i32(wlen),
+                    req := wide_char_to_multi_byte(CP_UTF8, 0, 
+                                            Wstring(wstr), i32(wlen),
                                             nil, 0, 
                                             nil, nil);
                     asset_id := "N/A";
                     if req != 0 {
                         buf := make([]byte, req);
-                        ok := win32.wide_char_to_multi_byte(win32.CP_UTF8, 0, 
-                                                      win32.Wstring(wstr), i32(wlen),
+                        ok := wide_char_to_multi_byte(CP_UTF8, 0, 
+                                                      Wstring(wstr), i32(wlen),
                                                       cstring(&buf[0]), i32(len(buf)), 
                                                       nil, nil);
                         assert(ok != 0);
@@ -138,9 +141,9 @@ _setup_notification :: proc(path: string) {
                     } 
 
                     switch c.action {
-                        case win32.FILE_ACTION_ADDED:
-                        case win32.FILE_ACTION_REMOVED:
-                        case win32.FILE_ACTION_MODIFIED:
+                        case FILE_ACTION_ADDED:
+                        case FILE_ACTION_REMOVED:
+                        case FILE_ACTION_MODIFIED:
                             _push_change({
                                 change=.Modify,
                                 asset_id=asset_id,
@@ -150,17 +153,16 @@ _setup_notification :: proc(path: string) {
                     if c.next_entry_offset == 0 {
                         c = nil;
                     } else {
-                        c = cast(^win32.File_Notify_Information)(cast(uintptr)cast(^byte)c + cast(uintptr)c.next_entry_offset);
+                        c = cast(^File_Notify_Information)(cast(uintptr)cast(^byte)c + cast(uintptr)c.next_entry_offset);
                     }
                 }
             } else {
-                fmt.eprintf("last win32 error: %d\n", win32.get_last_error());
+                fmt.eprintf("last win32 error: %d\n", get_last_error());
                 break;
             }
         }
 
-        win32.close_handle(dir_handle);
-        return 0;
+        close_handle(dir_handle);
     }
 
 

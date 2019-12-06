@@ -43,7 +43,7 @@ my_window_proc :: proc "c" (hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam
 }
 
 @private
-hpc_init :: proc(my_hwnd: rawptr) -> (bool, []Display_Info) {
+hpc_init_old :: proc(my_hwnd: rawptr) -> (bool, []Display_Info) {
     my_hwnd := cast(Hwnd)cast(uintptr)my_hwnd;
 
     // Add a new win32 message processing function.
@@ -62,3 +62,60 @@ hpc_init :: proc(my_hwnd: rawptr) -> (bool, []Display_Info) {
 
     return did_receive_calibration, received_device_infos[:num_received_devices];
 }
+
+import hpc "../lib/HoloPlayCore"
+
+@private hpc_init :: proc() -> (bool, []Display_Info) {
+    using hpc;
+
+    defer hpc.tear_down_message_pipe();
+
+    device_w, device_h: i32;
+
+    {
+        msg := hpc.Message {command = "{\"info\":{}}" };
+        reply := hpc.send_message_blocking(&msg);
+        if (reply.client_error != .NOERROR) {
+            fmt.eprintln("hpc error:", reply.client_error);
+            return false, nil;
+        } else {
+            devices := mem.slice_ptr(reply.devices, cast(int)reply.num_devices);
+            if len(devices) == 0 {
+                return false, nil;
+            }
+            for device in devices {
+                device_w, device_h = cast(i32)device.calibration.screen_w, cast(i32)device.calibration.screen_h;
+                break;
+            }
+        }
+    }
+
+    {
+        msg := hpc.Message { command = "{\"uniforms\":{}}" };
+        reply := hpc.send_message_blocking(&msg);
+        if (reply.client_error != .NOERROR) {
+            fmt.eprintln("hpc error:", reply.client_error);
+        } else {
+            // TODO: get rid of this Display_Info struct and just use the struct in HoloplayCore directly
+            using reply.uniforms;
+            num_received_devices = 1;
+            received_device_infos[0] = Display_Info {
+                xpos = win_x,
+                ypos = win_y,
+                width = device_w, // TODO: uniforms call isn't returning 
+                height = device_h,
+                pitch = pitch,
+                tilt = tilt,
+                center = center,
+                invView = invView,
+                subp = subp,
+                ri = ri,
+                bi = bi,
+            };
+            return true, received_device_infos[:1];
+        }
+    }
+
+    return false, nil;
+}
+
