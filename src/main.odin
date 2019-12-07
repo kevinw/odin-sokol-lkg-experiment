@@ -260,7 +260,7 @@ init_callback :: proc "c" () {
     editor_settings = editor_settings_defaults();
 
     hp_infos:[]Display_Info;
-    hp_connected, hp_infos = hpc_init();
+    hp_connected, hp_infos = holoplaycore_init();
     fmt.println("HP_CONNECTED", hp_connected);
     if len(hp_infos) == 0 do hp_connected = false;
     if !hp_connected do FORCE_2D = true;
