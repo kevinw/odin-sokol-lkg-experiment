@@ -35,22 +35,9 @@ calc_lkg_subquilt_size :: proc(framebuffer_width, framebuffer_height: int) -> (i
     return cast(i32)width, cast(i32)height;
 }
 
-create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: int) {
-    width, height := calc_lkg_subquilt_size(framebuffer_width, framebuffer_height);
-
-    assert(width > 0 && height > 0);
-    //fmt.printf("creating offscreen multiview pass (%dx%d) with %d views\n", width, height, num_views);
-
-    using state.offscreen;
-
-    /* destroy previous resource (can be called for invalid id) */
-    sg.destroy_pass(pass);
-    sg.destroy_image(pass_desc.color_attachments[0].image);
-    sg.destroy_image(pass_desc.depth_stencil_attachment.image);
-
-    /* create offscreen rendertarget images and pass */
+rendertarget_array_desc :: proc(width, height, num_layers: i32, label: cstring) -> sg.Image_Desc {
     offscreen_sample_count := sg.query_features().msaa_render_targets ? MSAA_SAMPLE_COUNT : 1;
-    color_img_desc = sg.Image_Desc {
+    desc := sg.Image_Desc {
         render_target = true,
         type = .ARRAY,
         width = width,
@@ -62,26 +49,71 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
         sample_count = cast(i32)offscreen_sample_count,
         label = "multiview color image"
     };
-    color_img_desc.layers = cast(i32)num_views;
+    desc.layers = num_layers;
+    return desc;
+}
 
-    depth_img_desc := color_img_desc; // copy values from color Image_Desc
-    depth_img_desc.pixel_format = .DEPTH_STENCIL;
-    depth_img_desc.label = "multiview depth image";
+create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: int) {
+    width, height := calc_lkg_subquilt_size(framebuffer_width, framebuffer_height);
 
-    pass_desc = {
-        color_attachments = {
-            0 = { image = sg.make_image(color_img_desc) },
-        },
-        depth_stencil_attachment = {
-            image = sg.make_image(depth_img_desc),
-        },
-        label = "multiview offscreen pass"
-    };
+    assert(width > 0 && height > 0);
+    //fmt.printf("creating offscreen multiview pass (%dx%d) with %d views\n", width, height, num_views);
 
-    pass = sg.make_pass(pass_desc);
+    {
+        using state.offscreen;
 
-    /* also need to update the fullscreen-quad texture bindings */
-    state.lenticular_bindings.fs_images[shader_meta.SLOT_screenTex] = pass_desc.color_attachments[0].image;
-    state.lenticular_bindings.fs_images[shader_meta.SLOT_depthTex] = pass_desc.depth_stencil_attachment.image;
+        /* destroy previous resource (can be called for invalid id) */
+        sg.destroy_pass(pass);
+        sg.destroy_image(pass_desc.color_attachments[0].image);
+        sg.destroy_image(pass_desc.depth_stencil_attachment.image);
+
+        /* create offscreen rendertarget images and pass */
+        color_img_desc = rendertarget_array_desc(width, height, cast(i32)num_views, "multiview color image");
+
+        depth_img_desc := color_img_desc; // copy values from color Image_Desc
+        depth_img_desc.pixel_format = .DEPTH_STENCIL;
+        depth_img_desc.label = "multiview depth image";
+
+        pass_desc = {
+            color_attachments = {
+                0 = { image = sg.make_image(color_img_desc) },
+            },
+            depth_stencil_attachment = {
+                image = sg.make_image(depth_img_desc),
+            },
+            label = "multiview offscreen pass"
+        };
+
+        pass = sg.make_pass(pass_desc);
+
+        /* also need to update the fullscreen-quad texture bindings */
+        state.lenticular_bindings.fs_images[shader_meta.SLOT_screenTex] = pass_desc.color_attachments[0].image;
+        state.lenticular_bindings.fs_images[shader_meta.SLOT_depthTex] = pass_desc.depth_stencil_attachment.image;
+    }
+
+    //
+    // depth of field
+    //
+    {
+        using state.depth_of_field;
+
+        sg.destroy_pass(pass);
+        sg.destroy_image(pass_desc.color_attachments[0].image);
+        sg.destroy_image(pass_desc.depth_stencil_attachment.image);
+
+        color_img_desc = rendertarget_array_desc(width, height, cast(i32)num_views, "depth of field coc image");
+
+        pass_desc = {
+            color_attachments = {
+                0 = { image = sg.make_image(color_img_desc) },
+            },
+            label = "depth of field coc pass",
+        };
+
+        pass = sg.make_pass(pass_desc);
+
+        state.dof_material.bindings.fs_images[shader_meta.SLOT_cameraDepth] =
+            state.offscreen.pass_desc.depth_stencil_attachment.image;
+    }
 }
 

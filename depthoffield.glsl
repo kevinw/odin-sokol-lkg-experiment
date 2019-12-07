@@ -3,7 +3,9 @@
 @include common.glsl
 
 @vs coc_vs
+
 #extension GL_ARB_shader_viewport_layer_array : require
+
 in vec2 pos;
 in vec2 uv0;
 out vec3 uvWithLayer;
@@ -20,19 +22,19 @@ void main() {
 in vec3 uvWithLayer;
 
 uniform sampler2DArray cameraDepth;
+
 uniform dof_uniforms {
     float focusDistance;
     float focusRange;
 };
+
+out vec4 outColor;
 
 float LinearEyeDepth(float depth) {
     float z_ndc = 2.0 * depth - 1.0;
     float z_eye = 2.0 * nearPlane * farPlane / (farPlane + nearPlane - z_ndc * (farPlane - nearPlane));
     return z_eye;
 }
-
-
-out vec4 outColor;
 
 void main() {
     float depth = texture(cameraDepth, uvWithLayer).r;

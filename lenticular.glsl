@@ -26,10 +26,12 @@ uniform lkg_fs_uniforms {
     int debug;
     int debugTile;
     int debug_depth; // @Speed these should be #ifdef'd away
+    int debug_dof;
 };
 
 uniform sampler2DArray screenTex;
 uniform sampler2DArray depthTex;
+uniform sampler2DArray cocTex;
 
 vec3 texArr(vec3 uvz)
 {
@@ -91,6 +93,10 @@ void main()
             debugColor = vec4(depth.xxx, 1);
         } else {
             debugColor = texture(screenTex, vec3(debugUV, debugTile));
+        }
+
+        if (debug_dof != 0) {
+            debugColor = texture(cocTex, vec3(debugUV, debugTile));
         }
 
         fragColor = vec4(rgb[ri].r, rgb[1].g, rgb[bi].b, 1.0) * (1 - debug) + debugColor * debug;

@@ -5,6 +5,8 @@ import "core:strings"
 import "core:os"
 import "core:mem"
 import "core:fmt"
+import "core:sys/win32"
+
 using import "math"
 
 import sg "sokol:sokol_gfx"
@@ -26,6 +28,7 @@ when OSC {
 
 LKG_ASPECT:f32 = 1;
 DEFAULT_CAMERA_FOV:f32 = 14.0;
+STACK_TRACES :: true;
 
 when STACK_TRACES {
     import "stacktrace"
@@ -36,7 +39,6 @@ when EDITOR {
 }
 
 EDITOR :: true;
-STACK_TRACES :: true;
 
 import "./shader_meta";
 
@@ -132,12 +134,56 @@ Node :: struct {
     transform: Matrix4,
 };
 
+Material :: struct {
+    pipeline: sg.Pipeline,
+    bindings: sg.Bindings,
+}
+
+create_fsq_material :: proc(label: cstring, shader: sg.Shader) -> Material {
+    using m: Material;
+
+    C :: 1;
+    vertices := [?][2]f32{
+        {-C, +C}, {+C, +C}, {-C, -C},
+        {-C, -C}, {+C, +C}, {+C, -C},
+    };
+
+    bindings.vertex_buffers[0] = sg.make_buffer({
+        label = label,
+        size = len(vertices) * size_of(vertices[0]),
+        content = &vertices[0],
+    });
+
+    pipeline = sg.make_pipeline({
+        shader = shader,
+        blend = {
+            depth_format = .NONE,
+        },
+        label = label,
+        layout = {
+            attrs = {
+                0 = {format = .FLOAT2 },
+                1 = {format = .FLOAT2 },
+            },
+        },
+    });
+
+    return m;
+}
+
 state: struct {
     offscreen: struct {
         pass_desc: sg.Pass_Desc,
         color_img_desc: sg.Image_Desc,
         pass: sg.Pass,
     },
+    depth_of_field: struct {
+        pass_desc: sg.Pass_Desc,
+        color_img_desc: sg.Image_Desc,
+        pass: sg.Pass,
+    },
+    dof_material: Material,
+    dof_enabled: bool,
 
     xform_a: gizmos.Transform,
 	pass_action: sg.Pass_Action,
@@ -150,7 +196,7 @@ state: struct {
 
     lenticular_pipeline: sg.Pipeline,
     lenticular_bindings: sg.Bindings,
-
+    
     font_normal_data: [256 * 1024]u8, // TODO: use a smaller buffer and the streaming capability of sokol-fetch
 
     // mesh
@@ -471,6 +517,12 @@ init_callback :: proc "c" () {
         });
     }
 
+    // make depth of field pipeline
+    {
+        dof_shader := sg.make_shader(shader_meta.dof_coc_shader_desc()^);
+        state.dof_material = create_fsq_material("depth of field", dof_shader);
+    }
+
     // make line rendering pipeline
     {
         state.line_rendering_pipeline = sgl.make_pipeline({
@@ -698,13 +750,16 @@ frame_callback :: proc "c" () {
     // TODO: write this only when the value changes?
     state.pass_action.colors[0] = {action = .CLEAR, val = {bg[0], bg[1], bg[2], 1}};
 
+    //
     // DRAW MESH
+    //
     if draw_mesh {
         sg.begin_pass(state.offscreen.pass, {
             colors = {
                 0 = { action = .CLEAR, val = { 0.25, 0.0, 0.0, 1.0 } },
             }
         });
+        defer sg.end_pass();
 
         _num_views := cast(int)num_views();
 
@@ -793,11 +848,25 @@ frame_callback :: proc "c" () {
                 sg.draw(cast(int)prim.base_element, cast(int)prim.num_elements, _num_views);
             }
         }
+    }
 
+    if state.dof_enabled {
+        using state.depth_of_field;
+        sg.begin_pass(pass, {
+            colors = {
+                0 = { action = .CLEAR, val = { 0.0, 0.0, 0.0, 0.0 } },
+            }
+        });
+        sg.apply_pipeline(state.dof_material.pipeline);
+        sg.apply_bindings(state.dof_material.bindings);
+        sg.draw(0, 6, num_views());
         sg.end_pass();
     }
 
     sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
+
+    state.lenticular_bindings.fs_images[shader_meta.SLOT_cocTex] =
+        state.depth_of_field.pass_desc.color_attachments[0].image;
 
     sg.apply_pipeline(state.lenticular_pipeline);
     sg.apply_bindings(state.lenticular_bindings);
@@ -1023,10 +1092,19 @@ event_callback :: proc "c" (event: ^sapp.Event) {
 	}
 }
 
-import "core:sys/win32"
-
+handle_args :: proc() {
+    for arg in os.args {
+        switch arg {
+            case "--2d", "--2D": FORCE_2D = true;
+            case "--no-dof": state.dof_enabled = false;
+        }
+    }
+}
 
 main :: proc() {
+    state.dof_enabled = true;
+    handle_args();
+
     // install a stacktrace handler for asserts
     when STACK_TRACES do context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
 
