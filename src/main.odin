@@ -286,7 +286,6 @@ when OSC {
 
     @private
     osc_thread_func :: proc(thread: ^thread.Thread) {
-        fmt.println("in osc thread func");
         osc.init({
             on_vector2 = proc (addr: string, v2: Vector2) { input_state.osc_move = v2; },
             on_vector3 = proc (addr: string, v3: Vector3) { input_state.osc_rotate = v3; }
@@ -856,6 +855,9 @@ frame_callback :: proc "c" () {
         }
     }
 
+    //
+    // DEPTH OF FIELD
+    //
     if state.dof_enabled {
         using state.depth_of_field;
         sg.begin_pass(pass, {
@@ -866,14 +868,15 @@ frame_callback :: proc "c" () {
         sg.apply_pipeline(state.dof_material.pipeline);
         sg.apply_bindings(state.dof_material.bindings);
 
-        uniforms := shader_meta.dof_uniforms {
+        apply_uniforms(.FS, shader_meta.SLOT_builtins, shader_meta.builtins {
+            nearPlane = state.camera.near_plane,  // TODO: do these two values change with the LKG projection matrix stuff? should they become functions on the gl_Layer specific projection matrix?
+            farPlane = state.camera.far_plane,
+        });
+
+        apply_uniforms(.FS, shader_meta.SLOT_dof_uniforms, shader_meta.dof_uniforms {
             focusDistance = editor_settings.dof_distance,
             focusRange = editor_settings.dof_range,
-        };
-
-
-        apply_uniforms(.FS, shader_meta.SLOT_dof_uniforms, &uniforms);
-
+        });
 
         sg.draw(0, 6, num_views());
         sg.end_pass();
@@ -901,7 +904,7 @@ frame_callback :: proc "c" () {
             if visualize_dof   do debug = .DepthOfField;
         }
 
-        uniforms := shader_meta.lkg_fs_uniforms {
+        apply_uniforms(.FS, shader_meta.SLOT_lkg_fs_uniforms, shader_meta.lkg_fs_uniforms {
             pitch = pitch,
             tilt = tilt,
             center = center,
@@ -914,8 +917,7 @@ frame_callback :: proc "c" () {
             debugTile = i32(num_views() / 2),
             tile = Vector4 {1, 1, cast(f32)num_views(), 0},
             viewPortion = Vector4{1, 1, 0, 0},
-        };
-        apply_uniforms(.FS, shader_meta.SLOT_lkg_fs_uniforms, &uniforms);
+        });
     }
     sg.draw(0, 6, 1);
 
@@ -923,16 +925,14 @@ frame_callback :: proc "c" () {
     if draw_quad {
         sg.apply_pipeline(state.pip);
         sg.apply_bindings(state.bind);
-        global_params_values := shader_meta.st_fs_uniforms {
+        apply_uniforms(.FS, shader_meta.SLOT_st_fs_uniforms, shader_meta.st_fs_uniforms {
             iTime = cast(f32)now_seconds * 3.0,
             iResolution = Vector3 { cast(f32)sapp.width()/2.0, cast(f32)sapp.height()/2.0, 1.0 },
             iTimeDelta = dt,
             iFrame = cast(i32)frame_count,
             iFrameRate = cast(f32)(1.0 / fps_counter.ms_per_frame),
             iSampleRate = 44100,
-        };
-        // shadertoy uniforms
-        apply_uniforms(.FS, shader_meta.SLOT_st_fs_uniforms, &global_params_values);
+        });
         sg.draw(0, 6, 1);
     }
 
