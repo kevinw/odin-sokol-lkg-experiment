@@ -18,16 +18,19 @@ uniform lkg_fs_uniforms {
     int ri;
     int bi;
 
-    // Quilt settings
+    // quilt settings
     vec4 tile;
     vec4 viewPortion;
     vec4 aspect;
 
-    int debug;
     int debugTile;
-    int debug_depth; // @Speed these should be #ifdef'd away
-    int debug_dof;
+    int debug;
 };
+
+#define DEBUG_OFF 0
+#define DEBUG_DEPTH 1
+#define DEBUG_COLOR 2
+#define DEBUG_DOF 3
 
 uniform sampler2DArray screenTex;
 uniform sampler2DArray depthTex;
@@ -52,54 +55,57 @@ vec3 texArr(vec3 uvz)
 
 vec3 clip(vec3 toclip)
 {
-        // recreate CG clip function (clear pixel if any component is negative)
-        vec3 empty = vec3(0,0,0);
-        bvec3 lt = lessThan(toclip, empty);
-        bvec3 lt2 = lessThan(1.0-toclip, empty);
-        bvec3 lt3 = bvec3(lt.x||lt2.x,lt.y||lt2.y,lt.z||lt2.z);
-        empty += float(!any(lt3));
-        // empty is (0,0,0) if there are negative values, (1,1,1) if there are not
-        return toclip * empty;
+    // recreate CG clip function (clear pixel if any component is negative)
+    vec3 empty = vec3(0,0,0);
+    bvec3 lt = lessThan(toclip, empty);
+    bvec3 lt2 = lessThan(1.0-toclip, empty);
+    bvec3 lt3 = bvec3(lt.x||lt2.x,lt.y||lt2.y,lt.z||lt2.z);
+    empty += float(!any(lt3));
+    // empty is (0,0,0) if there are negative values, (1,1,1) if there are not
+    return toclip * empty;
 }
 
 void main()
 {
-        vec3 nuv = vec3(texCoords.xy, 0.0);
-        nuv -= 0.5;
-        float modx = clamp (step(aspect.y, aspect.x) * step(aspect.z, 0.5) + step(aspect.x, aspect.y) * step(0.5, aspect.z), 0, 1);
-        nuv.x = modx * nuv.x * aspect.x / aspect.y + (1.0-modx) * nuv.x;
-        nuv.y = modx * nuv.y + (1.0-modx) * nuv.y * aspect.y / aspect.x;
-        nuv += 0.5;
-        nuv = clip (nuv);
-        vec4 rgb[3];
-        for (int i=0; i < 3; i++)
-        {
-                nuv.z = (texCoords.x + i * subp + texCoords.y * tilt) * pitch - center;
-                nuv.z = mod(nuv.z + ceil(abs(nuv.z)), 1.0);
-                nuv.z = (1.0 - invView) * nuv.z + invView * (1.0 - nuv.z);
-                rgb[i] = texture(screenTex, texArr(nuv));
-        }
+    vec3 nuv = vec3(texCoords.xy, 0.0);
+    nuv -= 0.5;
+    float modx = clamp (step(aspect.y, aspect.x) * step(aspect.z, 0.5) + step(aspect.x, aspect.y) * step(0.5, aspect.z), 0, 1);
+    nuv.x = modx * nuv.x * aspect.x / aspect.y + (1.0-modx) * nuv.x;
+    nuv.y = modx * nuv.y + (1.0-modx) * nuv.y * aspect.y / aspect.x;
+    nuv += 0.5;
+    nuv = clip (nuv);
+    vec4 rgb[3];
+    for (int i=0; i < 3; i++)
+    {
+        nuv.z = (texCoords.x + i * subp + texCoords.y * tilt) * pitch - center;
+        nuv.z = mod(nuv.z + ceil(abs(nuv.z)), 1.0);
+        nuv.z = (1.0 - invView) * nuv.z + invView * (1.0 - nuv.z);
+        rgb[i] = texture(screenTex, texArr(nuv));
+    }
 
-        vec2 debugUV = texCoords.xy;
+    vec2 debugUV = texCoords.xy;
 #ifdef FLIP_Y
-        debugUV.y = 1.0 - debugUV.y;
+    debugUV.y = 1.0 - debugUV.y;
 #endif
 
-        vec4 debugColor;
-        if (debug_depth != 0) {
-            float depth = texture(depthTex, vec3(debugUV, debugTile)).r;
-            float VAL = 0.985;
-            depth = clamp(depth - VAL, 0, 1) / (1.0 - VAL);
-            debugColor = vec4(depth.xxx, 1);
-        } else {
-            debugColor = texture(screenTex, vec3(debugUV, debugTile));
-        }
+    vec4 debugColor;
 
-        if (debug_dof != 0) {
-            debugColor = texture(cocTex, vec3(debugUV, debugTile));
-        }
+    // TODO: #if DEBUG or something
+    if (debug == DEBUG_DEPTH) {
+        float depth = texture(depthTex, vec3(debugUV, debugTile)).r;
+        float VAL = 0.985;
+        depth = clamp(depth - VAL, 0, 1) / (1.0 - VAL);
+        debugColor = vec4(depth.xxx, 1);
+    } else if (debug == DEBUG_COLOR) {
+        debugColor = texture(screenTex, vec3(debugUV, debugTile));
+    } else if (debug == DEBUG_DOF) {
+        debugColor = texture(cocTex, vec3(debugUV, debugTile));
+    }
 
-        fragColor = vec4(rgb[ri].r, rgb[1].g, rgb[bi].b, 1.0) * (1 - debug) + debugColor * debug;
+    int debug_on = clamp(debug, 0, 1);
+
+    fragColor = vec4(rgb[ri].r, rgb[1].g, rgb[bi].b, 1.0)
+        * (1 - debug_on) + debugColor * debug_on;
 }
 @end
 

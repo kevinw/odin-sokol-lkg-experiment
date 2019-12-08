@@ -5,8 +5,19 @@ games with depth
     battletoads wind tunnel style procgen'd infinite 
 shader reloading - see https://github.com/ThisDrunkDane/libbrew/blob/6ecefb232bc5d8d1b71fad706fc0a857da156fb6/catalog/catalog.odin for an example of using ReadDirectoryChangesW in this context
 depth of field
+check for same mu scissor rect before resetting draw
+shader globals from an @annotation
 @qualityOfLife sokol's asserts could trigger a stack trace
 shadow maps
+turn @annotations into shader globals like this:
+    uniform my_debug_uniforms {
+        int debug;
+    };
+
+    #define DEBUG_OFF 0
+    #define DEBUG_DEPTH 1
+    #define DEBUG_COLOR 2
+    #define DEBUG_DOF 3
 @editor scene view (both this and shadow maps require similar camera work)
 asset catalog: shaders, configs, images
 a set of "println" tools for the screen - temporary message, permanent message with corner

@@ -142,10 +142,15 @@ Material :: struct {
 create_fsq_material :: proc(label: cstring, shader: sg.Shader) -> Material {
     using m: Material;
 
-    C :: 1;
-    vertices := [?][2]f32{
-        {-C, +C}, {+C, +C}, {-C, -C},
-        {-C, -C}, {+C, +C}, {+C, -C},
+    Vertex :: struct {
+        pos: [2]f32,
+        uv:  [2]f32,
+    };
+
+    C :: 1.0;
+    vertices := [?]Vertex {
+        {{+C, +C}, {1, 0}}, {{+C, -C}, {0, 1}}, {{-C, -C}, {0, 0}},
+        {{-C, -C}, {0, 0}}, {{-C, +C}, {0, 0}}, {{+C, +C}, {1, 0}},
     };
 
     bindings.vertex_buffers[0] = sg.make_buffer({
@@ -260,6 +265,8 @@ delta := v3(-1.92, -0.07, 1.52);
 render_gizmos :: proc(mesh: ^gizmos.Mesh) {
     // @Speed just pass index buffers to a sg_pipeline and be done with it.
     sgl.begin_triangles();
+    defer sgl.end();
+
     for _, t in mesh.triangles {
         tri := &mesh.triangles[t];
         for i in 0..<3 {
@@ -271,7 +278,6 @@ render_gizmos :: proc(mesh: ^gizmos.Mesh) {
         }
 
     }
-    sgl.end();
 }
 
 when OSC {
@@ -804,8 +810,8 @@ frame_callback :: proc "c" () {
                 if prim.index_buffer != SCENE_INVALID_INDEX {
                     bind.index_buffer = buffers[prim.index_buffer];
                 }
-                sg.apply_uniforms(.VS, shader_meta.SLOT_vs_params, &vs_params, size_of(vs_params));
-                sg.apply_uniforms(.FS, shader_meta.SLOT_light_params, &state.point_light, size_of(state.point_light));
+                apply_uniforms(.VS, shader_meta.SLOT_vs_params, &vs_params);
+                apply_uniforms(.FS, shader_meta.SLOT_light_params, &state.point_light);
                 //if mat.is_metallic {
                     {
                         base_color_tex := state.placeholders.white;
@@ -817,10 +823,10 @@ frame_callback :: proc "c" () {
                         if prim.material != -1 {
                             metallic := &materials[prim.material];
 
-                            sg.apply_uniforms(sg.Shader_Stage.FS,
+                            apply_uniforms(sg.Shader_Stage.FS,
                                 shader_meta.SLOT_metallic_params,
-                                &metallic.fs_params,
-                                size_of(shader_meta.metallic_params));
+                                &metallic.fs_params);
+                                
 
                             using metallic.images;
                             if base_color != -1         && images[base_color].id != 0         do base_color_tex = images[base_color];
@@ -859,6 +865,16 @@ frame_callback :: proc "c" () {
         });
         sg.apply_pipeline(state.dof_material.pipeline);
         sg.apply_bindings(state.dof_material.bindings);
+
+        uniforms := shader_meta.dof_uniforms {
+            focusDistance = editor_settings.dof_distance,
+            focusRange = editor_settings.dof_range,
+        };
+
+
+        apply_uniforms(.FS, shader_meta.SLOT_dof_uniforms, &uniforms);
+
+
         sg.draw(0, 6, num_views());
         sg.end_pass();
     }
@@ -872,6 +888,19 @@ frame_callback :: proc "c" () {
     sg.apply_bindings(state.lenticular_bindings);
     {
         using hp_info;
+
+        // TODO: must match constants in lenticular.glsl. use an @annotation and an enum to just generate them!
+        Debug :: enum { Off, Depth, Color, DepthOfField, };
+
+        debug:Debug = .Off;
+        {
+            using editor_settings;
+            // TODO: this should be an enum
+            if visualize_depth do debug = .Depth;
+            if visualize_color do debug = .Color;
+            if visualize_dof   do debug = .DepthOfField;
+        }
+
         uniforms := shader_meta.lkg_fs_uniforms {
             pitch = pitch,
             tilt = tilt,
@@ -881,15 +910,12 @@ frame_callback :: proc "c" () {
             bi = cast(i32)bi,
             invView = invView,
             aspect = cast(f32)width/cast(f32)height,
-
-            debug = FORCE_2D ? 1 : 0,
-            debug_depth = cast(i32)editor_settings.visualize_depth,
-
+            debug = i32(debug),
             debugTile = i32(num_views() / 2),
-            tile = Vector4{1, 1, cast(f32)num_views(), 0},
+            tile = Vector4 {1, 1, cast(f32)num_views(), 0},
             viewPortion = Vector4{1, 1, 0, 0},
         };
-        sg.apply_uniforms(.FS, shader_meta.SLOT_lkg_fs_uniforms, &uniforms, size_of(shader_meta.lkg_fs_uniforms));
+        apply_uniforms(.FS, shader_meta.SLOT_lkg_fs_uniforms, &uniforms);
     }
     sg.draw(0, 6, 1);
 
@@ -906,7 +932,7 @@ frame_callback :: proc "c" () {
             iSampleRate = 44100,
         };
         // shadertoy uniforms
-        sg.apply_uniforms(.FS, shader_meta.SLOT_st_fs_uniforms, &global_params_values, size_of(shader_meta.st_fs_uniforms));
+        apply_uniforms(.FS, shader_meta.SLOT_st_fs_uniforms, &global_params_values);
         sg.draw(0, 6, 1);
     }
 

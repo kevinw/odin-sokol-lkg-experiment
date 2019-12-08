@@ -11,6 +11,7 @@ in vec2 uv0;
 out vec3 uvWithLayer;
 
 void main() {
+    gl_Layer = gl_InstanceID;
     gl_Position = vec4(pos, 0, 1);
     uvWithLayer = vec3(uv0, gl_InstanceID);
 }
