@@ -8,7 +8,8 @@ games with depth
     crash bandicoot-style coming outwards
     battletoads wind tunnel style procgen'd infinite 
 shader reloading - see https://github.com/ThisDrunkDane/libbrew/blob/6ecefb232bc5d8d1b71fad706fc0a857da156fb6/catalog/catalog.odin for an example of using ReadDirectoryChangesW in this context
-consider some kind of MainTex_TexelSize magic
+wrap high level "c" procs in context setup wrapper functions for things like the assert handler
+consider some kind of MainTex_TexelSize magic?
 depth of field
 @graphics reflect a cubemap of the helmet, like https://github.com/DiligentGraphics/DiligentFX/tree/master/GLTF_PBR_Renderer
 check for same mu scissor rect before resetting draw

@@ -3,6 +3,7 @@
 @include common.glsl
 
 @fs fs
+#define DEVELOPMENT
 #define FLIP_Y 1
 
 in vec2 texCoords;
@@ -29,27 +30,22 @@ uniform lkg_fs_uniforms {
 
 #define DEBUG_OFF 0
 #define DEBUG_DEPTH 1
-#define DEBUG_COLOR 2
-#define DEBUG_DOF_COC 3
-#define DEBUG_DOF_BOKEH 4
+#define DEBUG_DOF_COC 2
 
-uniform sampler2DArray screenTex, depthTex, cocTex, bokehTex;
+uniform sampler2DArray screenTex;
+#if defined(DEVELOPMENT)
+uniform sampler2DArray depthTex;
+uniform sampler2DArray cocTex;
+#endif
 
 vec3 texArr(vec3 uvz)
 {
-    // decide which section to take from based on the z.
-    float z = floor(uvz.z * tile.z);
-
+    float z = floor(uvz.z * tile.z); // decide which section to take from based on the z.
     vec2 uv2 = uvz.xy;
 #ifdef FLIP_Y
     uv2.y = 1.0 - uv2.y;
 #endif
     return vec3(uv2, z);
-    /*
-    float x = (mod(z, tile.x) + uvz.x) / tile.x;
-    float y = (floor(z / tile.x) + uvz.y) / tile.y;
-    return vec2(x, y) * viewPortion.xy;
-    */
 }
 
 vec3 clip(vec3 toclip)
@@ -82,8 +78,6 @@ void main()
 
         if (debug == DEBUG_DOF_COC) {
             rgb[i] = texture(cocTex, texArr(nuv));
-        } else if (debug == DEBUG_DOF_BOKEH) {
-            rgb[i] = texture(bokehTex, texArr(nuv));
         } else {
             rgb[i] = texture(screenTex, texArr(nuv));
         }
@@ -102,12 +96,10 @@ void main()
         float VAL = 0.985;
         depth = clamp(depth - VAL, 0, 1) / (1.0 - VAL);
         debugColor = vec4(depth.xxx, 1);
-    } else if (debug == DEBUG_COLOR) {
-        debugColor = texture(screenTex, vec3(debugUV, debugTile));
     }
 
     int debug_on = clamp(debug, 0, 1);
-    if (debug == DEBUG_DOF_COC || debug == DEBUG_DOF_BOKEH)
+    if (debug == DEBUG_DOF_COC)
         debug_on = 0;
 
     fragColor = vec4(rgb[ri].r, rgb[1].g, rgb[bi].b, 1.0)

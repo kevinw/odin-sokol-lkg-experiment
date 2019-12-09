@@ -67,6 +67,10 @@ uniform sampler2DArray prefilterCoc;
 
 out vec4 outColor;
 
+float Weigh (vec3 c) {
+    return 1 / (1 + max(max(c.r, c.g), c.b));
+}
+
 void main() {
     vec2 texelSize = textureSize(prefilterColor, 0).xy;
     texelSize.x = 1.0 / texelSize.x;
@@ -74,18 +78,26 @@ void main() {
 
     vec4 o = texelSize.xyxy * vec2(-0.5, 0.5).xxyy;
 
-    // TODO: use texture gathering here.
+    vec3 s0 = texture(prefilterColor, vec3(uvWithLayer.xy + o.xy, uvWithLayer.z)).rgb;
+    vec3 s1 = texture(prefilterColor, vec3(uvWithLayer.xy + o.zy, uvWithLayer.z)).rgb;
+    vec3 s2 = texture(prefilterColor, vec3(uvWithLayer.xy + o.xw, uvWithLayer.z)).rgb;
+    vec3 s3 = texture(prefilterColor, vec3(uvWithLayer.xy + o.zw, uvWithLayer.z)).rgb;
+
+    float w0 = Weigh(s0);
+    float w1 = Weigh(s1);
+    float w2 = Weigh(s2);
+    float w3 = Weigh(s3);
+
+    vec3 color = s0 * w0 + s1 * w1 + s2 * w2 + s3 * w3;
+    color /= max(w0 + w1 + w2 + s3, 0.00001);
+
     float coc0 = texture(prefilterCoc, vec3(uvWithLayer.xy + o.xy, uvWithLayer.z)).r;
     float coc1 = texture(prefilterCoc, vec3(uvWithLayer.xy + o.zy, uvWithLayer.z)).r;
     float coc2 = texture(prefilterCoc, vec3(uvWithLayer.xy + o.xw, uvWithLayer.z)).r;
     float coc3 = texture(prefilterCoc, vec3(uvWithLayer.xy + o.zw, uvWithLayer.z)).r;
-    
-    // regular downsample
-    //float coc = (coc0 + coc1 + coc2 + coc3) * 0.25;
-    
-    // instead, take the most extreme CoC value, either positive or negative.
+
     float cocMin = min(min(min(coc0, coc1), coc2), coc3);
-	float cocMax = max(max(max(coc0, coc1), coc2), coc3);
+    float cocMax = max(max(max(coc0, coc1), coc2), coc3);
     float coc = cocMax >= -cocMin ? cocMax : cocMin;
 
     outColor = vec4(texture(prefilterColor, uvWithLayer).rgb, coc);
@@ -224,7 +236,7 @@ void main() {
 @program dof_postfilter dof_vs dof_postfilter_fs
 
 ////////////
-// combine
+// combine - combine original high-res camera color and half-size depth of field, depending on the coc
 //
 @fs dof_combine_fs
 in vec3 uvWithLayer;
@@ -232,6 +244,7 @@ uniform sampler2DArray mainCameraColor;
 uniform sampler2DArray cocTexArr;
 uniform sampler2DArray dofTex;
 out vec4 outColor;
+
 void main() {
     vec4 source = texture(mainCameraColor, uvWithLayer);
 

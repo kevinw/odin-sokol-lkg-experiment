@@ -4,11 +4,11 @@ import sgl "sokol:sokol_gl"
 using import "math"
 
 Editor_Settings :: struct {
-    dof_distance, dof_range, bokeh_radius: f32,
+    dof: struct {
+        distance, range, bokeh_radius: f32,
+    },
     visualize_depth: bool,
-    visualize_color: bool,
-    visualize_dof: bool,
-    visualize_bokeh: bool,
+    visualize_dof_coc: bool,
     num_views:f32,
     lkg_camera_size:f32, // = 6.0: 
     subview_w: f32,
@@ -26,17 +26,17 @@ editor_settings_defaults :: proc() -> Editor_Settings {
 
     lkg_camera_size = 0.80;
     subview_w = 700;
-    dof_distance = 2.0;
-    dof_range = 0.5;
-
-    bokeh_radius = 4;
-
+    {
+        using dof;
+        distance = 2.0;
+        range = 0.5;
+        bokeh_radius = 4;
+    }
     lkg_view_cone = 2.51;
     num_views = 45;
     fov = 25.7;
-    visualize_bokeh = true; // @nocheckin
 
-    ui_mousewheel_scroll_speed = -10;
+    ui_mousewheel_scroll_speed = -16;
 
     return e;
 }

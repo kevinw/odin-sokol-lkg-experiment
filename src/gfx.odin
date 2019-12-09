@@ -114,3 +114,18 @@ reinit_pass :: inline proc(pass: ^sg.Pass, desc: sg.Pass_Desc) {
     sg.destroy_pass(pass^);
     pass^ = sg.make_pass(desc);
 }
+
+reinit_pipeline :: inline proc(pipeline: ^sg.Pipeline, desc: sg.Pipeline_Desc) {
+    assert(pipeline != nil);
+
+    sg.destroy_pipeline(pipeline^);
+    pipeline^ = sg.make_pipeline(desc);
+}
+
+static_shader :: inline proc(s: ^sg.Shader, desc: ^sg.Shader_Desc) -> sg.Shader {
+    if s.id == 0 {
+        s^ = sg.make_shader(desc^);
+    }
+
+    return s^;
+}

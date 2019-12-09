@@ -846,9 +846,9 @@ frame_callback :: proc "c" () {
                 farPlane = state.camera.far_plane,
             });
             apply_uniforms(.FS, shader_meta.SLOT_dof_uniforms, shader_meta.dof_uniforms {
-                focusDistance = editor_settings.dof_distance,
-                focusRange = editor_settings.dof_range,
-                bokeh_radius = editor_settings.bokeh_radius,
+                focusDistance = editor_settings.dof.distance,
+                focusRange = editor_settings.dof.range,
+                bokeh_radius = editor_settings.dof.bokeh_radius,
             });
 
             sg.draw(0, 6, num_views());
@@ -868,7 +868,7 @@ frame_callback :: proc "c" () {
             bokeh_material.bindings.fs_images[shader_meta.SLOT_cameraColorWithCoc] = half_size_color;// offscreen.pass_desc.color_attachments[0].image;
             apply_material(&bokeh_material);
             apply_uniforms(.FS, shader_meta.SLOT_bokeh_uniforms, shader_meta.bokeh_uniforms {
-                bokeh_radius = editor_settings.bokeh_radius,
+                bokeh_radius = editor_settings.dof.bokeh_radius,
             });
 
             sg.draw(0, 6, num_views());
@@ -889,12 +889,16 @@ frame_callback :: proc "c" () {
     sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
 
     {
-        using state.lenticular_bindings;
+        using state;
+        using lenticular_bindings;
         using shader_meta;
-        fs_images[SLOT_cocTex]    = state.depth_of_field.coc_pass_desc.color_attachments[0].image;
-        fs_images[SLOT_bokehTex]  = state.depth_of_field.bokeh_pass_desc.color_attachments[0].image;
-        fs_images[SLOT_screenTex] = state.depth_of_field.final_img;
-        fs_images[SLOT_depthTex]  = state.offscreen.pass_desc.depth_stencil_attachment.image;
+        if state.depth_of_field.enabled {
+            fs_images[SLOT_cocTex]    = depth_of_field.coc_pass_desc.color_attachments[0].image;
+            fs_images[SLOT_depthTex]  = offscreen.pass_desc.depth_stencil_attachment.image;
+            fs_images[SLOT_screenTex] = depth_of_field.final_img;
+        } else {
+            fs_images[SLOT_screenTex] = offscreen.pass_desc.color_attachments[0].image;
+        }
     }
 
     sg.apply_pipeline(state.lenticular_pipeline);
@@ -903,16 +907,13 @@ frame_callback :: proc "c" () {
         using hp_info;
 
         // TODO: must match constants in lenticular.glsl. use an @annotation and an enum to just generate them!
-        Debug :: enum { Off, Depth, Color, DOFCoc, DOFBokeh, };
+        Debug :: enum { Off, Depth, DOFCoc };
 
         debug:Debug = .Off;
         {
             using editor_settings;
-            // TODO: this should be an enum
-            if visualize_depth do debug = .Depth;
-            if visualize_color do debug = .Color;
-            if visualize_dof   do debug = .DOFCoc;
-            if visualize_bokeh do debug = .DOFBokeh;
+            if visualize_depth   do debug = .Depth; // TODO: this should be an enum in editor_settings
+            if visualize_dof_coc do debug = .DOFCoc;
         }
 
         apply_uniforms(.FS, shader_meta.SLOT_lkg_fs_uniforms, shader_meta.lkg_fs_uniforms {

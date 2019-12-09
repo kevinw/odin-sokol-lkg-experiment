@@ -84,17 +84,19 @@ Blitter :: struct {
     bindings: sg.Bindings,
 };
 
-create_blit :: proc(label: cstring, target_rt: sg.Image, shader_: sg.Shader = {}) -> Blitter {
-    using b: Blitter;
+recreate_blit :: proc(using b: ^Blitter, label: cstring, target_rt: sg.Image, shader_: sg.Shader = {}) {
 
     // @Leak 
     shader := shader_;
     if shader.id == 0 {
-        shader = sg.make_shader(shader_meta.blit_shader_desc()^);
+        @static blit_shader: sg.Shader;
+        if blit_shader.id == 0 {
+            blit_shader = sg.make_shader(shader_meta.blit_shader_desc()^);
+        }
+        shader = blit_shader;
     }
 
-    sg.destroy_pipeline(pipeline);
-    pipeline = sg.make_pipeline({
+    reinit_pipeline(&pipeline, {
         label = label,
         shader = shader,
         blend = {
@@ -107,19 +109,22 @@ create_blit :: proc(label: cstring, target_rt: sg.Image, shader_: sg.Shader = {}
             }
         }
     });
+    assert(pipeline.id != sg.INVALID_ID);
 
     reinit_pass(&pass, {
         label = label,
         color_attachments = { 0 = { image = target_rt } }
     });
+    assert(pass.id != sg.INVALID_ID);
 
     bindings.vertex_buffers[0] = get_quad_negone_one();
-    return b;
 }
 
 blit :: proc(using b: ^Blitter, source_rt: sg.Image, source_slot: int = 0) {
     sg.begin_pass(pass, { colors = { 0 = { action = .LOAD }}});
     defer sg.end_pass();
+
+    assert(pipeline.id != sg.INVALID_ID, fmt.tprintf("blit pipeline is invalid for blit at %p", b));
 
     sg.apply_pipeline(pipeline);
     bindings.fs_images[source_slot] = source_rt;
@@ -191,7 +196,7 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
         bokeh_width, bokeh_height := width / 2, height / 2;
         {
             sg.destroy_image(bokeh_pass_desc.color_attachments[0].image);
-            sg.destroy_image(bokeh_pass_desc.depth_stencil_attachment.image);
+
             bokeh_img_desc = rendertarget_array_desc(bokeh_width, bokeh_height, cast(i32)num_views, "depth of field bokeh image");
             bokeh_pass_desc = {
                 label = "depth of field bokeh pass",
@@ -209,26 +214,11 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
 
         reinit_image(&half_size_color, rendertarget_array_desc(half_w, half_h, cast(i32)num_views, "half_size_color"));
 
-        @static prefilter_shader: sg.Shader;
-        if prefilter_shader.id == 0 {
-            prefilter_shader = sg.make_shader(shader_meta.dof_prefilter_shader_desc()^);
-        }
-        prefilter_blit = create_blit("prefilter", half_size_color, prefilter_shader);
-
-        @static postfilter_shader: sg.Shader;
-        if postfilter_shader.id == 0 {
-            postfilter_shader = sg.make_shader(shader_meta.dof_postfilter_shader_desc()^);
-        }
-
-        postfilter_blit = create_blit("postfilter", half_size_color, postfilter_shader);
-
-        @static combine_shader: sg.Shader;
-        if combine_shader.id == 0 {
-            combine_shader = sg.make_shader(shader_meta.dof_combine_shader_desc()^);
-        }
-
+        @static prefilter_shader, postfilter_shader, combine_shader: sg.Shader;
+        recreate_blit(&prefilter_blit, "prefilter", half_size_color, static_shader(&prefilter_shader, shader_meta.dof_prefilter_shader_desc()));
+        recreate_blit(&postfilter_blit, "postfilter", half_size_color, static_shader(&postfilter_shader, shader_meta.dof_postfilter_shader_desc()));
         reinit_image(&final_img, rendertarget_array_desc(width, height, cast(i32)num_views, "full size dof final"));
-        combine_blit = create_blit("dof_combine", final_img, combine_shader);
+        recreate_blit(&combine_blit, "dof_combine", final_img, static_shader(&combine_shader, shader_meta.dof_combine_shader_desc()));
     }
 }
 
