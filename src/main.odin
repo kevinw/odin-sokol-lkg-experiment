@@ -570,6 +570,7 @@ debug_window :: proc(ctx: ^mu.Context) {
         @static show_info: i32 = 0;
         if mu.header(ctx, &show_info, "debug") {
             mu_layout_row(ctx, {80, -1}, 0);
+            mu.label(ctx, "dof:"); mu_checkbox(ctx, &state.depth_of_field.enabled, "depth of field");
             mu.label(ctx, "ms per frame:"); mu_label_printf(ctx, "%f", fps_counter.ms_per_frame);
             mu.label(ctx, "num elements:"); mu_label_printf(ctx, "%d", per_frame_stats.num_elements);
 
