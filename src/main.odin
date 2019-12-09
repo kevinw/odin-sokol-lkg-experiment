@@ -1046,6 +1046,8 @@ event_callback :: proc "c" (event: ^sapp.Event) {
                 case .LEFT: input_state.left_mouse = false;
                 case .RIGHT: input_state.right_mouse = false;
             }
+        case .MOUSE_SCROLL:
+            mu.input_scroll(&mu_ctx, cast(i32)event.scroll_x, cast(i32)(event.scroll_y * editor_settings.ui_mousewheel_scroll_speed));
         case .MOUSE_MOVE:
             mu.input_mousemove(&mu_ctx, cast(i32)event.mouse_x, cast(i32)event.mouse_y);
             state.mouse.pos = v2(event.mouse_x, event.mouse_y);
