@@ -36,6 +36,8 @@ calc_lkg_subquilt_size :: proc(framebuffer_width, framebuffer_height: int) -> (i
     return cast(i32)width, cast(i32)height;
 }
 
+DOF_COC_IMAGE_FORMAT: sg.Pixel_Format = .R32F;
+
 init_dof_pipelines :: proc() {
     quad_buf := get_quad_negone_one();
 
@@ -46,7 +48,7 @@ init_dof_pipelines :: proc() {
             label = "dof coc pipeline",
             shader = sg.make_shader(shader_meta.dof_coc_shader_desc()^),
             blend = {
-                color_format = .R8,
+                color_format = DOF_COC_IMAGE_FORMAT,
                 depth_format = .NONE,
             },
             layout = {
@@ -106,8 +108,7 @@ create_blit :: proc(label: cstring, target_rt: sg.Image, shader_: sg.Shader = {}
         }
     });
 
-    sg.destroy_pass(pass);
-    pass = sg.make_pass({
+    reinit_pass(&pass, {
         label = label,
         color_attachments = { 0 = { image = target_rt } }
     });
@@ -136,7 +137,6 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
         using state.offscreen;
 
         /* destroy previous resource (can be called for invalid id) */
-        sg.destroy_pass(pass);
         sg.destroy_image(pass_desc.color_attachments[0].image);
         sg.destroy_image(pass_desc.depth_stencil_attachment.image);
 
@@ -157,7 +157,7 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
             label = "multiview offscreen pass"
         };
 
-        pass = sg.make_pass(pass_desc);
+        reinit_pass(&pass, pass_desc);
     }
 
     //
@@ -167,12 +167,11 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
         using state.depth_of_field;
 
         {
-            sg.destroy_pass(coc_pass);
             sg.destroy_image(coc_pass_desc.color_attachments[0].image);
             sg.destroy_image(coc_pass_desc.depth_stencil_attachment.image);
 
             coc_img_desc = rendertarget_array_desc(width, height, cast(i32)num_views, "depth of field coc image");
-            coc_img_desc.pixel_format = .R8;
+            coc_img_desc.pixel_format = DOF_COC_IMAGE_FORMAT;
 
             coc_pass_desc = {
                 color_attachments = {
@@ -181,6 +180,7 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
                 label = "depth of field coc pass",
             };
 
+            sg.destroy_pass(coc_pass);
             coc_pass = sg.make_pass(coc_pass_desc);
 
             // set "cameraDepth" uniform texture
@@ -192,9 +192,7 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
         {
             sg.destroy_image(bokeh_pass_desc.color_attachments[0].image);
             sg.destroy_image(bokeh_pass_desc.depth_stencil_attachment.image);
-
             bokeh_img_desc = rendertarget_array_desc(bokeh_width, bokeh_height, cast(i32)num_views, "depth of field bokeh image");
-
             bokeh_pass_desc = {
                 label = "depth of field bokeh pass",
                 color_attachments = {
@@ -202,8 +200,7 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
                 },
             };
 
-            sg.destroy_pass(bokeh_pass);
-            bokeh_pass = sg.make_pass(bokeh_pass_desc);
+            reinit_pass(&bokeh_pass, bokeh_pass_desc);
         }
 
         cam_tex := &state.offscreen.color_img_desc;

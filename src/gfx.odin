@@ -107,3 +107,10 @@ reinit_image :: inline proc(img: ^sg.Image, desc: sg.Image_Desc) {
     sg.destroy_image(img^);
     img^ = sg.make_image(desc);
 }
+
+reinit_pass :: inline proc(pass: ^sg.Pass, desc: sg.Pass_Desc) {
+    assert(pass != nil);
+
+    sg.destroy_pass(pass^);
+    pass^ = sg.make_pass(desc);
+}
