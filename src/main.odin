@@ -610,6 +610,10 @@ debug_window :: proc(ctx: ^mu.Context) {
 }
 
 frame_callback :: proc "c" () {
+    when STACK_TRACES {
+        context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
+    }
+
 	//
 	// TIME
 	//
@@ -1141,7 +1145,9 @@ main :: proc() {
     handle_args();
 
     // install a stacktrace handler for asserts
-    when STACK_TRACES do context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
+    when STACK_TRACES {
+        context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
+    }
 
 	os.exit(run_app());
 }
