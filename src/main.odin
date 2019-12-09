@@ -144,12 +144,6 @@ apply_material :: proc(using material: ^Material) {
     sg.apply_bindings(bindings);
 }
 
-Blitter :: struct {
-    pass: sg.Pass,
-    pipeline: sg.Pipeline,
-    bindings: sg.Bindings,
-};
-
 state: struct {
     offscreen: struct {
         pass_desc: sg.Pass_Desc,
@@ -159,8 +153,10 @@ state: struct {
     depth_of_field: struct {
         prefilter_blit: Blitter,
         postfilter_blit: Blitter,
+        combine_blit: Blitter,
 
         half_size_color: sg.Image,
+        final_img: sg.Image,
 
         coc_pass_desc: sg.Pass_Desc,
         coc_pass: sg.Pass,
@@ -495,7 +491,9 @@ init_callback :: proc "c" () {
     }
 
     // make depth of field pipelines
-    init_dof_pipelines();
+    {
+        init_dof_pipelines();
+    }
 
     // make line rendering pipeline
     {
@@ -541,7 +539,7 @@ debug_window :: proc(ctx: ^mu.Context) {
         mu.init_window(ctx, &window, {});
         window.rect = FORCE_2D ? 
             mu.rect(20, 20, 250, 450) :
-            mu.rect(20, 20, 600, 850);
+            mu.rect(20, 20, 550, 1050);
     }
 
     window.rect.w = max(window.rect.w, 240);
@@ -875,16 +873,24 @@ frame_callback :: proc "c" () {
             // post filter pass
             blit(&postfilter_blit, bokeh_pass_desc.color_attachments[0].image);
         }
+
+        {
+            // combine pass
+            combine_blit.bindings.fs_images[shader_meta.SLOT_cocTexArr] = state.depth_of_field.coc_pass_desc.color_attachments[0].image;
+            combine_blit.bindings.fs_images[shader_meta.SLOT_dofTex] = half_size_color;
+            blit(&combine_blit, state.offscreen.pass_desc.color_attachments[0].image);
+        }
     }
 
     sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
 
     {
         using state.lenticular_bindings;
-        fs_images[shader_meta.SLOT_cocTex] =
-            state.depth_of_field.coc_pass_desc.color_attachments[0].image;
-        fs_images[shader_meta.SLOT_bokehTex] =
-            state.depth_of_field.bokeh_pass_desc.color_attachments[0].image;
+        using shader_meta;
+        fs_images[SLOT_cocTex]    = state.depth_of_field.coc_pass_desc.color_attachments[0].image;
+        fs_images[SLOT_bokehTex]  = state.depth_of_field.bokeh_pass_desc.color_attachments[0].image;
+        fs_images[SLOT_screenTex] = state.depth_of_field.final_img;
+        fs_images[SLOT_depthTex]  = state.offscreen.pass_desc.depth_stencil_attachment.image;
     }
 
     sg.apply_pipeline(state.lenticular_pipeline);

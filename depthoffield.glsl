@@ -75,18 +75,18 @@ void main() {
     vec4 o = texelSize.xyxy * vec2(-0.5, 0.5).xxyy;
 
     // TODO: use texture gathering here.
-    lowp float coc0 = texture(prefilterCoc, vec3(uvWithLayer.xy + o.xy, uvWithLayer.z)).r;
-    lowp float coc1 = texture(prefilterCoc, vec3(uvWithLayer.xy + o.zy, uvWithLayer.z)).r;
-    lowp float coc2 = texture(prefilterCoc, vec3(uvWithLayer.xy + o.xw, uvWithLayer.z)).r;
-    lowp float coc3 = texture(prefilterCoc, vec3(uvWithLayer.xy + o.zw, uvWithLayer.z)).r;
+    float coc0 = texture(prefilterCoc, vec3(uvWithLayer.xy + o.xy, uvWithLayer.z)).r;
+    float coc1 = texture(prefilterCoc, vec3(uvWithLayer.xy + o.zy, uvWithLayer.z)).r;
+    float coc2 = texture(prefilterCoc, vec3(uvWithLayer.xy + o.xw, uvWithLayer.z)).r;
+    float coc3 = texture(prefilterCoc, vec3(uvWithLayer.xy + o.zw, uvWithLayer.z)).r;
     
     // regular downsample
-    //lowp float coc = (coc0 + coc1 + coc2 + coc3) * 0.25;
+    //float coc = (coc0 + coc1 + coc2 + coc3) * 0.25;
     
     // instead, take the most extreme CoC value, either positive or negative.
-    lowp float cocMin = min(min(min(coc0, coc1), coc2), coc3);
-	lowp float cocMax = max(max(max(coc0, coc1), coc2), coc3);
-    lowp float coc = cocMax >= -cocMin ? cocMax : cocMin;
+    float cocMin = min(min(min(coc0, coc1), coc2), coc3);
+	float cocMax = max(max(max(coc0, coc1), coc2), coc3);
+    float coc = cocMax >= -cocMin ? cocMax : cocMin;
 
     outColor = vec4(texture(prefilterColor, uvWithLayer).rgb, coc);
 }
@@ -158,6 +158,12 @@ const vec2 kernel[kernelSampleCount] = {
 	vec2(0.90096885, -0.43388376),
 };
 
+float saturate(float s) { return clamp(s, 0, 1); }
+
+float Weigh(float coc, float radius) {
+    return saturate((coc - radius + 2) / 2);
+}
+
 void main() {
     vec3 color = vec3(0, 0, 0);
 
@@ -171,13 +177,14 @@ void main() {
 
     for (int k = 0; k < kernelSampleCount; ++k) {
         vec2 o = kernel[k] * bokeh_radius;
-        lowp float radius = length(o); // TODO: precompute these above
+        float radius = length(o); // TODO: precompute these above
         o *= texelSize.xy;
-        lowp vec4 s = texture(cameraColorWithCoc, uvWithLayer + vec3(o, 0));
-        //if (abs(s.a) >= radius) {
-            color += s.rgb;
-            weight += 1;
-        //}
+
+        vec4 s = texture(cameraColorWithCoc, uvWithLayer + vec3(o, 0));
+
+        float sw = Weigh(abs(s.a), radius);
+        color += s.rgb * sw;
+        weight += sw;
     }
 
     color *= 1.0 / weight;
@@ -189,7 +196,9 @@ void main() {
 
 @program dof_bokeh dof_vs bokeh_fs
 
-/////////////
+//////////////////////////////
+// postfilter
+//
 @fs dof_postfilter_fs
 
 in vec3 uvWithLayer;
@@ -213,4 +222,28 @@ void main() {
 @end
 
 @program dof_postfilter dof_vs dof_postfilter_fs
+
 ////////////
+// combine
+//
+@fs dof_combine_fs
+in vec3 uvWithLayer;
+uniform sampler2DArray mainCameraColor;
+uniform sampler2DArray cocTexArr;
+uniform sampler2DArray dofTex;
+out vec4 outColor;
+void main() {
+    vec4 source = texture(mainCameraColor, uvWithLayer);
+
+    float coc = texture(cocTexArr, uvWithLayer).r;
+    vec4  dof = texture(dofTex, uvWithLayer);
+
+    float dofStrength = smoothstep(0.1, 1, abs(coc));
+    vec3 color = mix(source.rgb, dof.rgb, dofStrength);
+
+    outColor = vec4(color, source.a);
+}
+
+@end
+
+@program dof_combine dof_vs dof_combine_fs

@@ -76,6 +76,11 @@ init_dof_pipelines :: proc() {
     }
 }
 
+Blitter :: struct {
+    pass: sg.Pass,
+    pipeline: sg.Pipeline,
+    bindings: sg.Bindings,
+};
 
 create_blit :: proc(label: cstring, target_rt: sg.Image, shader_: sg.Shader = {}) -> Blitter {
     using b: Blitter;
@@ -112,7 +117,7 @@ create_blit :: proc(label: cstring, target_rt: sg.Image, shader_: sg.Shader = {}
 }
 
 blit :: proc(using b: ^Blitter, source_rt: sg.Image, source_slot: int = 0) {
-    sg.begin_pass(pass, {});
+    sg.begin_pass(pass, { colors = { 0 = { action = .LOAD }}});
     defer sg.end_pass();
 
     sg.apply_pipeline(pipeline);
@@ -153,10 +158,6 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
         };
 
         pass = sg.make_pass(pass_desc);
-
-        /* also need to update the fullscreen-quad texture bindings */
-        state.lenticular_bindings.fs_images[shader_meta.SLOT_screenTex] = pass_desc.color_attachments[0].image;
-        state.lenticular_bindings.fs_images[shader_meta.SLOT_depthTex] = pass_desc.depth_stencil_attachment.image;
     }
 
     //
@@ -223,6 +224,14 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
         }
 
         postfilter_blit = create_blit("postfilter", half_size_color, postfilter_shader);
+
+        @static combine_shader: sg.Shader;
+        if combine_shader.id == 0 {
+            combine_shader = sg.make_shader(shader_meta.dof_combine_shader_desc()^);
+        }
+
+        reinit_image(&final_img, rendertarget_array_desc(width, height, cast(i32)num_views, "full size dof final"));
+        combine_blit = create_blit("dof_combine", final_img, combine_shader);
     }
 }
 

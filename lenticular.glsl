@@ -33,10 +33,7 @@ uniform lkg_fs_uniforms {
 #define DEBUG_DOF_COC 3
 #define DEBUG_DOF_BOKEH 4
 
-uniform sampler2DArray screenTex;
-uniform sampler2DArray depthTex;
-uniform sampler2DArray cocTex;
-uniform sampler2DArray bokehTex;
+uniform sampler2DArray screenTex, depthTex, cocTex, bokehTex;
 
 vec3 texArr(vec3 uvz)
 {
