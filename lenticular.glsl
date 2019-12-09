@@ -30,11 +30,13 @@ uniform lkg_fs_uniforms {
 #define DEBUG_OFF 0
 #define DEBUG_DEPTH 1
 #define DEBUG_COLOR 2
-#define DEBUG_DOF 3
+#define DEBUG_DOF_COC 3
+#define DEBUG_DOF_BOKEH 4
 
 uniform sampler2DArray screenTex;
 uniform sampler2DArray depthTex;
 uniform sampler2DArray cocTex;
+uniform sampler2DArray bokehTex;
 
 vec3 texArr(vec3 uvz)
 {
@@ -80,7 +82,14 @@ void main()
         nuv.z = (texCoords.x + i * subp + texCoords.y * tilt) * pitch - center;
         nuv.z = mod(nuv.z + ceil(abs(nuv.z)), 1.0);
         nuv.z = (1.0 - invView) * nuv.z + invView * (1.0 - nuv.z);
-        rgb[i] = texture(screenTex, texArr(nuv));
+
+        if (debug == DEBUG_DOF_COC) {
+            rgb[i] = texture(cocTex, texArr(nuv));
+        } else if (debug == DEBUG_DOF_BOKEH) {
+            rgb[i] = texture(bokehTex, texArr(nuv));
+        } else {
+            rgb[i] = texture(screenTex, texArr(nuv));
+        }
     }
 
     vec2 debugUV = texCoords.xy;
@@ -98,11 +107,11 @@ void main()
         debugColor = vec4(depth.xxx, 1);
     } else if (debug == DEBUG_COLOR) {
         debugColor = texture(screenTex, vec3(debugUV, debugTile));
-    } else if (debug == DEBUG_DOF) {
-        debugColor = texture(cocTex, vec3(debugUV, debugTile));
     }
 
     int debug_on = clamp(debug, 0, 1);
+    if (debug == DEBUG_DOF_COC || debug == DEBUG_DOF_BOKEH)
+        debug_on = 0;
 
     fragColor = vec4(rgb[ri].r, rgb[1].g, rgb[bi].b, 1.0)
         * (1 - debug_on) + debugColor * debug_on;

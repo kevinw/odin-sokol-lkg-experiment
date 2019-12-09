@@ -234,6 +234,7 @@ foreign libmicroui {
 	input_mousedown :: proc(ctx: ^Context, x, y: c.int, btn: c.int) ---;
 	input_mouseup   :: proc(ctx: ^Context, x, y: c.int, btn: c.int) ---;
 	input_scroll    :: proc(ctx: ^Context, x, y: c.int)             ---;
+	input_mousewheel :: proc(ctx: ^Context, y: c.int)               ---;
 	input_keydown   :: proc(ctx: ^Context, key: c.int)              ---;
 	input_keyup     :: proc(ctx: ^Context, key: c.int)              ---;
 	input_text      :: proc(ctx: ^Context, text: cstring)           ---;

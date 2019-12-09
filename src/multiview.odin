@@ -1,5 +1,6 @@
 package main
 
+import "core:fmt"
 import sg "sokol:sokol_gfx"
 import "./shader_meta";
 
@@ -35,22 +36,89 @@ calc_lkg_subquilt_size :: proc(framebuffer_width, framebuffer_height: int) -> (i
     return cast(i32)width, cast(i32)height;
 }
 
-rendertarget_array_desc :: proc(width, height, num_layers: i32, label: cstring) -> sg.Image_Desc {
-    offscreen_sample_count := sg.query_features().msaa_render_targets ? MSAA_SAMPLE_COUNT : 1;
-    desc := sg.Image_Desc {
-        render_target = true,
-        type = .ARRAY,
-        width = width,
-        height = height,
-        min_filter = .LINEAR,
-        mag_filter = .LINEAR,
-        wrap_u = .CLAMP_TO_EDGE,
-        wrap_v = .CLAMP_TO_EDGE,
-        sample_count = cast(i32)offscreen_sample_count,
-        label = "multiview color image"
-    };
-    desc.layers = num_layers;
-    return desc;
+init_dof_pipelines :: proc() {
+    quad_buf := get_quad_negone_one();
+
+    {
+        using state.depth_of_field.coc_material;
+        bindings.vertex_buffers[0] = quad_buf;
+        pipeline = sg.make_pipeline({
+            label = "dof coc pipeline",
+            shader = sg.make_shader(shader_meta.dof_coc_shader_desc()^),
+            blend = {
+                color_format = .R8,
+                depth_format = .NONE,
+            },
+            layout = {
+                attrs = {
+                    0 = {format = .FLOAT2 },
+                    1 = {format = .FLOAT2 },
+                },
+            },
+        });
+    }
+    {
+        using state.depth_of_field.bokeh_material;
+        bindings.vertex_buffers[0] = quad_buf;
+        pipeline = sg.make_pipeline({
+            label = "dof bokeh pipeline",
+            shader = sg.make_shader(shader_meta.dof_bokeh_shader_desc()^),
+            blend = {
+                depth_format = .NONE,
+            },
+            layout = {
+                attrs = {
+                    0 = {format = .FLOAT2 },
+                    1 = {format = .FLOAT2 },
+                },
+            },
+        });
+    }
+}
+
+
+create_blit :: proc(label: cstring, target_rt: sg.Image, shader_: sg.Shader = {}) -> Blitter {
+    using b: Blitter;
+
+    // @Leak 
+    shader := shader_;
+    if shader.id == 0 {
+        shader = sg.make_shader(shader_meta.blit_shader_desc()^);
+    }
+
+    sg.destroy_pipeline(pipeline);
+    pipeline = sg.make_pipeline({
+        label = label,
+        shader = shader,
+        blend = {
+            depth_format = .NONE,
+        },
+        layout = {
+            attrs = {
+                0 = {format = .FLOAT2},
+                1 = {format = .FLOAT2},
+            }
+        }
+    });
+
+    sg.destroy_pass(pass);
+    pass = sg.make_pass({
+        label = label,
+        color_attachments = { 0 = { image = target_rt } }
+    });
+
+    bindings.vertex_buffers[0] = get_quad_negone_one();
+    return b;
+}
+
+blit :: proc(using b: ^Blitter, source_rt: sg.Image, source_slot: int = 0) {
+    sg.begin_pass(pass, {});
+    defer sg.end_pass();
+
+    sg.apply_pipeline(pipeline);
+    bindings.fs_images[source_slot] = source_rt;
+    sg.apply_bindings(bindings);
+    sg.draw(0, 6, num_views());
 }
 
 create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: int) {
@@ -97,23 +165,64 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
     {
         using state.depth_of_field;
 
-        sg.destroy_pass(pass);
-        sg.destroy_image(pass_desc.color_attachments[0].image);
-        sg.destroy_image(pass_desc.depth_stencil_attachment.image);
+        {
+            sg.destroy_pass(coc_pass);
+            sg.destroy_image(coc_pass_desc.color_attachments[0].image);
+            sg.destroy_image(coc_pass_desc.depth_stencil_attachment.image);
 
-        color_img_desc = rendertarget_array_desc(width, height, cast(i32)num_views, "depth of field coc image");
+            coc_img_desc = rendertarget_array_desc(width, height, cast(i32)num_views, "depth of field coc image");
+            coc_img_desc.pixel_format = .R8;
 
-        pass_desc = {
-            color_attachments = {
-                0 = { image = sg.make_image(color_img_desc) },
-            },
-            label = "depth of field coc pass",
-        };
+            coc_pass_desc = {
+                color_attachments = {
+                    0 = { image = sg.make_image(coc_img_desc) },
+                },
+                label = "depth of field coc pass",
+            };
 
-        pass = sg.make_pass(pass_desc);
+            coc_pass = sg.make_pass(coc_pass_desc);
 
-        state.dof_material.bindings.fs_images[shader_meta.SLOT_cameraDepth] =
-            state.offscreen.pass_desc.depth_stencil_attachment.image;
+            // set "cameraDepth" uniform texture
+            coc_material.bindings.fs_images[shader_meta.SLOT_cameraDepth] =
+                state.offscreen.pass_desc.depth_stencil_attachment.image;
+        }
+
+        bokeh_width, bokeh_height := width / 2, height / 2;
+        {
+            sg.destroy_image(bokeh_pass_desc.color_attachments[0].image);
+            sg.destroy_image(bokeh_pass_desc.depth_stencil_attachment.image);
+
+            bokeh_img_desc = rendertarget_array_desc(bokeh_width, bokeh_height, cast(i32)num_views, "depth of field bokeh image");
+
+            bokeh_pass_desc = {
+                label = "depth of field bokeh pass",
+                color_attachments = {
+                    0 = { image = sg.make_image(bokeh_img_desc) },
+                },
+            };
+
+            sg.destroy_pass(bokeh_pass);
+            bokeh_pass = sg.make_pass(bokeh_pass_desc);
+        }
+
+        cam_tex := &state.offscreen.color_img_desc;
+
+        half_w, half_h := cam_tex.width / 2, cam_tex.height / 2;
+
+        reinit_image(&half_size_color, rendertarget_array_desc(half_w, half_h, cast(i32)num_views, "half_size_color"));
+
+        @static prefilter_shader: sg.Shader;
+        if prefilter_shader.id == 0 {
+            prefilter_shader = sg.make_shader(shader_meta.dof_prefilter_shader_desc()^);
+        }
+        prefilter_blit = create_blit("prefilter", half_size_color, prefilter_shader);
+
+        @static postfilter_shader: sg.Shader;
+        if postfilter_shader.id == 0 {
+            postfilter_shader = sg.make_shader(shader_meta.dof_postfilter_shader_desc()^);
+        }
+
+        postfilter_blit = create_blit("postfilter", half_size_color, postfilter_shader);
     }
 }
 

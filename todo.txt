@@ -1,10 +1,16 @@
-(A) prioritize this list by using a game idea as a forcing function
+(A) shader_meta needs a cleanup. at the very least, start with package-per-shader?
+    or should we just go immediately for a more late-binding approach?
+    ideally some mix of both is ideal...where to look for inspiration?
+hdr pbr textures https://texturehaven.com/textures/
+(B) prioritize this list by using a game idea as a forcing function
 games with depth
     flying, walking, racing inwards
     crash bandicoot-style coming outwards
     battletoads wind tunnel style procgen'd infinite 
 shader reloading - see https://github.com/ThisDrunkDane/libbrew/blob/6ecefb232bc5d8d1b71fad706fc0a857da156fb6/catalog/catalog.odin for an example of using ReadDirectoryChangesW in this context
+consider some kind of MainTex_TexelSize magic
 depth of field
+@graphics reflect a cubemap of the helmet, like https://github.com/DiligentGraphics/DiligentFX/tree/master/GLTF_PBR_Renderer
 check for same mu scissor rect before resetting draw
 shader globals from an @annotation
 @qualityOfLife sokol's asserts could trigger a stack trace
@@ -19,14 +25,13 @@ turn @annotations into shader globals like this:
     #define DEBUG_COLOR 2
     #define DEBUG_DOF 3
 @editor scene view (both this and shadow maps require similar camera work)
+make subview quilt size a multiple of the actual device width? this way, 8k would get a higher res by default...
 asset catalog: shaders, configs, images
 a set of "println" tools for the screen - temporary message, permanent message with corner
 multiple window support with a scene view - essential for lkg development?
 integrate sokol compute pull request
 log system with info/debug/warn/error
 cleanup input/keys array state
-shader_meta needs a cleanup. at the very least, start with package-per-shader?
-    or should we just go immediately for a more late-binding approach?
 undo @editor
 @editor consider a switch to imgui
 remove c runtime dependency from dependencies?

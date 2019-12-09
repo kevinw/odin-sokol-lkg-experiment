@@ -139,42 +139,16 @@ Material :: struct {
     bindings: sg.Bindings,
 }
 
-create_fsq_material :: proc(label: cstring, shader: sg.Shader) -> Material {
-    using m: Material;
-
-    Vertex :: struct {
-        pos: [2]f32,
-        uv:  [2]f32,
-    };
-
-    C :: 1.0;
-    vertices := [?]Vertex {
-        {{+C, +C}, {1, 0}}, {{+C, -C}, {0, 1}}, {{-C, -C}, {0, 0}},
-        {{-C, -C}, {0, 0}}, {{-C, +C}, {0, 0}}, {{+C, +C}, {1, 0}},
-    };
-
-    bindings.vertex_buffers[0] = sg.make_buffer({
-        label = label,
-        size = len(vertices) * size_of(vertices[0]),
-        content = &vertices[0],
-    });
-
-    pipeline = sg.make_pipeline({
-        shader = shader,
-        blend = {
-            depth_format = .NONE,
-        },
-        label = label,
-        layout = {
-            attrs = {
-                0 = {format = .FLOAT2 },
-                1 = {format = .FLOAT2 },
-            },
-        },
-    });
-
-    return m;
+apply_material :: proc(using material: ^Material) {
+    sg.apply_pipeline(pipeline);
+    sg.apply_bindings(bindings);
 }
+
+Blitter :: struct {
+    pass: sg.Pass,
+    pipeline: sg.Pipeline,
+    bindings: sg.Bindings,
+};
 
 state: struct {
     offscreen: struct {
@@ -183,12 +157,23 @@ state: struct {
         pass: sg.Pass,
     },
     depth_of_field: struct {
-        pass_desc: sg.Pass_Desc,
-        color_img_desc: sg.Image_Desc,
-        pass: sg.Pass,
+        prefilter_blit: Blitter,
+        postfilter_blit: Blitter,
+
+        half_size_color: sg.Image,
+
+        coc_pass_desc: sg.Pass_Desc,
+        coc_pass: sg.Pass,
+        coc_img_desc: sg.Image_Desc,
+        coc_material: Material,
+
+        bokeh_pass_desc: sg.Pass_Desc,
+        bokeh_pass: sg.Pass,
+        bokeh_img_desc: sg.Image_Desc,
+        bokeh_material: Material,
+
+        enabled: bool,
     },
-    dof_material: Material,
-    dof_enabled: bool,
 
     xform_a: gizmos.Transform,
 	pass_action: sg.Pass_Action,
@@ -371,7 +356,7 @@ init_callback :: proc "c" () {
     r_init();
     mu.init(&mu_ctx);
     if !FORCE_2D {
-        font_scale = 4.3;
+        font_scale = 4.05;
         mu_ctx._style = {
             nil,       /* font */
             { 68, 10 }, /* size */
@@ -445,19 +430,6 @@ init_callback :: proc "c" () {
         }
     });
 
-    make_image :: proc(width, height: i32, pixel_format: sg.Pixel_Format, pixels: []u32) -> sg.Image {
-        image_desc := sg.Image_Desc {
-            width = width,
-            height = height,
-            pixel_format = pixel_format
-        };
-        image_desc.content.subimage[0][0] = {
-            ptr = &pixels[0],
-            size = cast(i32)len(pixels), // ??????????????????????????
-        };
-        return sg.make_image(image_desc);
-    }
-
     // create placeholder textures
     pixels: [64]u32;
     for i in 0..<64 do pixels[i] = 0xFFFFFFFF;
@@ -522,11 +494,8 @@ init_callback :: proc "c" () {
         });
     }
 
-    // make depth of field pipeline
-    {
-        dof_shader := sg.make_shader(shader_meta.dof_coc_shader_desc()^);
-        state.dof_material = create_fsq_material("depth of field", dof_shader);
-    }
+    // make depth of field pipelines
+    init_dof_pipelines();
 
     // make line rendering pipeline
     {
@@ -858,34 +827,65 @@ frame_callback :: proc "c" () {
     //
     // DEPTH OF FIELD
     //
-    if state.dof_enabled {
+
+    if state.depth_of_field.enabled {
         using state.depth_of_field;
-        sg.begin_pass(pass, {
-            colors = {
-                0 = { action = .CLEAR, val = { 0.0, 0.0, 0.0, 0.0 } },
-            }
-        });
-        sg.apply_pipeline(state.dof_material.pipeline);
-        sg.apply_bindings(state.dof_material.bindings);
+        {
+            // coc (circle of confusion)
+            sg.begin_pass(coc_pass, {
+                colors = { 0 = { action = .CLEAR, val = { 0.0, 0.0, 0.0, 0.0 } }, }
+            });
+            defer sg.end_pass();
 
-        apply_uniforms(.FS, shader_meta.SLOT_builtins, shader_meta.builtins {
-            nearPlane = state.camera.near_plane,  // TODO: do these two values change with the LKG projection matrix stuff? should they become functions on the gl_Layer specific projection matrix?
-            farPlane = state.camera.far_plane,
-        });
+            apply_material(&coc_material);
 
-        apply_uniforms(.FS, shader_meta.SLOT_dof_uniforms, shader_meta.dof_uniforms {
-            focusDistance = editor_settings.dof_distance,
-            focusRange = editor_settings.dof_range,
-        });
+            apply_uniforms(.FS, shader_meta.SLOT_builtins, shader_meta.builtins {
+                nearPlane = state.camera.near_plane,  // TODO: do these two values change with the LKG projection matrix stuff? should they become functions on the gl_Layer specific projection matrix?
+                farPlane = state.camera.far_plane,
+            });
+            apply_uniforms(.FS, shader_meta.SLOT_dof_uniforms, shader_meta.dof_uniforms {
+                focusDistance = editor_settings.dof_distance,
+                focusRange = editor_settings.dof_range,
+                bokeh_radius = editor_settings.bokeh_radius,
+            });
 
-        sg.draw(0, 6, num_views());
-        sg.end_pass();
+            sg.draw(0, 6, num_views());
+        }
+
+        {
+            // prefilter (main color and coc -> half size color with coc in alpha)
+            prefilter_blit.bindings.fs_images[shader_meta.SLOT_prefilterCoc] = coc_pass_desc.color_attachments[0].image;
+            blit(&prefilter_blit, offscreen.pass_desc.color_attachments[0].image);
+        }
+
+        {
+            // bokeh pass (already to half-size texture)
+            // TODO: make this another set of 'create_blit'/'blit' calls
+            sg.begin_pass(bokeh_pass, { colors = { 0 = { action = .CLEAR, val = { 0.0, 0.0, 0.0, 0.0 } }, } });
+            defer sg.end_pass();
+            bokeh_material.bindings.fs_images[shader_meta.SLOT_cameraColorWithCoc] = half_size_color;// offscreen.pass_desc.color_attachments[0].image;
+            apply_material(&bokeh_material);
+            apply_uniforms(.FS, shader_meta.SLOT_bokeh_uniforms, shader_meta.bokeh_uniforms {
+                bokeh_radius = editor_settings.bokeh_radius,
+            });
+
+            sg.draw(0, 6, num_views());
+        }
+        {
+            // post filter pass
+            blit(&postfilter_blit, bokeh_pass_desc.color_attachments[0].image);
+        }
     }
 
     sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
 
-    state.lenticular_bindings.fs_images[shader_meta.SLOT_cocTex] =
-        state.depth_of_field.pass_desc.color_attachments[0].image;
+    {
+        using state.lenticular_bindings;
+        fs_images[shader_meta.SLOT_cocTex] =
+            state.depth_of_field.coc_pass_desc.color_attachments[0].image;
+        fs_images[shader_meta.SLOT_bokehTex] =
+            state.depth_of_field.bokeh_pass_desc.color_attachments[0].image;
+    }
 
     sg.apply_pipeline(state.lenticular_pipeline);
     sg.apply_bindings(state.lenticular_bindings);
@@ -893,7 +893,7 @@ frame_callback :: proc "c" () {
         using hp_info;
 
         // TODO: must match constants in lenticular.glsl. use an @annotation and an enum to just generate them!
-        Debug :: enum { Off, Depth, Color, DepthOfField, };
+        Debug :: enum { Off, Depth, Color, DOFCoc, DOFBokeh, };
 
         debug:Debug = .Off;
         {
@@ -901,7 +901,8 @@ frame_callback :: proc "c" () {
             // TODO: this should be an enum
             if visualize_depth do debug = .Depth;
             if visualize_color do debug = .Color;
-            if visualize_dof   do debug = .DepthOfField;
+            if visualize_dof   do debug = .DOFCoc;
+            if visualize_bokeh do debug = .DOFBokeh;
         }
 
         apply_uniforms(.FS, shader_meta.SLOT_lkg_fs_uniforms, shader_meta.lkg_fs_uniforms {
@@ -916,7 +917,7 @@ frame_callback :: proc "c" () {
             debug = i32(debug),
             debugTile = i32(num_views() / 2),
             tile = Vector4 {1, 1, cast(f32)num_views(), 0},
-            viewPortion = Vector4{1, 1, 0, 0},
+            viewPortion = Vector4{1, 1, 0, 0}, // TODO: not used with render target arrays
         });
     }
     sg.draw(0, 6, 1);
@@ -1124,13 +1125,13 @@ handle_args :: proc() {
     for arg in os.args {
         switch arg {
             case "--2d", "--2D": FORCE_2D = true;
-            case "--no-dof": state.dof_enabled = false;
+            case "--no-dof": state.depth_of_field.enabled = false;
         }
     }
 }
 
 main :: proc() {
-    state.dof_enabled = true;
+    state.depth_of_field.enabled = true; // TODO: have a state init function
     handle_args();
 
     // install a stacktrace handler for asserts
