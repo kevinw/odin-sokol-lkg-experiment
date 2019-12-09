@@ -15,6 +15,7 @@ shader reloading - see https://github.com/ThisDrunkDane/libbrew/blob/6ecefb232bc
 wrap high level "c" procs in context setup wrapper functions for things like the assert handler
 consider some kind of MainTex_TexelSize magic?
 @graphics reflect a cubemap of the helmet, like https://github.com/DiligentGraphics/DiligentFX/tree/master/GLTF_PBR_Renderer
+bloom/hdr/post processing/filmic aes?
 check for same mu scissor rect before resetting draw
 shader globals from an @annotation
 @qualityOfLife sokol's asserts could trigger a stack trace

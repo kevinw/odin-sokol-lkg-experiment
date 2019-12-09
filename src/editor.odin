@@ -28,8 +28,8 @@ editor_settings_defaults :: proc() -> Editor_Settings {
     subview_w = 700;
     {
         using dof;
-        distance = 2.0;
-        range = 0.5;
+        distance = 1.9;
+        range = 0.9;
         bokeh_radius = 4;
     }
     lkg_view_cone = 2.51;
