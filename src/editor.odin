@@ -4,6 +4,10 @@ import sgl "sokol:sokol_gl"
 using import "math"
 
 Editor_Settings :: struct {
+    sdftext: struct {
+        gamma: f32,
+        buf: f32,
+    },
     dof: struct {
         distance, range, bokeh_radius: f32,
     },
@@ -24,6 +28,12 @@ editor_settings: Editor_Settings;
 editor_settings_defaults :: proc() -> Editor_Settings {
     using e := Editor_Settings {};
 
+    {
+        using sdftext;
+        gamma = 0.12;
+        buf = 0.75; // cast(f32)(192.0 / 256.0);
+    }
+
     lkg_camera_size = 0.80;
     subview_w = 700;
     {
@@ -37,6 +47,7 @@ editor_settings_defaults :: proc() -> Editor_Settings {
     fov = 25.7;
 
     ui_mousewheel_scroll_speed = -16;
+
 
     return e;
 }

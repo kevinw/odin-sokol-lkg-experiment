@@ -1,7 +1,7 @@
 (A) shader_meta needs a cleanup. at the very least, start with package-per-shader?
     or should we just go immediately for a more late-binding approach?
     ideally some mix of both is ideal...where to look for inspiration?
-hdr pbr textures https://texturehaven.com/textures/
+(B) try some of the PBR textures here https://texturehaven.com/textures/
 (B) prioritize this list by using a game idea as a forcing function
 (B) shadow maps
 @postfx depth of field - putting dof range negative makes fg objects blur. check the usage of it!
@@ -21,10 +21,7 @@ check for same mu scissor rect before resetting draw
 shader globals from an @annotation
 @qualityOfLife sokol's asserts could trigger a stack trace
 turn @annotations into shader globals like this:
-    uniform my_debug_uniforms {
-        int debug;
-    };
-
+    uniform my_debug_uniforms { int debug; };
     #define DEBUG_OFF 0
     #define DEBUG_DEPTH 1
     #define DEBUG_COLOR 2
@@ -52,6 +49,7 @@ project window for assets in project @editor
 (C) sketch out a flowchart for asset generation, research assimp vs other approaches
 (C) @vim make 'float3' typo correct to 'vec3', etc, in glsl files
 
+x instanced rendering with constant buffers
 x render a framebuffer
 x render a quilt
 x render a complex mesh

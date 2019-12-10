@@ -88,17 +88,17 @@ sdf_text_init :: proc() {
     pass_action.colors[0] = {action = .LOAD, val = {1.0, 0.0, 1.0, 1.0}};
 }
 
-sdf_text_render :: proc(matrix: Matrix4) {
+sdf_text_render :: proc(matrix: Matrix4, color: Vector4, gamma, buf: f32) {
     vs_uniforms := shader_meta.sdf_vs_uniforms {
         matrix = matrix,
         texsize = text.texture_size,
     };
 
     fs_uniforms := shader_meta.sdf_fs_uniforms {
-        color = Vector4{1, 1, 1, 1},
+        color = color,
         debug = 0.0,
-        gamma = 0.02,
-        buf = cast(f32)(192.0 / 256.0),
+        gamma = gamma,
+        buf = buf,
     };
 
     using text;

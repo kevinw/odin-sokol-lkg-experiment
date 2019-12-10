@@ -335,8 +335,9 @@ create_vertex_buffer_mapping_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim:
 @private
 create_sg_layout_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Primitive, vbuf_map: ^Vertex_Buffer_Mapping) -> sg.Layout_Desc {
     assert(prim.attributes_count <= sg.MAX_VERTEX_ATTRIBUTES);
-    layout: sg.Layout_Desc = { };
+    layout: sg.Layout_Desc;
     attributes := mem.slice_ptr(prim.attributes, prim.attributes_count);
+    highest_slot: i32 = -1;
     for _, attr_index in attributes {
         attr := &attributes[attr_index];
         attr_slot := gltf_attr_type_to_vs_input_slot(attr.type);
@@ -347,12 +348,18 @@ create_sg_layout_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Prim
             for vb_slot :i32= 0; vb_slot < vbuf_map.num; vb_slot+=1 {
                 if vbuf_map.buffer[vb_slot] == cast(i32)buffer_view_index {
                     layout.attrs[attr_slot].buffer_index = vb_slot;
+                    highest_slot = max(attr_slot, highest_slot);
                 }
             }
         } else {
             fmt.eprintln("error: attr_slot was SCENE_INVALID_INDEX");
         }
     }
+
+    // TODO: per instance data
+    //instance_model_slot := highest_slot + 1;
+    //layout.attrs[shader_meta.ATTR_vs_instance_model].buffer_index = instance_model_slot;
+    //layout.attrs[shader_meta.ATTR_vs_instance_model].
 
     return layout;
 }

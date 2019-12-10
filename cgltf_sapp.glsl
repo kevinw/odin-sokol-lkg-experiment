@@ -5,19 +5,25 @@
  */
 @include common.glsl
 
-
 @vs vs
 #define MAX_VIEWS 45
+#define MAX_INSTANCES 100
 #extension GL_ARB_shader_viewport_layer_array : require
 uniform vs_params {
-    mat4 model;
+    //mat4 model;
     mat4 view_proj_array[MAX_VIEWS];
     vec3 eye_pos;
+    int num_instances;
+    //int num_views;
+    mat4 instance_model_matrices[MAX_INSTANCES];
 };
 
 layout(location=0) in vec4 cgltf_position;
 layout(location=1) in vec3 normal;
 layout(location=2) in vec2 texcoord;
+
+//layout(location=3) in mat4 instance_model;
+//
 
 out vec3 v_pos;
 out vec3 v_nrm;
@@ -25,7 +31,16 @@ out vec2 v_uv;
 out vec3 v_eye_pos;
 
 void main() {
-    gl_Layer = gl_InstanceID;
+    // draw all instances to the first view, then all instances to the second view, ....
+    // i.e. instance0-layer0 instance1-layer0 instance0-layer1 instance1-layer1 ...
+    gl_Layer = int(uint(gl_InstanceID) / uint(num_instances));
+    int instanceID = int(uint(gl_InstanceID) % uint(num_instances));
+    mat4 model = instance_model_matrices[instanceID];
+
+    // draw each instance to all the views, an instance at a time.
+    // i.e. instance0-layer0 instance0-layer1 instance 0-layer2 ...
+    // gl_Layer = mod(gl_InstanceID, num_views);
+    // int instanceID = int(uint(gl_InstanceID) / uint(num_views));
 
     vec4 pos = model * cgltf_position;
     v_pos = pos.xyz / pos.w;
