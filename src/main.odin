@@ -19,7 +19,6 @@ import "../lib/basisu"
 import "./watcher"
 
 SNAKE :: true;
-FORCE_2D := false;
 OSC :: true;
 
 when OSC {
@@ -294,17 +293,11 @@ init_callback :: proc "c" () {
 
     hp_infos:[]Display_Info;
     hp_connected, hp_infos = holoplaycore_init();
-    fmt.println("HP_CONNECTED", hp_connected);
+
     if len(hp_infos) == 0 do hp_connected = false;
-    if !hp_connected do FORCE_2D = true;
-    if FORCE_2D {
-        //fmt.println("FORCE2D is on");
-        hp_connected = false;
-    }
-    if hp_connected {
-        hp_info = hp_infos[0];
-        LKG_ASPECT = cast(f32)hp_info.width / cast(f32)hp_info.height;
-    }
+    hp_info = hp_connected ? hp_infos[0] : STOCK_DISPLAY_INFO;
+
+    LKG_ASPECT = cast(f32)hp_info.width / cast(f32)hp_info.height;
 
     when OSC {
         _osc_running = true;
@@ -316,13 +309,11 @@ init_callback :: proc "c" () {
         move_window(sapp.win32_get_hwnd(), hp_info.xpos, hp_info.ypos, hp_info.width, hp_info.height, true);
     }
 
-    {
-        state.xform_a = {
-            position = {0, 0, 0},
-            orientation = transmute(Vector4)degrees_to_quaternion(v3(180, 0, 0)), // TODO: identity quat?
-            scale = {1, 1, 1},
-        };
-    }
+    state.xform_a = {
+        position = {0, 0, 0},
+        orientation = transmute(Vector4)degrees_to_quaternion(v3(180, 0, 0)), // TODO: identity quat?
+        scale = {1, 1, 1},
+    };
 
 	sg.setup({
 		mtl_device                   = sapp.metal_get_device(),
@@ -367,7 +358,8 @@ init_callback :: proc "c" () {
 
     r_init();
     mu.init(&mu_ctx);
-    if !FORCE_2D {
+    if hp_connected
+    {
         font_scale = 4.05;
         mu_ctx._style = {
             nil,       /* font */
@@ -548,15 +540,15 @@ init_callback :: proc "c" () {
     // make text rendering pipeline
     //
     sdf_text_init();
+
+    draw_gizmos = false;
 }
 
 debug_window :: proc(ctx: ^mu.Context) {
     if window.inited == {} {
         mu.init_window(ctx, &window, {});
         if SNAKE do window.open = 0;
-        window.rect = FORCE_2D ? 
-            mu.rect(20, 20, 250, 450) :
-            mu.rect(20, 20, 550, 1050);
+        window.rect = hp_connected ? mu.rect(20, 20, 550, 1050) : mu.rect(20, 20, 250, 450);
     }
 
     window.rect.w = max(window.rect.w, 240);
@@ -671,28 +663,30 @@ frame_callback :: proc "c" () {
     maybe_recreate_multiview_pass(num_views(), sapp.framebuffer_size());
 
     when EDITOR {
-        mouse_ray := worldspace_ray(&state.camera, state.mouse.pos);
-        using state.camera;
-        gizmos.update(&gizmos_ctx, {
-            mouse_left = input_state.left_mouse,
-            hotkey_ctrl = input_state.left_ctrl,
-            hotkey_translate = input_state.t,
-            hotkey_rotate = input_state.r,
-            hotkey_scale = input_state.s,
-            hotkey_local = input_state.l,
-            ray = mouse_ray,
-            cam = {
-                yfov = size,
-                near_clip = near_plane,
-                far_clip = far_plane,
-                position = position,
-                orientation = transmute(Vector4)rotation,
-            }
-        });
+        if draw_gizmos {
+            mouse_ray := worldspace_ray(&state.camera, state.mouse.pos);
+            using state.camera;
+            gizmos.update(&gizmos_ctx, {
+                mouse_left = input_state.left_mouse,
+                hotkey_ctrl = input_state.left_ctrl,
+                hotkey_translate = input_state.t,
+                hotkey_rotate = input_state.r,
+                hotkey_scale = input_state.s,
+                hotkey_local = input_state.l,
+                ray = mouse_ray,
+                cam = {
+                    yfov = size,
+                    near_clip = near_plane,
+                    far_clip = far_plane,
+                    position = position,
+                    orientation = transmute(Vector4)rotation,
+                }
+            });
 
-        using state;
-        if gizmos.xform(&gizmos_ctx, "first-example-gizmo", &xform_a) {
-            // hovered or changed
+            using state;
+            if gizmos.xform(&gizmos_ctx, "first-example-gizmo", &xform_a) {
+                // hovered or changed
+            }
         }
     }
 
@@ -726,7 +720,7 @@ frame_callback :: proc "c" () {
 
     {
         using input_state;
-        xform_a.orientation = transmute(Vector4)degrees_to_quaternion(osc_rotate + v3(180, x_rotation, 0));
+        state.xform_a.orientation = transmute(Vector4)degrees_to_quaternion(osc_rotate + v3(180, x_rotation, 0));
     }
 
     //
@@ -926,7 +920,7 @@ frame_callback :: proc "c" () {
         {
             // prefilter (main color and coc -> half size color with coc in alpha)
             prefilter_blit.bindings.fs_images[shader_meta.SLOT_prefilterCoc] = coc_pass_desc.color_attachments[0].image;
-            blit(&prefilter_blit, offscreen.pass_desc.color_attachments[0].image);
+            blit(&prefilter_blit, state.offscreen.pass_desc.color_attachments[0].image);
         }
 
         {
@@ -1052,7 +1046,7 @@ frame_callback :: proc "c" () {
 
     // DRAW SDF TEXT
     if draw_sdf_text {
-        y:f32 = FORCE_2D ? 60 : 75;
+        y:f32 = is_fullscreen ? 75 : 40;
         fps := fps_counter.ms_per_frame > 0 ? cast(int)(1000.0 / fps_counter.ms_per_frame) : 0;
         txt := fmt.tprintf("%d fps - %f ms per frame - %d tris - %d views", fps, fps_counter.ms_per_frame, per_frame_stats.num_elements * cast(u64)num_views(), num_views());
         draw_text(txt, y, v2(f32(10), y));
@@ -1085,7 +1079,6 @@ toggle_multiview :: proc() {
 
 toggle_fullscreen :: proc() {
     is_fullscreen = !is_fullscreen;
-    fmt.println("toggling fullscreen", is_fullscreen);
 
     {
         using win32;
@@ -1176,7 +1169,9 @@ event_callback :: proc "c" (event: ^sapp.Event) {
             case .Q: q = true;
             case .E: e = true;
             case .R: r = true;
-            case .G: g = true;
+            case .G:
+                g = true;
+                draw_gizmos = !draw_gizmos;
             case .T: t = true;
             case .L: l = true;
             case .P:
@@ -1228,7 +1223,6 @@ event_callback :: proc "c" (event: ^sapp.Event) {
 handle_args :: proc() {
     for arg in os.args {
         switch arg {
-            case "--2d", "--2D": FORCE_2D = true;
             case "--no-dof": state.depth_of_field.enabled = false;
         }
     }
@@ -1249,7 +1243,7 @@ main :: proc() {
 is_fullscreen: bool;
 
 run_app :: proc() -> int {
-    is_fullscreen = !FORCE_2D;
+    is_fullscreen = true;
 
 	return sapp.run({
 		init_cb      = init_callback,

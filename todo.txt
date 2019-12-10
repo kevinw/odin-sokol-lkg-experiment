@@ -27,6 +27,7 @@ turn @annotations into shader globals like this:
     #define DEBUG_COLOR 2
     #define DEBUG_DOF 3
 @editor scene view (both this and shadow maps require similar camera work)
+read https://thebookofshaders.com/
 make subview quilt size a multiple of the actual device width? this way, 8k would get a higher res by default...
 asset catalog: shaders, configs, images
 a set of "println" tools for the screen - temporary message, permanent message with corner

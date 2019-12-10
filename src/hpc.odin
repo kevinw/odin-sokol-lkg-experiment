@@ -7,6 +7,22 @@ Display_Info :: struct {
     pitch, tilt, center, invView, subp, ri, bi: f32,
 }
 
+// these are just the values from my personal looking glass (for
+// testing!) -kevin
+STOCK_DISPLAY_INFO := Display_Info {
+    xpos = -2560,
+    ypos = -154,
+    width = 2560,
+    height = 1600,
+    pitch = 354.622,
+    tilt = -0.114,
+    center = -0.107,
+    invView = 1.000,
+    subp = 0,
+    ri = 0,
+    bi = 2,
+};
+
 MAX_DEVICES :: 10;
 @private _hpc_state: struct {
     did_receive_calibration : bool,
@@ -27,6 +43,10 @@ import hpc "../lib/HoloPlayCore"
         reply := hpc.send_message_blocking(&msg);
         if (reply.client_error != .NOERROR) {
             fmt.eprintln("hpc error:", reply.client_error);
+            return false, nil;
+        }
+
+        if reply.num_devices < 1 {
             return false, nil;
         }
     }
