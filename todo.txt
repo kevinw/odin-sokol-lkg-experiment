@@ -6,6 +6,7 @@ hdr pbr textures https://texturehaven.com/textures/
 (B) shadow maps
 @postfx depth of field - putting dof range negative makes fg objects blur. check the usage of it!
     unfinished fg/bg background stuff from https://catlikecoding.com/unity/tutorials/advanced-rendering/depth-of-field/
+    bokeh_size seems to be dependent on the resolution-should it be multiplied by the texture size on the way into the shader?
 @postfx @editor gizmos showing DOF planes?
 games with depth
     flying, walking, racing inwards

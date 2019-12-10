@@ -138,7 +138,7 @@ draw_text :: proc(str: string, size: f32, pos: Vector2) {
 
     if text.bind.vertex_buffers[0].id == 0 {
         text.bind.vertex_buffers[0] = sg.make_buffer({
-            size = cast(i32)(1000 * size_of(vertex_elems[0])),
+            size = cast(i32)(5000 * size_of(vertex_elems[0])),
             usage = .DYNAMIC,
             label = "text-glyph-vertices",
         });

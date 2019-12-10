@@ -791,6 +791,11 @@ frame_callback :: proc "c" () {
                         occlusion_tex := state.placeholders.white;
                         emissive_tex := state.placeholders.black;
 
+                        // TODO: can we just make the asset loader put the
+                        // placeholders there, and then overwrite them when
+                        // they arrive/are decoded? we shouldn't be "looking
+                        // them up" every frame.
+
                         if prim.material != -1 {
                             metallic := &materials[prim.material];
 
@@ -985,7 +990,7 @@ frame_callback :: proc "c" () {
     // DRAW SDF TEXT
     if draw_sdf_text {
         y:f32 = FORCE_2D ? 60 : 80;
-        draw_text(fmt.tprintf("%f ms per frame", fps_counter.ms_per_frame), y, v2(f32(10), y));
+        draw_text(fmt.tprintf("%d fps - %f ms per frame - %d tris - %d views", cast(int)(1000.0 / fps_counter.ms_per_frame), fps_counter.ms_per_frame, per_frame_stats.num_elements, num_views()), y, v2(f32(10), y));
         text_matrix := ortho3d(0, cast(f32)sapp.width(), 0, cast(f32)sapp.height(), -10.0, 10.0);
         sdf_text_render(text_matrix);
     }
