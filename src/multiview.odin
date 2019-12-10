@@ -9,8 +9,12 @@ MAXIMUM_VIEWS :: 45; // match shader value
 hp_info: Display_Info;
 hp_connected: bool;
 
+force_num_views: int = -1;
+
 num_views :: proc() -> int {
     if FORCE_2D do return 1;
+
+    if force_num_views != -1 do return force_num_views;
 
     return min(MAXIMUM_VIEWS, max(1, cast(int)editor_settings.num_views));
 }

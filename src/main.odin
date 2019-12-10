@@ -997,6 +997,17 @@ frame_callback :: proc "c" () {
 	sg.commit();
 }
 
+_old_num_views: int;
+toggle_multiview :: proc() {
+    views := num_views();
+    if views > 1 {
+        _old_num_views = views;
+        force_num_views = 1;
+    } else {
+        force_num_views = -1;
+    }
+}
+
 toggle_fullscreen :: proc() {
     is_fullscreen = !is_fullscreen;
     fmt.println("toggling fullscreen", is_fullscreen);
@@ -1099,6 +1110,8 @@ event_callback :: proc "c" (event: ^sapp.Event) {
                 num_2 = true;
                 toggle_fullscreen();
             case .NUM_3: num_3 = true;
+                num_3 = true;
+                toggle_multiview();
             case .LEFT_ALT: left_alt = true;
             case .LEFT_CONTROL: left_ctrl = true;
             case .LEFT_SHIFT: left_shift = true;
