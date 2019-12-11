@@ -10,6 +10,18 @@ import shader_meta "./shader_meta"
 import "core:encoding/json"
 using import "math"
 
+SDF_Text_Vert :: struct #packed {
+    pos: Vector3,
+    uv: Vector2,
+}
+
+@private _layout := sg.Layout_Desc { // TODO: generate this with the above struct, using anotations, at compile-time
+    attrs = {
+        shader_meta.ATTR_vs_a_pos = {format = .FLOAT3},
+        shader_meta.ATTR_vs_a_texcoord = {format = .FLOAT2},
+    },
+};
+
 SDF_Text_Metrics :: struct {
     family: string,
     style: string,
@@ -37,7 +49,7 @@ text: struct {
     json_data: [256 * 1024]u8,
     metrics: SDF_Text_Metrics,
 
-    vertex_elems: [dynamic]f32,
+    vertex_elems: [dynamic]SDF_Text_Vert,
     needs_update: bool,
 };
 
@@ -78,12 +90,7 @@ sdf_text_init :: proc() {
             src_factor_rgb = .SRC_ALPHA,
             dst_factor_rgb = .ONE_MINUS_SRC_ALPHA,
         },
-        layout = {
-            attrs = {
-                shader_meta.ATTR_vs_a_pos = {format = .FLOAT2},
-                shader_meta.ATTR_vs_a_texcoord = {format = .FLOAT2},
-            },
-        },
+        layout = _layout,
     });
     pass_action.colors[0] = {action = .LOAD, val = {1.0, 0.0, 1.0, 1.0}};
 }
@@ -106,25 +113,25 @@ sdf_text_render :: proc(matrix: Matrix4, color: Vector4, gamma, buf: f32) {
     if needs_update {
         sg.update_buffer(bind.vertex_buffers[0], &vertex_elems[0], len(vertex_elems) * size_of(vertex_elems[0]));
     }
-
-    sg.apply_pipeline(pipeline);
-    sg.apply_bindings(bind);
-    sg.apply_uniforms(.VS, shader_meta.SLOT_sdf_vs_uniforms, &vs_uniforms, size_of(shader_meta.sdf_vs_uniforms));
-    sg.apply_uniforms(.FS, shader_meta.SLOT_sdf_fs_uniforms, &fs_uniforms, size_of(shader_meta.sdf_fs_uniforms));
-    sg.draw(0, len(vertex_elems) / 4, 1);
-
-    if needs_update {
+    defer if needs_update {
         clear(&text.vertex_elems); // must happen after the draw call? is the update_buffer not immediate?
         needs_update = false;
     }
+
+    sg.apply_pipeline(pipeline);
+    sg.apply_bindings(bind);
+    apply_uniforms(.VS, shader_meta.SLOT_sdf_vs_uniforms, &vs_uniforms);
+    apply_uniforms(.FS, shader_meta.SLOT_sdf_fs_uniforms, &fs_uniforms);
+    sg.draw(0, len(vertex_elems), 1);
+
 }
 
-draw_text :: proc(str: string, size: f32, pos: Vector2) {
+draw_text :: proc(str: string, size: f32, pos: Vector3) {
     using text;
 
     needs_update = true;
 
-    pen := Vector3 {pos.x, pos.y, 0};
+    pen := pos;
 
     buf := strings.make_builder();
     defer strings.destroy_builder(&buf);
@@ -145,7 +152,7 @@ draw_text :: proc(str: string, size: f32, pos: Vector2) {
     }
 }
 
-draw_glyph :: proc(character: string, pen: ^Vector3, size: f32, vertex_elements: ^[dynamic]f32) {
+draw_glyph :: proc(character: string, pen: ^Vector3, size: f32, vertex_elements: ^[dynamic]SDF_Text_Vert) {
     metric, found := text.metrics.chars[character];
     if !found do return;
 
@@ -171,20 +178,25 @@ draw_glyph :: proc(character: string, pen: ^Vector3, size: f32, vertex_elements:
         y0 := pen.y - (height - h_bearing_y) * scale;
         y1 := pen.y + (h_bearing_y) * scale;
 
-        append(vertex_elements, 
-            (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y0),
-            pos_x, pos_y + height,
-            (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y0),
-            pos_x + width, pos_y + height,
-            (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y1),
-            pos_x, pos_y,
+        V :: SDF_Text_Vert;
 
-            (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y0),
-            pos_x + width, pos_y + height,
-            (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y1),
-            pos_x, pos_y,
-            (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y1),
-            pos_x + width, pos_y
+        z:f32 = 0;
+
+        // two tris per glyph
+        append(vertex_elements, 
+            V{ { (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y0), z }, 
+               { pos_x, pos_y + height, } },
+            V{ { (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y0), z },
+               { pos_x + width, pos_y + height } },
+            V{ { (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y1), z },
+                { pos_x, pos_y } },
+
+            V{ { (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y0), z },
+               { pos_x + width, pos_y + height } },
+            V{ { (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y1), z },
+               { pos_x, pos_y } },
+            V{ { (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y1), z },
+               { pos_x + width, pos_y } },
         );
     }
 
@@ -257,6 +269,7 @@ font_normal_loaded :: proc "c" (response: ^sfetch.Response) {
     did_load();
 }
 
+// TODO: use asset catalog system or something here
 metrics_from_json :: proc(json_text: []byte) -> SDF_Text_Metrics {
     if val, err := json.parse(json_text); err != .None {
         panic("could not parse json");

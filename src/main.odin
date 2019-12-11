@@ -18,7 +18,7 @@ import mu "../lib/microui"
 import "../lib/basisu"
 import "./watcher"
 
-SNAKE :: true;
+SNAKE :: false;
 OSC :: true;
 
 when OSC {
@@ -41,6 +41,8 @@ when EDITOR {
 EDITOR :: true;
 
 import "./shader_meta";
+
+osc_enabled := true;
 
 draw_mesh := true;
 draw_quad := false;
@@ -300,9 +302,11 @@ init_callback :: proc "c" () {
     LKG_ASPECT = cast(f32)hp_info.width / cast(f32)hp_info.height;
 
     when OSC {
-        _osc_running = true;
-        osc_thread = thread.create(osc_thread_func);
-        if osc_thread != nil do thread.start(osc_thread);
+        if osc_enabled {
+            _osc_running = true;
+            osc_thread = thread.create(osc_thread_func);
+            if osc_thread != nil do thread.start(osc_thread);
+        }
     }
 
     if hp_connected {
@@ -955,12 +959,17 @@ frame_callback :: proc "c" () {
         using state;
         using lenticular_bindings;
         using shader_meta;
+
+        camera_color := offscreen.pass_desc.color_attachments[0].image;
+
         if state.depth_of_field.enabled {
             fs_images[SLOT_cocTex]    = depth_of_field.coc_pass_desc.color_attachments[0].image;
             fs_images[SLOT_depthTex]  = offscreen.pass_desc.depth_stencil_attachment.image;
             fs_images[SLOT_screenTex] = depth_of_field.final_img;
         } else {
-            fs_images[SLOT_screenTex] = offscreen.pass_desc.color_attachments[0].image;
+            fs_images[SLOT_cocTex]    = camera_color;
+            fs_images[SLOT_depthTex]  = offscreen.pass_desc.depth_stencil_attachment.image;
+            fs_images[SLOT_screenTex] = camera_color;
         }
     }
 
@@ -1046,11 +1055,17 @@ frame_callback :: proc "c" () {
 
     // DRAW SDF TEXT
     if draw_sdf_text {
-        y:f32 = is_fullscreen ? 75 : 40;
-        fps := fps_counter.ms_per_frame > 0 ? cast(int)(1000.0 / fps_counter.ms_per_frame) : 0;
-        txt := fmt.tprintf("%d fps - %f ms per frame - %d tris - %d views", fps, fps_counter.ms_per_frame, per_frame_stats.num_elements * cast(u64)num_views(), num_views());
-        draw_text(txt, y, v2(f32(10), y));
-        text_matrix := ortho3d(0, cast(f32)sapp.width(), 0, cast(f32)sapp.height(), -10.0, 10.0);
+        //y:f32 = is_fullscreen ? 75 : 40;
+        y:f32 = 0.1;
+        when true {
+            fps := fps_counter.ms_per_frame > 0 ? cast(int)(1000.0 / fps_counter.ms_per_frame) : 0;
+            txt := fmt.tprintf("%d fps - %f ms per frame - %d tris - %d views", fps, fps_counter.ms_per_frame, per_frame_stats.num_elements * cast(u64)num_views(), num_views());
+            draw_text(txt, y, v3(f32(0), y, 0));
+        } else {
+            draw_text("A", y, v3(0, 0, 0));
+        }
+        text_matrix := state.view_proj;
+        //text_matrix := ortho3d(0, cast(f32)sapp.width(), 0, cast(f32)sapp.height(), -10.0, 10.0);
 
         color := Vector4{1, 1, 1, 0.35};
         {
@@ -1111,7 +1126,12 @@ toggle_fullscreen :: proc() {
 }
 
 cleanup :: proc "c" () {
-    when OSC do stop_osc_thread();
+    when OSC {
+        if osc_enabled {
+            stop_osc_thread();
+        }
+    }
+
     basisu.shutdown();
     sfetch.shutdown();
     sg.shutdown();
@@ -1224,6 +1244,9 @@ handle_args :: proc() {
     for arg in os.args {
         switch arg {
             case "--no-dof": state.depth_of_field.enabled = false;
+            case "--no-osc": osc_enabled = false;
+            case "--2D", "--2d": force_num_views = 1;
+            case "--no-model": draw_mesh = false;
         }
     }
 }

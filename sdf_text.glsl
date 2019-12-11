@@ -1,8 +1,8 @@
 @include common.glsl
 
 @vs vs
-in vec2 a_pos;
-in vec2 a_texcoord;
+layout(location=0) in vec4 a_pos;
+layout(location=1) in vec2 a_texcoord;
 
 uniform sdf_vs_uniforms {
     mat4 matrix;
@@ -12,13 +12,14 @@ uniform sdf_vs_uniforms {
 out vec2 v_texcoord;
 
 void main() {
-    gl_Position = matrix * vec4(a_pos.xy, 0.0, 1);
+    gl_Position = matrix * a_pos;
     v_texcoord = a_texcoord / texsize;
 }
 @end
 
 @fs fs
 uniform sampler2D font_atlas;
+
 uniform sdf_fs_uniforms {
     vec4 color;
     float buf;
