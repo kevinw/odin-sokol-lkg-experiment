@@ -21,9 +21,7 @@ uniform vs_params {
 layout(location=0) in vec4 cgltf_position;
 layout(location=1) in vec3 normal;
 layout(location=2) in vec2 texcoord;
-
 //layout(location=3) in mat4 instance_model;
-//
 
 out vec3 v_pos;
 out vec3 v_nrm;

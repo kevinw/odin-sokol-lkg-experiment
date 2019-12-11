@@ -4,6 +4,17 @@ import sgl "sokol:sokol_gl"
 using import "math"
 
 Editor_Settings :: struct {
+    sdftext: struct {
+        gamma: f32,
+        buf: f32,
+
+        num_layers: f32,
+        buf_falloff: f32,
+        z_thickness: f32,
+        z_start: f32,
+
+        pos: Vector3,
+    },
     subview_w: f32,
     num_views:f32,
     lkg_camera_size:f32, // = 6.0: 
@@ -15,10 +26,6 @@ Editor_Settings :: struct {
     visualize_dof_coc: bool,
     fov: f32,
     grid_offset: Vector3,
-    sdftext: struct {
-        gamma: f32,
-        buf: f32,
-    },
     ui_mousewheel_scroll_speed: f32, // = 5.0
 };
 
@@ -31,7 +38,11 @@ editor_settings_defaults :: proc() -> Editor_Settings {
     {
         using sdftext;
         gamma = 0.12;
+        buf_falloff = 0.9;
         buf = 0.75; // cast(f32)(192.0 / 256.0);
+        num_layers = 10;
+        z_thickness = 0.15;
+        pos = v3(-1.2, -0.81, -3.3);
     }
 
     lkg_camera_size = 0.80;

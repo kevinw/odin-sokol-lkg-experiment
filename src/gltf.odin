@@ -393,20 +393,22 @@ create_sg_pipeline_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Pr
         append(&state.pip_cache, pip_params);
         is_metallic:bool = prim.material == nil || prim.material.has_pbr_metallic_roughness != 0 ? true : false;
         assert(is_metallic, "exptecting metallic for now");
+
+        using pip_params;
         append(&state.scene.pipelines, sg.make_pipeline({
-            layout = pip_params.layout,
+            layout = layout,
             shader = state.shaders.metallic, // TODO is_metallic ? state.shaders.metallic : state.shaders.specular,
-            primitive_type = pip_params.prim_type,
-            index_type = pip_params.index_type,
+            primitive_type = prim_type,
+            index_type = index_type,
             depth_stencil = {
-                depth_write_enabled = !pip_params.alpha,
+                depth_write_enabled = !alpha,
                 depth_compare_func = .LESS_EQUAL,
             },
             blend = {
-                enabled = pip_params.alpha,
-                src_factor_rgb = pip_params.alpha ? .SRC_ALPHA : ._DEFAULT,
-                dst_factor_rgb = pip_params.alpha ? .ONE_MINUS_SRC_ALPHA : ._DEFAULT,
-                color_write_mask = pip_params.alpha ? sg.COLOR_MASK_RGB : sg.COLOR_MASK__DEFAULT,
+                enabled = alpha,
+                src_factor_rgb = alpha ? .SRC_ALPHA : ._DEFAULT,
+                dst_factor_rgb = alpha ? .ONE_MINUS_SRC_ALPHA : ._DEFAULT,
+                color_write_mask = alpha ? sg.COLOR_MASK_RGB : sg.COLOR_MASK__DEFAULT,
             },
             rasterizer = {
                 cull_mode = .BACK,

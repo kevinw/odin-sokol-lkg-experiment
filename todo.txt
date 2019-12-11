@@ -4,7 +4,10 @@
 (B) try some of the PBR textures here https://texturehaven.com/textures/
 (B) prioritize this list by using a game idea as a forcing function
 (B) shadow maps
+unify the multiview rendering thing with a set of macros shared between cgltf and sdf_text.glsl
 api hook for sokol assertions so that stack traces appear there!
+leakcheck allocator
+use hash in caller_procedure to do microui stuff
 @postfx depth of field - putting dof range negative makes fg objects blur. check the usage of it!
     unfinished fg/bg background stuff from https://catlikecoding.com/unity/tutorials/advanced-rendering/depth-of-field/
     bokeh_size seems to be dependent on the resolution-should it be multiplied by the texture size on the way into the shader?

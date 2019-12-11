@@ -203,6 +203,7 @@ state: struct {
 
     camera: Camera,
     view_proj: Matrix4,
+    view_proj_array: [MAXIMUM_VIEWS]Matrix4,
 
     placeholders: struct { white, normal, black: sg.Image },
     pip_cache: [dynamic]Pipeline_Cache_Params,
@@ -758,6 +759,36 @@ frame_callback :: proc "c" () {
     */
 
     //
+    // Compute multiview view_proj matrices
+    //
+    _num_views := num_views();
+    {
+        camera_size:f32 = editor_settings.lkg_camera_size;
+        cam_forward := quaternion_forward(state.camera.rotation);
+        focal_position := state.camera.position + norm(cam_forward) * camera_size;
+        camera_distance := length(state.camera.position - focal_position);
+
+        // Looking Glass multiview-each gl_Layer gets a different view-projection matrix,
+        // each one offset on a horizontal "rail"
+        for view_i:int = 0; view_i < _num_views; view_i += 1 {
+            // start at -viewCone * 0.5 and go up to viewCone * 0.5
+            offset_angle := _num_views == 1 ? 0 : (cast(f32)view_i / (cast(f32)_num_views - 1) - 0.5) * editor_settings.lkg_view_cone;
+
+            // calculate the offset
+            offset := camera_distance * tan(offset_angle);
+
+            view_matrix := view;
+            view_matrix[3][0] -= offset;
+
+            // modify the projection matrix, relative to the camera size and aspect ratio
+            projection_matrix := proj;
+            projection_matrix[2][0] -= offset / (camera_size * LKG_ASPECT);
+
+            state.view_proj_array[view_i] = mul(projection_matrix, view_matrix);
+        }
+    }
+
+    //
     // DRAW MESH
     //
     if draw_mesh {
@@ -772,8 +803,6 @@ frame_callback :: proc "c" () {
             }
         });
         defer sg.end_pass();
-
-        _num_views := cast(int)num_views();
 
         using state.scene;
         for _, node_index in nodes {
@@ -804,30 +833,9 @@ frame_callback :: proc "c" () {
                 }
             }
 
-            camera_size:f32 = editor_settings.lkg_camera_size;
-            cam_forward := quaternion_forward(state.camera.rotation);
-            focal_position := state.camera.position + norm(cam_forward) * camera_size;
-            camera_distance := length(state.camera.position - focal_position);
-
-            // Looking Glass multiview-each gl_Layer gets a different view-projection matrix,
-            // each one offset on a horizontal "rail"
             for view_i:int = 0; view_i < _num_views; view_i += 1 {
-                // start at -viewCone * 0.5 and go up to viewCone * 0.5
-                offset_angle := _num_views == 1 ? 0 : (cast(f32)view_i / (cast(f32)_num_views - 1) - 0.5) * editor_settings.lkg_view_cone;
-
-                // calculate the offset
-                offset := camera_distance * tan(offset_angle);
-
-                view_matrix := view;
-                view_matrix[3][0] -= offset;
-
-                // modify the projection matrix, relative to the camera size and aspect ratio
-                projection_matrix := proj;
-                projection_matrix[2][0] -= offset / (camera_size * LKG_ASPECT);
-
-                vs_params.view_proj_array[view_i] = mul(projection_matrix, view_matrix);
+                vs_params.view_proj_array[view_i] = state.view_proj_array[view_i];
             }
-
 
             mesh := &meshes[node.mesh];
             for i in 0..<mesh.num_primitives {
@@ -901,9 +909,7 @@ frame_callback :: proc "c" () {
         using state.depth_of_field;
         {
             // coc (circle of confusion)
-            sg.begin_pass(coc_pass, {
-                colors = { 0 = { action = .CLEAR, val = { 0.0, 0.0, 0.0, 0.0 } }, }
-            });
+            sg.begin_pass(coc_pass, { colors = { 0 = { action = .CLEAR, val = { 0.0, 0.0, 0.0, 0.0 } }, } });
             defer sg.end_pass();
 
             apply_material(&coc_material);
@@ -953,6 +959,46 @@ frame_callback :: proc "c" () {
         }
     }
 
+    //
+    // DRAW WORLD SPACE SDF TEXT
+    //
+    if draw_sdf_text {
+        //y:f32 = is_fullscreen ? 75 : 40;
+        y:f32 = 0.08;
+        fps := fps_counter.ms_per_frame > 0 ? cast(int)(1000.0 / fps_counter.ms_per_frame) : 0;
+        txt := fmt.tprintf("%d fps - %f ms per frame - %d tris - %d views", fps, fps_counter.ms_per_frame, per_frame_stats.num_elements * cast(u64)num_views(), num_views());
+        {
+            using editor_settings.sdftext;
+            actual_num_layers := _num_views > 1 ? int(max(num_layers, 1)) : 1;
+            for i in 0..<actual_num_layers { // weird sdf layer effect
+                factor := f32(i)/f32(num_layers);
+                layer_buf := lerp(buf, lerp(buf, 1.0, buf_falloff), factor);
+                z := z_start - factor * z_thickness;
+                draw_text(txt, y, v3(f32(0), y, z), gamma, layer_buf);
+            }
+        }
+
+        color := Vector4{1, 1, 1, 0.35};
+        {
+            using editor_settings.sdftext;
+            //text_matrix := state.view_proj;
+            //text_matrix := ortho3d(0, cast(f32)sapp.width(), 0, cast(f32)sapp.height(), -10.0, 10.0);
+
+            {
+                sg.begin_pass(text.pass, text.pass_action);
+                defer sg.end_pass();
+
+                model_matrix := mat4_translate(state.camera.position);
+                model_matrix = mul(model_matrix, quat_to_mat4(state.camera.rotation));
+                model_matrix = mul(model_matrix, mat4_translate(pos));
+                sdf_text_render(state.view_proj_array, model_matrix, _num_views, color);
+            }
+        }
+    }
+
+    //
+    // DEFAULT FRAMEBUFFER PASS
+    //
     sg.begin_default_pass(state.pass_action, sapp.framebuffer_size());
 
     {
@@ -972,6 +1018,7 @@ frame_callback :: proc "c" () {
             fs_images[SLOT_screenTex] = camera_color;
         }
     }
+
 
     sg.apply_pipeline(state.lenticular_pipeline);
     sg.apply_bindings(state.lenticular_bindings);
@@ -1050,27 +1097,6 @@ frame_callback :: proc "c" () {
             matrix_mode_modelview();
             load_matrix(&state.view_proj[0][0]);
             gizmos.draw(&gizmos_ctx);
-        }
-    }
-
-    // DRAW SDF TEXT
-    if draw_sdf_text {
-        //y:f32 = is_fullscreen ? 75 : 40;
-        y:f32 = 0.1;
-        when true {
-            fps := fps_counter.ms_per_frame > 0 ? cast(int)(1000.0 / fps_counter.ms_per_frame) : 0;
-            txt := fmt.tprintf("%d fps - %f ms per frame - %d tris - %d views", fps, fps_counter.ms_per_frame, per_frame_stats.num_elements * cast(u64)num_views(), num_views());
-            draw_text(txt, y, v3(f32(0), y, 0));
-        } else {
-            draw_text("A", y, v3(0, 0, 0));
-        }
-        text_matrix := state.view_proj;
-        //text_matrix := ortho3d(0, cast(f32)sapp.width(), 0, cast(f32)sapp.height(), -10.0, 10.0);
-
-        color := Vector4{1, 1, 1, 0.35};
-        {
-            using editor_settings.sdftext;
-            sdf_text_render(text_matrix, color, gamma, buf);
         }
     }
 

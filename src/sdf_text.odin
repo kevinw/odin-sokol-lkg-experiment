@@ -10,15 +10,26 @@ import shader_meta "./shader_meta"
 import "core:encoding/json"
 using import "math"
 
+SDF_Text_Vert_Attrib :: struct #packed {
+    gamma: f32,
+    buf: f32,
+    unused0: f32,
+    unused1: f32,
+}
+
 SDF_Text_Vert :: struct #packed {
     pos: Vector3,
     uv: Vector2,
-}
+    attribs: SDF_Text_Vert_Attrib,
+};
 
-@private _layout := sg.Layout_Desc { // TODO: generate this with the above struct, using anotations, at compile-time
+// TODO: generate this with the above struct, using anotations, at compile-time
+// or, even better, generate this, AND the above struct, via the shader compiler...hmm...
+@private _layout := sg.Layout_Desc { 
     attrs = {
         shader_meta.ATTR_vs_a_pos = {format = .FLOAT3},
         shader_meta.ATTR_vs_a_texcoord = {format = .FLOAT2},
+        shader_meta.ATTR_vs_a_attribs = {format = .FLOAT4},
     },
 };
 
@@ -41,6 +52,7 @@ SDF_Text_Chars :: struct {
 };
 
 text: struct {
+    pass: sg.Pass,
     pass_action: sg.Pass_Action,
     bind: sg.Bindings,
     pipeline: sg.Pipeline,
@@ -95,22 +107,29 @@ sdf_text_init :: proc() {
     pass_action.colors[0] = {action = .LOAD, val = {1.0, 0.0, 1.0, 1.0}};
 }
 
-sdf_text_render :: proc(matrix: Matrix4, color: Vector4, gamma, buf: f32) {
+sdf_text_render :: proc(view_proj_array: [MAXIMUM_VIEWS]Matrix4, model_matrix: Matrix4, num_views: int, color: Vector4) {
     vs_uniforms := shader_meta.sdf_vs_uniforms {
-        matrix = matrix,
+        view_proj_array = view_proj_array,
+        model_matrix = model_matrix,
         texsize = text.texture_size,
     };
 
     fs_uniforms := shader_meta.sdf_fs_uniforms {
         color = color,
         debug = 0.0,
-        gamma = gamma,
-        buf = buf,
     };
 
     using text;
 
     if needs_update {
+        if text.bind.vertex_buffers[0].id == 0 {
+            text.bind.vertex_buffers[0] = sg.make_buffer({
+                size = cast(i32)(15000 * size_of(vertex_elems[0])),
+                usage = .DYNAMIC,
+                label = "text-glyph-vertices",
+            });
+        }
+
         sg.update_buffer(bind.vertex_buffers[0], &vertex_elems[0], len(vertex_elems) * size_of(vertex_elems[0]));
     }
     defer if needs_update {
@@ -122,37 +141,29 @@ sdf_text_render :: proc(matrix: Matrix4, color: Vector4, gamma, buf: f32) {
     sg.apply_bindings(bind);
     apply_uniforms(.VS, shader_meta.SLOT_sdf_vs_uniforms, &vs_uniforms);
     apply_uniforms(.FS, shader_meta.SLOT_sdf_fs_uniforms, &fs_uniforms);
-    sg.draw(0, len(vertex_elems), 1);
-
+    sg.draw(0, len(vertex_elems), num_views);
 }
 
-draw_text :: proc(str: string, size: f32, pos: Vector3) {
+draw_text :: proc(str: string, size: f32, pos: Vector3, gamma, buf: f32) {
     using text;
 
     needs_update = true;
-
     pen := pos;
-
-    buf := strings.make_builder();
-    defer strings.destroy_builder(&buf);
+    string_buf := strings.make_builder();
+    defer strings.destroy_builder(&string_buf);
 
     for r in str {
-        strings.reset_builder(&buf);
-        strings.write_rune(&buf, r);
-        r_str := strings.to_string(buf);
-        draw_glyph(r_str, &pen, size, &vertex_elems);
+        // @Speed -- isn't there a faster way to iterate the runes than writing
+        // them into a buffer?
+        strings.reset_builder(&string_buf);
+        strings.write_rune(&string_buf, r);
+        r_str := strings.to_string(string_buf);
+        draw_glyph(r_str, &pen, size, &vertex_elems, gamma, buf);
     }
 
-    if text.bind.vertex_buffers[0].id == 0 {
-        text.bind.vertex_buffers[0] = sg.make_buffer({
-            size = cast(i32)(5000 * size_of(vertex_elems[0])),
-            usage = .DYNAMIC,
-            label = "text-glyph-vertices",
-        });
-    }
 }
 
-draw_glyph :: proc(character: string, pen: ^Vector3, size: f32, vertex_elements: ^[dynamic]SDF_Text_Vert) {
+draw_glyph :: proc(character: string, pen: ^Vector3, size: f32, vertex_elements: ^[dynamic]SDF_Text_Vert, gamma, buf: f32) {
     metric, found := text.metrics.chars[character];
     if !found do return;
 
@@ -177,26 +188,29 @@ draw_glyph :: proc(character: string, pen: ^Vector3, size: f32, vertex_elements:
 
         y0 := pen.y - (height - h_bearing_y) * scale;
         y1 := pen.y + (h_bearing_y) * scale;
+        z:f32 = pen.z;
 
-        V :: SDF_Text_Vert;
-
-        z:f32 = 0;
+        attribs := SDF_Text_Vert_Attrib {
+            gamma = gamma,
+            buf = buf,
+        };
 
         // two tris per glyph
+        V :: SDF_Text_Vert;
         append(vertex_elements, 
             V{ { (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y0), z }, 
-               { pos_x, pos_y + height, } },
+               { pos_x, pos_y + height, }, attribs },
             V{ { (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y0), z },
-               { pos_x + width, pos_y + height } },
+               { pos_x + width, pos_y + height }, attribs },
             V{ { (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y1), z },
-                { pos_x, pos_y } },
+                { pos_x, pos_y }, attribs },
 
             V{ { (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y0), z },
-               { pos_x + width, pos_y + height } },
+               { pos_x + width, pos_y + height }, attribs },
             V{ { (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y1), z },
-               { pos_x, pos_y } },
+               { pos_x, pos_y }, attribs },
             V{ { (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y1), z },
-               { pos_x + width, pos_y } },
+               { pos_x + width, pos_y }, attribs },
         );
     }
 

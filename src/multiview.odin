@@ -4,7 +4,7 @@ import "core:fmt"
 import sg "sokol:sokol_gfx"
 import "./shader_meta";
 
-MAXIMUM_VIEWS :: 45; // match shader value
+MAXIMUM_VIEWS :: 45; // must match shader value
 
 hp_info: Display_Info;
 hp_connected: bool;
@@ -221,6 +221,18 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
         recreate_blit(&postfilter_blit, "postfilter", half_size_color, static_shader(&postfilter_shader, shader_meta.dof_postfilter_shader_desc()));
         reinit_image(&final_img, rendertarget_array_desc(width, height, cast(i32)num_views, "full size dof final"));
         recreate_blit(&combine_blit, "dof_combine", final_img, static_shader(&combine_shader, shader_meta.dof_combine_shader_desc()));
+
+        // init the worldspace sdf text pass-need to blit to the color image
+        post_dof_image := state.depth_of_field.enabled ? final_img : state.offscreen.pass_desc.color_attachments[0].image;
+        reinit_pass(&text.pass, {
+            color_attachments = {
+                0 = { image = post_dof_image }
+            },
+            depth_stencil_attachment = {
+                image = state.offscreen.pass_desc.depth_stencil_attachment.image,
+            },
+            label = "sdf text pass"
+        });
     }
 }
 

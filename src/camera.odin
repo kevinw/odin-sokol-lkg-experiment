@@ -16,16 +16,10 @@ Camera :: struct {
 
     clear_color: Colorf,
 
-    //current_rendermode: Rendermode,
-
     position: Vec3,
     rotation: Quat,
 
     pixel_width, pixel_height, aspect: f32,
-
-    //draw_mode: gpu.Draw_Mode,
-
-    //framebuffer: Framebuffer,
 }
 
 camera_target_resized :: proc(camera: ^Camera, pixel_width, pixel_height: f32) {
@@ -88,12 +82,6 @@ init_camera :: proc(camera: ^Camera, is_perspective: bool, size: f32, pixel_widt
     camera.pixel_width = cast(f32)pixel_width;
     camera.pixel_height = cast(f32)pixel_height;
     camera.aspect = camera.pixel_width / camera.pixel_height;
-}
-
-delete_camera :: proc(camera: Camera) {
-}
-
-orbit :: proc(camera: ^Camera, input_state: Input_State, dt: f32, distance: f32) {
 }
 
 do_camera_movement :: proc(camera: ^Camera, input_state: Input_State, dt: f32, normal_speed: f32, fast_speed: f32, slow_speed: f32) {
