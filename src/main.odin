@@ -797,12 +797,7 @@ frame_callback :: proc "c" () {
         //}
         //sg.update_buffer(instance_model, &instance_model_matrices[0], len(instance_model_matrices) * size_of(Matrix4));
 
-        sg.begin_pass(state.offscreen.pass, {
-            colors = {
-                0 = { action = .CLEAR, val = { 0.00, 0.0, 0.0, 1.0 } },
-            }
-        });
-        defer sg.end_pass();
+        BEGIN_PASS(state.offscreen.pass, { colors = { 0 = { action = .CLEAR, val = { 0.00, 0.0, 0.0, 1.0 } }}});
 
         using state.scene;
         for _, node_index in nodes {
@@ -909,8 +904,7 @@ frame_callback :: proc "c" () {
         using state.depth_of_field;
         {
             // coc (circle of confusion)
-            sg.begin_pass(coc_pass, { colors = { 0 = { action = .CLEAR, val = { 0.0, 0.0, 0.0, 0.0 } }, } });
-            defer sg.end_pass();
+            BEGIN_PASS(coc_pass, { colors = { 0 = { action = .CLEAR, val = { 0.0, 0.0, 0.0, 0.0 } }, } });
 
             apply_material(&coc_material);
 
@@ -936,8 +930,7 @@ frame_callback :: proc "c" () {
         {
             // bokeh pass (already to half-size texture)
             // TODO: make this another set of 'create_blit'/'blit' calls
-            sg.begin_pass(bokeh_pass, { colors = { 0 = { action = .CLEAR, val = { 0.0, 0.0, 0.0, 0.0 } }, } });
-            defer sg.end_pass();
+            BEGIN_PASS(bokeh_pass, { colors = { 0 = { action = .CLEAR, val = { 0.0, 0.0, 0.0, 0.0 } }, } });
             bokeh_material.bindings.fs_images[shader_meta.SLOT_cameraColorWithCoc] = half_size_color;// offscreen.pass_desc.color_attachments[0].image;
             apply_material(&bokeh_material);
             apply_uniforms(.FS, shader_meta.SLOT_bokeh_uniforms, shader_meta.bokeh_uniforms {
@@ -985,9 +978,7 @@ frame_callback :: proc "c" () {
             //text_matrix := ortho3d(0, cast(f32)sapp.width(), 0, cast(f32)sapp.height(), -10.0, 10.0);
 
             {
-                sg.begin_pass(text.pass, text.pass_action);
-                defer sg.end_pass();
-
+                BEGIN_PASS(text.pass, text.pass_action);
                 model_matrix := mat4_translate(state.camera.position);
                 model_matrix = mul(model_matrix, quat_to_mat4(state.camera.rotation));
                 model_matrix = mul(model_matrix, mat4_translate(pos));

@@ -123,8 +123,7 @@ recreate_blit :: proc(using b: ^Blitter, label: cstring, target_rt: sg.Image, sh
 }
 
 blit :: proc(using b: ^Blitter, source_rt: sg.Image, source_slot: int = 0) {
-    sg.begin_pass(pass, { colors = { 0 = { action = .LOAD }}});
-    defer sg.end_pass();
+    BEGIN_PASS(pass, { colors = { 0 = { action = .LOAD }}});
 
     assert(pipeline.id != sg.INVALID_ID, fmt.tprintf("blit pipeline is invalid for blit at %p", b));
 

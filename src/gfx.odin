@@ -129,3 +129,9 @@ static_shader :: inline proc(s: ^sg.Shader, desc: ^sg.Shader_Desc) -> sg.Shader 
 
     return s^;
 }
+
+@(deferred_out=sg.end_pass)
+BEGIN_PASS :: proc(pass: sg.Pass, pass_action: sg.Pass_Action) {
+    sg.begin_pass(pass, pass_action);
+}
+
