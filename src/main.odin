@@ -1277,6 +1277,19 @@ main :: proc() {
         context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
     }
 
+    sg.set_assert_func(proc "c" (expr, file: cstring, line: i32) {
+        fd := os.stderr;
+        os.write_string(fd, "sokol_gfx assert failed: '");
+        os.write_string(fd, string(expr));
+        os.write_string(fd, "' in ");
+        os.write_string(fd, string(file));
+        os.write_string(fd, ":");
+        os.write_string(fd, fmt.aprint(line));
+        os.write_string(fd, "\n");
+        stacktrace.print_stack_trace(1);
+        runtime.debug_trap();
+    });
+
 	os.exit(run_app());
 }
 
