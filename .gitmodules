@@ -1,3 +1,6 @@
 [submodule "lib/cgltf"]
 	path = lib/cgltf
 	url = git@github.com:kevinw/odin-cgltf.git
+[submodule "lib\\odin-sokol"]
+	path = lib\\odin-sokol
+	url = git@github.com:kevinw/odin-sokol.git
