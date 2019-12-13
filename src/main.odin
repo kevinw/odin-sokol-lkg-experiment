@@ -52,7 +52,6 @@ draw_quad := false;
 draw_grid_lines := false;
 draw_gizmos := false;
 draw_sdf_text := true;
-draw_ui := true;
 mesh_rotate_speed:f32 = 12.0;
 
 ANIM_CURVE_WIP :: false;
@@ -243,9 +242,6 @@ bg := [?]f32 { 0.5, 0.7, 1.0 };
 
 test_curve := Bezier_Curve { 1, 0, 0, 1 };
 
-window: mu.Container;
-mu_ctx: mu.Context;
-
 /* microui callbacks */
 delta := v3(-1.92, -0.07, 1.52);
 
@@ -375,39 +371,6 @@ init_callback :: proc "c" () {
 
     gizmos_ctx.render = render_gizmos;
     gizmos.init(&gizmos_ctx);
-
-    r_init();
-    mu.init(&mu_ctx);
-    if hp_connected
-    {
-        font_scale = 4.05;
-        mu_ctx._style = {
-            nil,       /* font */
-            { 68, 10 }, /* size */
-            25, 20, 40,   /* padding, spacing, indent */
-            50,         /* title_height */
-            30, 25,      /* scrollbar_size, thumb_size */
-            {
-                { 230, 230, 230, 255 }, /* MU_COLOR_TEXT */
-                { 25,  25,  25,  255 }, /* MU_COLOR_BORDER */
-                { 50,  50,  50,  255 }, /* MU_COLOR_WINDOWBG */
-                { 25,  25,  25,  255 }, /* MU_COLOR_TITLEBG */
-                { 240, 240, 240, 255 }, /* MU_COLOR_TITLETEXT */
-                { 0,   0,   0,   0   }, /* MU_COLOR_PANELBG */
-                { 75,  75,  75,  255 }, /* MU_COLOR_BUTTON */
-                { 95,  95,  95,  255 }, /* MU_COLOR_BUTTONHOVER */
-                { 115, 115, 115, 255 }, /* MU_COLOR_BUTTONFOCUS */
-                { 30,  30,  30,  255 }, /* MU_COLOR_BASE */
-                { 35,  35,  35,  255 }, /* MU_COLOR_BASEHOVER */
-                { 40,  40,  40,  255 }, /* MU_COLOR_BASEFOCUS */
-                { 43,  43,  43,  255 }, /* MU_COLOR_SCROLLBASE */
-                { 30,  30,  30,  255 }  /* MU_COLOR_SCROLLTHUMB */
-            }
-        };
-        mu_ctx.style = &mu_ctx._style;
-    }
-    mu_ctx.text_width = r_text_width_cb;
-    mu_ctx.text_height = r_get_text_height;
 
 	stime.setup();
 
@@ -564,84 +527,6 @@ init_callback :: proc "c" () {
     draw_gizmos = false;
 }
 
-debug_window :: proc(ctx: ^mu.Context) {
-    if window.inited == {} {
-        mu.init_window(ctx, &window, {});
-        if SNAKE do window.open = 0;
-        window.rect = hp_connected ? mu.rect(20, 20, 550, 1050) : mu.rect(20, 20, 250, 450);
-    }
-
-    window.rect.w = max(window.rect.w, 240);
-    window.rect.h = max(window.rect.h, 300);
-
-    if mu.begin_window(ctx, &window, "") {
-        defer mu.end_window(ctx);
-        when ANIM_CURVE_WIP {
-            mu.layout_begin_column(ctx);
-            mu_layout_row(ctx, {100,}, 100);
-            mu_anim_curve(ctx, &test_curve);
-            mu.layout_end_column(ctx);
-        }
-
-        @static show_tweaks: i32 = 1;
-        if mu.header(ctx, &show_tweaks, "tweaks") {
-            when len(all_tweakables) == 0 {
-                mu.label(ctx, "no tweaks");
-            } else {
-                for tweakable in all_tweakables {
-                    mu_label(ctx, tweakable.name);
-                    any_ptr := tweakable.ptr();
-                    mu_struct_ti(ctx, tweakable.name, any_ptr.data, type_info_of(any_ptr.id));
-                }
-            }
-        }
-
-        @static show_info: i32 = 0;
-        if mu.header(ctx, &show_info, "debug") {
-            mu_layout_row(ctx, {80, -1}, 0);
-            mu.label(ctx, "dof:"); mu_checkbox(ctx, &state.depth_of_field.enabled, "depth of field");
-            mu.label(ctx, "ms per frame:"); mu_label_printf(ctx, "%f", fps_counter.ms_per_frame);
-            mu.label(ctx, "num elements:"); mu_label_printf(ctx, "%d", per_frame_stats.num_elements);
-
-            mu.label(ctx, "camera eye pos:");
-
-            mu_vector(ctx, &state.camera.position, -20, 20);
-
-            mu.label(ctx, "camera rot quat:");
-            mu_vector(ctx, transmute(^Vector4)&state.camera.rotation, -200, 200);
-
-            mu_layout_row(ctx, { 40, -1 }, 0);
-            mu.label(ctx, "fov:"); mu.slider(ctx, &state.camera.size, 1, 200);
-            mu.label(ctx, "rotate"); mu_checkbox(ctx, &state.auto_rotate, "auto rotate");
-
-            for row_index in 0..<4 {
-                row := &state.view_proj[row_index];
-                mu_layout_row(ctx, { 300, -1 }, 0);
-                mu.label(ctx, strings.clone_to_cstring(
-                    fmt.tprintf("%f  %f  %f  %f", row[0], row[1], row[2], row[3]),
-                    context.temp_allocator));
-            }
-
-            mu_layout_row(ctx, { -78, -1 }, 74);
-            /* sliders */
-            mu.layout_begin_column(ctx);
-            mu_layout_row(ctx, { 46, -1 }, 0);
-            mu.label(ctx, "Red:");   mu.slider(ctx, &bg[0], 0, 1.0);
-            mu.label(ctx, "Green:"); mu.slider(ctx, &bg[1], 0, 1.0);
-            mu.label(ctx, "Blue:");  mu.slider(ctx, &bg[2], 0, 1.0);
-            mu.layout_end_column(ctx);
-            /* color preview */
-            r := mu.layout_next(ctx);
-
-            mu.draw_rect(ctx, r, mu.Color{cast(u8)(bg[0]*255.0), cast(u8)(bg[1]*255.0), cast(u8)(bg[2]*255.0), 255});
-            s := fmt.tprintf("#%02X%02X%02X", cast(i32) bg[0], cast(i32) bg[1], cast(i32) bg[2]);
-            c_s := strings.clone_to_cstring(s, context.temp_allocator);
-            mu.draw_control_text(ctx, c_s, r, cast(i32)mu.Style_Color.Text, {mu.Opt.AlignCenter});
-
-        }
-    }
-}
-
 frame_callback :: proc "c" () {
  
     sfetch.dowork();
@@ -745,19 +630,19 @@ frame_callback :: proc "c" () {
     }
 
     //
-    // MICROUI
-    //
-    {
-        mu.begin(&mu_ctx);
-        defer mu.end(&mu_ctx);
-        debug_window(&mu_ctx);
-    }
-
-    //
     // IMGUI
     //
     {
-        imgui.show_demo_window();
+        //imgui.show_demo_window();
+
+        if BEGIN("Inspector") {
+            for tweakable in all_tweakables {
+                any_ptr := tweakable.ptr();
+                imgui_struct_ti(tweakable.name, any_ptr.data, type_info_of(any_ptr.id), "", true);
+            }
+
+            imgui_struct(&state, "state");
+        }
     }
 
     per_frame_stats = {};
@@ -1099,10 +984,6 @@ frame_callback :: proc "c" () {
         //sgl.draw();
     }
 
-    if draw_ui {
-        mu_render(sapp.width(), sapp.height()); // note; this just pushes commands to a queue. r_draw below actually does the draw calls
-    }
-
     // DRAW GIZMOS
     when EDITOR {
         if draw_gizmos {
@@ -1118,7 +999,6 @@ frame_callback :: proc "c" () {
     }
 
     // DRAW UI
-    r_draw();
     simgui.render();
 
     sg.end_pass();
@@ -1190,36 +1070,19 @@ event_callback :: proc "c" (event: ^sapp.Event) {
         case .RESIZED:
             camera_target_resized(&state.camera, cast(f32)sapp.width(), cast(f32)sapp.height());
         case .MOUSE_DOWN:
-            set_capture(sapp.win32_get_hwnd());
-
-            mu.input_mousedown(&mu_ctx, cast(i32)event.mouse_x, cast(i32)event.mouse_y, 1 << cast(u32)event.mouse_button);
+            //set_capture(sapp.win32_get_hwnd());
             switch event.mouse_button {
                 case .LEFT: input_state.left_mouse = true;
                 case .RIGHT: input_state.right_mouse = true;
             }
         case .MOUSE_UP:
-            release_capture(sapp.win32_get_hwnd());
-
-            mu.input_mouseup(&mu_ctx, cast(i32)event.mouse_x, cast(i32)event.mouse_y, 1 << cast(u32)event.mouse_button);
+            //release_capture(sapp.win32_get_hwnd());
             switch event.mouse_button {
                 case .LEFT: input_state.left_mouse = false;
                 case .RIGHT: input_state.right_mouse = false;
             }
-        case .MOUSE_SCROLL:
-            mu.input_scroll(&mu_ctx, cast(i32)event.scroll_x, cast(i32)(event.scroll_y * editor_settings.ui_mousewheel_scroll_speed));
         case .MOUSE_MOVE:
-            mu.input_mousemove(&mu_ctx, cast(i32)event.mouse_x, cast(i32)event.mouse_y);
             state.mouse.pos = v2(event.mouse_x, event.mouse_y);
-        case .KEY_DOWN:
-            if !want_capture_keyboard do mu.input_keydown(&mu_ctx, cast(i32)key_map[event.key_code & cast(sapp.Key_Code)511]);
-        case .KEY_UP:
-            if !want_capture_keyboard do mu.input_keyup(&mu_ctx, cast(i32)key_map[event.key_code & cast(sapp.Key_Code)511]);
-        case .CHAR:
-            if !want_capture_keyboard {
-                txt := [2]u8 { cast(u8)(event.char_code & 255), 0 };
-                mu.input_text(&mu_ctx, cstring(&txt[0]));
-            }
-
     }
 
 	if event.type == .KEY_DOWN && !event.key_repeat {
@@ -1245,7 +1108,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
             case .L: l = true;
             case .P:
                 p = true;
-                window.open = window.open == 1 ? 0 : 1;
+                //window.open = window.open == 1 ? 0 : 1;
             case .NUM_0: num_0 = true;
             case .NUM_1: num_1 = true;
             case .NUM_2:

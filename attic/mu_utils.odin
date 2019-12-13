@@ -230,14 +230,14 @@ r_draw_callback :: proc(dst: mu.Rect, callback: rawptr) {
     }
 }
 
-mu_render :: proc(width, height: int) {
+mu_render :: proc(mu_ctx: ^mu.Context, width, height: int) {
     // microui rendering
     r_begin(width, height);
     defer r_end();
 
     cmd:^mu.Command = nil;
     for  {
-        if !mu.next_command(&mu_ctx, &cmd) do break;
+        if !mu.next_command(mu_ctx, &cmd) do break;
         using cmd;
         switch type {
             case .Text: r_draw_text(cstring_ptr_to_slice(cast(^u8)&text.str[0]), text.pos, text.color);
