@@ -14,6 +14,8 @@ import sapp "sokol:sokol_app"
 import stime "sokol:sokol_time"
 import sfetch "sokol:sokol_fetch"
 import sgl "sokol:sokol_gl"
+import simgui "sokol:sokol_imgui"
+import imgui "../lib/odin-imgui"
 import mu "../lib/microui"
 import "../lib/basisu"
 import "./watcher"
@@ -29,6 +31,7 @@ when OSC {
 LKG_ASPECT:f32 = 1;
 DEFAULT_CAMERA_FOV:f32 = 14.0;
 STACK_TRACES :: true;
+LEAK_CHECK :: false;
 
 when STACK_TRACES {
     import "stacktrace"
@@ -290,12 +293,14 @@ when OSC {
 
 init_callback :: proc "c" () {
 
-    original_allocator := context.allocator;
-    passthrough_allocator = {
-        procedure = passthrough_allocator_proc,
-        data = &original_allocator,
-    };
-    context.allocator = passthrough_allocator;
+    when LEAK_CHECK {
+        original_allocator := context.allocator;
+        passthrough_allocator = {
+            procedure = passthrough_allocator_proc,
+            data = &original_allocator,
+        };
+        context.allocator = passthrough_allocator;
+    }
 
     watcher._setup_notification(".");
 
@@ -345,6 +350,8 @@ init_callback :: proc "c" () {
         max_commands = 300,
         pipeline_pool_size = 5,
     });
+
+    setup_simgui();
 
     basisu.setup();
 
@@ -637,6 +644,8 @@ debug_window :: proc(ctx: ^mu.Context) {
 
 frame_callback :: proc "c" () {
  
+    sfetch.dowork();
+    if !_did_load do return;
 
     when STACK_TRACES {
         context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
@@ -652,6 +661,9 @@ frame_callback :: proc "c" () {
     elapsed_ticks:u64 = last_ticks == 0 ? 0 : stime.diff(current_ticks, last_ticks);
 	last_ticks = current_ticks;
 	elapsed_seconds := stime.sec(elapsed_ticks);
+    dt := cast(f32)elapsed_seconds;
+
+    simgui.new_frame(cast(i32)sapp.width(), cast(i32)sapp.height(), elapsed_seconds);
 
     {
         using fps_counter;
@@ -668,12 +680,6 @@ frame_callback :: proc "c" () {
 	//
 
     if frame_count % 30 == 0 do watcher.handle_changes();
-
-    sfetch.dowork();
-
-    if !_did_load do return;
-
-    dt := cast(f32)elapsed_seconds;
 
     maybe_recreate_multiview_pass(num_views(), sapp.framebuffer_size());
 
@@ -745,6 +751,13 @@ frame_callback :: proc "c" () {
         mu.begin(&mu_ctx);
         defer mu.end(&mu_ctx);
         debug_window(&mu_ctx);
+    }
+
+    //
+    // IMGUI
+    //
+    {
+        imgui.show_demo_window();
     }
 
     per_frame_stats = {};
@@ -1021,6 +1034,9 @@ frame_callback :: proc "c" () {
     }
 
 
+    //
+    // Blit the offscreen render target array into a lenticular image
+    //
     sg.apply_pipeline(state.lenticular_pipeline);
     sg.apply_bindings(state.lenticular_bindings);
     {
@@ -1103,6 +1119,7 @@ frame_callback :: proc "c" () {
 
     // DRAW UI
     r_draw();
+    simgui.render();
 
     sg.end_pass();
 	sg.commit();
@@ -1159,6 +1176,7 @@ cleanup :: proc "c" () {
         }
     }
 
+    simgui.shutdown();
     basisu.shutdown();
     sfetch.shutdown();
     sg.shutdown();
@@ -1166,6 +1184,8 @@ cleanup :: proc "c" () {
 }
 
 event_callback :: proc "c" (event: ^sapp.Event) {
+    want_capture_keyboard := simgui.handle_event(event);
+
     switch event.type {
         case .RESIZED:
             camera_target_resized(&state.camera, cast(f32)sapp.width(), cast(f32)sapp.height());
@@ -1191,12 +1211,14 @@ event_callback :: proc "c" (event: ^sapp.Event) {
             mu.input_mousemove(&mu_ctx, cast(i32)event.mouse_x, cast(i32)event.mouse_y);
             state.mouse.pos = v2(event.mouse_x, event.mouse_y);
         case .KEY_DOWN:
-            mu.input_keydown(&mu_ctx, cast(i32)key_map[event.key_code & cast(sapp.Key_Code)511]);
+            if !want_capture_keyboard do mu.input_keydown(&mu_ctx, cast(i32)key_map[event.key_code & cast(sapp.Key_Code)511]);
         case .KEY_UP:
-            mu.input_keyup(&mu_ctx, cast(i32)key_map[event.key_code & cast(sapp.Key_Code)511]);
+            if !want_capture_keyboard do mu.input_keyup(&mu_ctx, cast(i32)key_map[event.key_code & cast(sapp.Key_Code)511]);
         case .CHAR:
-            txt := [2]u8 { cast(u8)(event.char_code & 255), 0 };
-            mu.input_text(&mu_ctx, cstring(&txt[0]));
+            if !want_capture_keyboard {
+                txt := [2]u8 { cast(u8)(event.char_code & 255), 0 };
+                mu.input_text(&mu_ctx, cstring(&txt[0]));
+            }
 
     }
 
