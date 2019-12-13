@@ -18,7 +18,7 @@ import mu "../lib/microui"
 import "../lib/basisu"
 import "./watcher"
 
-SNAKE :: false;
+SNAKE :: true;
 OSC :: true;
 
 when OSC {
@@ -289,6 +289,14 @@ when OSC {
 }
 
 init_callback :: proc "c" () {
+
+    original_allocator := context.allocator;
+    passthrough_allocator = {
+        procedure = passthrough_allocator_proc,
+        data = &original_allocator,
+    };
+    context.allocator = passthrough_allocator;
+
     watcher._setup_notification(".");
 
     state.auto_rotate = true;
@@ -628,6 +636,8 @@ debug_window :: proc(ctx: ^mu.Context) {
 }
 
 frame_callback :: proc "c" () {
+ 
+
     when STACK_TRACES {
         context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
     }
@@ -1268,6 +1278,24 @@ handle_args :: proc() {
     }
 }
 
+passthrough_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode, size, alignment: int, old_memory: rawptr, old_size: int, flags: u64 = 0, location := #caller_location) -> rawptr {
+    switch mode {
+    case .Alloc:
+        fmt.printf("Alloc!   \n  size = %v\n  alignment = %v\n  old_memory = %v\n  old_size = %v\n  flags = %v\n  location = %v\n", size, alignment, old_memory, old_size, flags, location);
+    case .Free:
+        fmt.printf("Free!    \n  size = %v\n  alignment = %v\n  old_memory = %v\n  old_size = %v\n  flags = %v\n  location = %v\n", size, alignment, old_memory, old_size, flags, location);
+    case .Free_All:
+        fmt.printf("Free_All!\n  size = %v\n  alignment = %v\n  old_memory = %v\n  old_size = %v\n  flags = %v\n  location = %v\n", size, alignment, old_memory, old_size, flags, location);
+    case .Resize:
+        fmt.printf("Resize!  \n  size = %v\n  alignment = %v\n  old_memory = %v\n  old_size = %v\n  flags = %v\n  location = %v\n", size, alignment, old_memory, old_size, flags, location);
+    }
+
+    original_allocator := cast(^mem.Allocator)allocator_data;
+    return original_allocator.procedure(original_allocator.data, mode, size, alignment, old_memory, old_size, flags, location);
+}
+
+passthrough_allocator: mem.Allocator;
+
 main :: proc() {
     state.depth_of_field.enabled = true; // TODO: have a state init function
     handle_args();
@@ -1294,6 +1322,7 @@ main :: proc() {
 }
 
 is_fullscreen: bool;
+
 
 run_app :: proc() -> int {
     is_fullscreen = true;
