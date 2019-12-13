@@ -173,6 +173,9 @@ make_lathed_geometry :: proc(_axis, arm1, arm2: Vector3, slices: int, points: []
     axis := _axis;
 
     mesh: Mesh;
+    mesh.vertices = make([dynamic]Geo_Vertex, 0, len(points) * slices);
+    mesh.triangles = make([dynamic][3]u32, 0, len(points) * slices * 2);
+
     for i in 0..cast(u32)slices {
         angle:f32 = (f32(cast(int)i % slices) * TAU / cast(f32)slices) + (TAU/8);
         rot := arm1 * cos(angle) + arm2 * sin(angle);
