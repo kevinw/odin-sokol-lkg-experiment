@@ -5,6 +5,7 @@ import "core:strings"
 import "core:os"
 import "core:mem"
 import "core:fmt"
+import "core:log"
 import "core:sys/win32"
 
 using import "math"
@@ -296,15 +297,7 @@ when OSC {
 }
 
 init_callback :: proc "c" () {
-
-    when LEAK_CHECK {
-        original_allocator := context.allocator;
-        passthrough_allocator = {
-            procedure = passthrough_allocator_proc,
-            data = &original_allocator,
-        };
-        context.allocator = passthrough_allocator;
-    }
+    context.logger = main_thread_logger;
 
     watcher._setup_notification(".");
 
@@ -416,6 +409,8 @@ init_callback :: proc "c" () {
     sfetch.send({
         path = gltf_path,
         callback = proc "c" (response: ^sfetch.Response) {
+            context.logger = main_thread_logger;
+
             if response.dispatched {
                 sfetch.bind_buffer(response.handle, sfetch_buffers[response.channel][response.lane][:]);
             } else if response.fetched {
@@ -538,9 +533,12 @@ init_callback :: proc "c" () {
     sdf_text_init();
 
     draw_gizmos = false;
+
+    log.info("init callback has finished.");
 }
 
 frame_callback :: proc "c" () {
+    context.logger = main_thread_logger;
  
     sfetch.dowork();
     if !_did_load do return;
@@ -649,7 +647,6 @@ frame_callback :: proc "c" () {
         //imgui.show_demo_window();
 
         if BEGIN("Inspector") {
-
             if imgui.button("Save") {
                 s := wbml.serialize(&editor_settings);
                 os.write_entire_file("state.wbml", transmute([]u8)s);
@@ -670,6 +667,8 @@ frame_callback :: proc "c" () {
             imgui_struct(&state, "state");
 
         }
+
+        imgui_console();
     }
 
     per_frame_stats = {};
@@ -1045,9 +1044,13 @@ toggle_multiview :: proc() {
     views := num_views();
     if views > 1 {
         _old_num_views = views;
+        log.info("changing to single view mode");
+        fmt.println("[dummy] changing to single view mode");
         force_num_views = 1;
     } else {
         force_num_views = -1;
+        log.info("changing to %d views", num_views());
+        fmt.println("[dummy] changing to multiview mode:", num_views(), "views");
     }
 }
 
@@ -1085,6 +1088,8 @@ toggle_fullscreen :: proc() {
 }
 
 cleanup :: proc "c" () {
+    context.logger = main_thread_logger;
+
     when OSC {
         if osc_enabled {
             stop_osc_thread();
@@ -1096,9 +1101,12 @@ cleanup :: proc "c" () {
     sfetch.shutdown();
     sg.shutdown();
     free_all(context.temp_allocator);
+    cleanup_logger();
 }
 
 event_callback :: proc "c" (event: ^sapp.Event) {
+    context.logger = main_thread_logger;
+
     want_capture_keyboard := simgui.handle_event(event);
 
     switch event.type {
@@ -1226,6 +1234,8 @@ main :: proc() {
     }
 
     sg.set_assert_func(proc "c" (expr, file: cstring, line: i32) {
+        context.logger = main_thread_logger;
+
         fd := os.stderr;
         os.write_string(fd, "sokol_gfx assert failed: '");
         os.write_string(fd, string(expr));
@@ -1238,11 +1248,45 @@ main :: proc() {
         runtime.debug_trap();
     });
 
+
+    when LEAK_CHECK {
+        original_allocator := context.allocator;
+        passthrough_allocator = {
+            procedure = passthrough_allocator_proc,
+            data = &original_allocator,
+        };
+        context.allocator = passthrough_allocator;
+    }
+
+    setup_logger();
+
 	os.exit(run_app());
 }
 
 is_fullscreen: bool;
 
+main_thread_logger: log.Logger;
+
+setup_logger :: proc() {
+    c := context;
+    main_thread_logger = log.create_multi_logger(
+        log.create_console_logger(),
+        log.Logger { imgui_logger_proc, nil, nil }
+    );
+    c.logger = main_thread_logger;
+    context = c;
+
+    log.warn("logger has been setup!");
+}
+
+cleanup_logger :: proc() {
+    multi_logger := main_thread_logger;
+    if multi_logger.data != nil {
+        data := cast(^log.Multi_Logger_Data)multi_logger.data;
+        log.destroy_console_logger(&data.loggers[0]);
+        log.destroy_multi_logger(&multi_logger);
+    }
+}
 
 run_app :: proc() -> int {
     is_fullscreen = true;

@@ -2,6 +2,7 @@ package main
 
 import "core:fmt"
 using import "../math"
+import "core:log"
 
 using import "../socket_wip"
 import tosc "../../lib/tinyosc"
@@ -22,13 +23,13 @@ init :: proc(cbs: Callbacks) {
     _cbs = cbs;
     data : WSA_Data;
     if err := wsa_startup(make_word(2, 2), &data); err != 0 {
-        fmt.eprintln("WSAStartup failed with error:", err);
+        log.fatal("WSAStartup failed with error:", err);
         return;
     }
 
     s = socket(AF_INET, SOCK_DGRAM, 0);
     if s == INVALID_SOCKET {
-        fmt.eprintln("could not initialize udp server");
+        log.error("could not initialize osc udp server");
         return;
     }
 
@@ -38,9 +39,9 @@ init :: proc(cbs: Callbacks) {
         port = htons(port),
     };
 
-    fmt.println("osc server listening on port", port);
+    log.info("osc server listening on port", port);
     if err := bind(s, cast(^Sock_Addr)(&server), size_of(server)); err == SOCKET_ERROR {
-        fmt.eprintln("could not bind server socket");
+        log.error("could not bind server socket");
         return;
     }
 }

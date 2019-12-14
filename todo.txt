@@ -3,7 +3,6 @@
     ideally some mix of both is ideal...where to look for inspiration?
 (A) shader reloading - see https://github.com/ThisDrunkDane/libbrew/blob/6ecefb232bc5d8d1b71fad706fc0a857da156fb6/catalog/catalog.odin for an example of using ReadDirectoryChangesW in this context
 (A) think about what it would take to have a live reload DLL for real...where is the boundary? "gameplay" code, state that gets automatically serialized, etc...
-(A) colored terminal text for readability. use for error logs, and for highlighting the important parts of stack traces
 
 (B) try some of the PBR textures here https://texturehaven.com/textures/
 (B) prioritize this list by using a game idea as a forcing function
@@ -66,3 +65,4 @@ x use hash in caller_procedure to do microui stuff
 x check for same mu scissor rect before resetting draw
 x consider using D3DCOMPILE_OPTIMIZATION_LEVEL0 for debug mode in sokol-"Directs the compiler to use the lowest optimization level. If you set this constant, the compiler might produce slower code but produces the code more quickly. Set this constant when you develop the shader iteratively."
 x @qualityOfLife sokol's asserts could trigger a stack trace
+x (A) colored terminal text for readability. use for error logs, and for highlighting the important parts of stack traces

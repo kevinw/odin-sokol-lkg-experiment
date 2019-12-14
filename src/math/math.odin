@@ -539,7 +539,7 @@ foreign _ {
 	exp_f64 :: proc(x: f64) -> f64 ---;
 }
 
-log :: proc{log_f32, log_f64};
+//log :: proc{log_f32, log_f64};
 exp :: proc{exp_f32, exp_f64};
 
 tan_f32 :: proc "c" (θ: f32) -> f32 { return sin(θ)/cos(θ); }

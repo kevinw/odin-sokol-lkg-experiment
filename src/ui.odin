@@ -6,25 +6,90 @@ import imgui "../lib/odin-imgui"
 import sapp "../lib/odin-sokol/src/sokol_app"
 import sg "../lib/odin-sokol/src/sokol_gfx"
 
-using import "core:runtime"
-import "core:strings"
-import "core:mem"
 using import "core:fmt"
+using import "core:runtime"
+import "core:log"
+import "core:mem"
+import "core:strings"
 
 @(deferred_out=_END)
-BEGIN :: proc(name: string) -> bool {
-    return imgui.begin(name);
+BEGIN :: proc(name: string, open: ^bool = nil) -> bool {
+    return imgui.begin(name, open);
 }
 
 @private _END :: proc(did_open: bool) { imgui.end(); }
+
+@(deferred_out=_END_CHILD)
+BEGIN_CHILD :: proc (str_id : string, size : imgui.Vec2 = imgui.Vec2{0,0}, border : bool = true, extra_flags := imgui.Window_Flags(0)) -> bool {
+    return imgui.begin_child(str_id, size, border, extra_flags);
+}
+
+@private _END_CHILD :: proc(did_open: bool) { imgui.end_child(); }
+
+@private Log_Entry :: struct {
+    message: string,
+    level: log.Level,
+    location: Source_Code_Location,
+}
+
+@private imgui_log_entries : [dynamic]Log_Entry;
+
+imgui_logger_proc :: proc(data: rawptr, level: log.Level, text: string, options: log.Options, location : Source_Code_Location) {
+    append(&imgui_log_entries, Log_Entry {text, level, location});
+}
+
+@static console_open: bool = true;
+imgui_console :: proc() {
+    W :: 400;
+    H :: 300;
+    PAD :: 40;
+    imgui.set_next_window_pos({f32(sapp.width() - W - PAD), f32(sapp.height() - H - PAD)}, .FirstUseEver);
+    imgui.set_next_window_size({W, H}, .FirstUseEver);
+    autoscroll :: true;
+    if console_open {
+        if BEGIN("Console", &console_open) {
+            // footer_height_to_reserve:f32 = imgui.get_style().item_spacing.y + imgui.get_frame_height_with_spacing(); // 1 separator, 1 input text
+            footer_height_to_reserve :f32 = 0;
+            BEGIN_CHILD("ScrollingRegion", {0, -footer_height_to_reserve}, false, .HorizontalScrollbar); // Leave room for 1 separator + 1 InputText
+            if imgui.begin_popup_context_window() {
+                if imgui.selectable("Clear") do imgui_console_clear();//ClearLog();
+                imgui.end_popup();
+            }
+
+            for entry in imgui_log_entries {
+                pop_color := false;
+                    using imgui;
+                switch entry.level {
+                    case .Warning:
+                        imgui.push_style_color(Style_Color.Text, Vec4{.4, 1, .4, 1});
+                        pop_color = true;
+                    case .Error:
+                        imgui.push_style_color(Style_Color.Text, Vec4{1, .4, .4, 1});
+                        pop_color = true;
+                }
+
+                imgui.text_unformatted(entry.message);
+                if pop_color {
+                    imgui.pop_style_color();
+                }
+            }
+
+            if autoscroll && imgui.get_scroll_y() >= imgui.get_scroll_max_y() {
+                imgui.set_scroll_here_y(1);
+            }
+        }
+    }
+}
+
+imgui_console_clear :: proc() {
+    clear(&imgui_log_entries);
+}
 
 imgui_struct_window :: inline proc(value: ^$T) {
     //imgui.push_font(imgui_font_mono); // TODO
     //defer imgui.pop_font();
 
-    imgui.begin(tprint(type_info_of(T)));
-    defer imgui.end();
-
+    BEGIN(tprint(type_info_of(T)));
     imgui_struct_ti("", value, type_info_of(T));
 }
 
