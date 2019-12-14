@@ -1,7 +1,7 @@
 package main
 
-import sg "sokol:sokol_gfx"
-import sfetch "sokol:sokol_fetch"
+import sg "../lib/odin-sokol/src/sokol_gfx"
+import sfetch "../lib/odin-sokol/src/sokol_fetch"
 import "core:strings"
 import "core:fmt"
 import "core:mem"

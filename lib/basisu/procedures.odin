@@ -1,6 +1,6 @@
 package basisu
 
-import sg "sokol:sokol_gfx"
+import sg "../odin-sokol/src/sokol_gfx"
 
 when ODIN_OS == "windows" do foreign import basisu_lib "basisu.lib"
 

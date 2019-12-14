@@ -3,8 +3,8 @@
 package main
 import simgui "../lib/odin-sokol/src/sokol_imgui"
 import imgui "../lib/odin-imgui"
-import sapp "sokol:sokol_app"
-import sg "sokol:sokol_gfx"
+import sapp "../lib/odin-sokol/src/sokol_app"
+import sg "../lib/odin-sokol/src/sokol_gfx"
 
 using import "core:runtime"
 import "core:strings"

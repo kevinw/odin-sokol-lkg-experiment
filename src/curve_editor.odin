@@ -1,7 +1,7 @@
 package main
 
-import sapp "sokol:sokol_app"
-import sgl "sokol:sokol_gl"
+import sapp "../lib/odin-sokol/src/sokol_app"
+import sgl "../lib/odin-sokol/src/sokol_gl"
 import mu "../lib/microui"
 using import "math"
 import "core:fmt"

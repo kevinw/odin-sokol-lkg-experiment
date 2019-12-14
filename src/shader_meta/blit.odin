@@ -1,6 +1,6 @@
 package shader_meta;
 
-import sg "sokol:sokol_gfx"
+import sg "../../lib/odin-sokol/src/sokol_gfx"
 using import "../math"
 
 /*

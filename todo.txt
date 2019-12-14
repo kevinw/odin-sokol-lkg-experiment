@@ -1,30 +1,45 @@
 (A) shader_meta needs a cleanup. at the very least, start with package-per-shader?
     or should we just go immediately for a more late-binding approach?
     ideally some mix of both is ideal...where to look for inspiration?
+(A) shader reloading - see https://github.com/ThisDrunkDane/libbrew/blob/6ecefb232bc5d8d1b71fad706fc0a857da156fb6/catalog/catalog.odin for an example of using ReadDirectoryChangesW in this context
+(A) think about what it would take to have a live reload DLL for real...where is the boundary? "gameplay" code, state that gets automatically serialized, etc...
+(A) colored terminal text for readability. use for error logs, and for highlighting the important parts of stack traces
+
 (B) try some of the PBR textures here https://texturehaven.com/textures/
 (B) prioritize this list by using a game idea as a forcing function
+    flying, walking, racing inwards
+    crash bandicoot-style coming outwards
+    battletoads wind tunnel style procgen'd infinite 
 (B) shadow maps
-unify the multiview rendering thing with a set of macros shared between cgltf and sdf_text.glsl
-api hook for sokol assertions so that stack traces appear there!
-remove the "collection" command line argument and just reference odin-sokol in the lib directory explicitly
-leakcheck allocator
-use hash in caller_procedure to do microui stuff
+(B) integrate sokol compute pull request
+(B) make subview quilt size a multiple of the actual device width? this way, 8k would get a higher res by default...
+a set of "println" tools for the screen - temporary message, permanent message with corner
+    change the "subview" var to a factor, default to 1.0, which is the resolution of the device
+(B) a set of "println" tools for the screen - temporary message, permanent message with corner
+    log system with info/debug/warn/error
+(B) bloom/hdr/post processing/filmic aes?
+(B) multiple window support with a scene view - essential for lkg development?
+(B) @graphics reflect a cubemap of the helmet, like https://github.com/DiligentGraphics/DiligentFX/tree/master/GLTF_PBR_Renderer
+
+(C) unify the multiview rendering thing with a set of macros shared between cgltf and sdf_text.glsl
+(C) wrap high level "c" procs in context setup wrapper functions for things like the assert handler
+(C) finish leakcheck allocator w/ map addition to passthrough allocator in main.odin
+(C) cleanup input/keys array state
+(C) @editor use relative mouse movement when dragging sliders (not needed w/ imgui?)
+(C) animation skinning
+(C) sketch out a flowchart for asset generation, research assimp vs other approaches
+(C) @vim make 'float3' typo correct to 'vec3', etc, in glsl files
+(C) @polish compile dependencies with all optimizations
+(C) project window for assets in project @editor
+(C) remove c runtime dependency from dependencies
+(C) make it very easy to say "this value lerps to this other value"
+
 @postfx depth of field - putting dof range negative makes fg objects blur. check the usage of it!
     unfinished fg/bg background stuff from https://catlikecoding.com/unity/tutorials/advanced-rendering/depth-of-field/
     bokeh_size seems to be dependent on the resolution-should it be multiplied by the texture size on the way into the shader?
 @postfx @editor gizmos showing DOF planes?
-games with depth
-    flying, walking, racing inwards
-    crash bandicoot-style coming outwards
-    battletoads wind tunnel style procgen'd infinite 
-shader reloading - see https://github.com/ThisDrunkDane/libbrew/blob/6ecefb232bc5d8d1b71fad706fc0a857da156fb6/catalog/catalog.odin for an example of using ReadDirectoryChangesW in this context
-wrap high level "c" procs in context setup wrapper functions for things like the assert handler
 consider some kind of MainTex_TexelSize magic?
-@graphics reflect a cubemap of the helmet, like https://github.com/DiligentGraphics/DiligentFX/tree/master/GLTF_PBR_Renderer
-bloom/hdr/post processing/filmic aes?
-check for same mu scissor rect before resetting draw
 shader globals from an @annotation
-@qualityOfLife sokol's asserts could trigger a stack trace
 turn @annotations into shader globals like this:
     uniform my_debug_uniforms { int debug; };
     #define DEBUG_OFF 0
@@ -33,31 +48,21 @@ turn @annotations into shader globals like this:
     #define DEBUG_DOF 3
 @editor scene view (both this and shadow maps require similar camera work)
 read https://thebookofshaders.com/
-make subview quilt size a multiple of the actual device width? this way, 8k would get a higher res by default...
 asset catalog: shaders, configs, images
-a set of "println" tools for the screen - temporary message, permanent message with corner
-multiple window support with a scene view - essential for lkg development?
-integrate sokol compute pull request
-log system with info/debug/warn/error
 undo @editor
-@editor consider a switch to imgui
-remove c runtime dependency from dependencies?
 @editor implement a rotation gizmo based on the trackball example here: http://www.songho.ca/opengl/gl_camera.html#example2
-make it very easy to say "this value lerps to this other value"
 iq's warp https://www.iquilezles.org/www/articles/warp/warp.htm?utm_source=share&utm_medium=ios_app&utm_name=iossmf
-consider using D3DCOMPILE_OPTIMIZATION_LEVEL0 for debug mode in sokol-"Directs the compiler to use the lowest optimization level. If you set this constant, the compiler might produce slower code but produces the code more quickly. Set this constant when you develop the shader iteratively."
-compile dependencies with all optimizations
-project window for assets in project @editor
 
-(C) cleanup input/keys array state
-(C) @editor use relative mouse movement when dragging sliders (not needed w/ imgui?)
-(C) animation skinning
-(C) sketch out a flowchart for asset generation, research assimp vs other approaches
-(C) @vim make 'float3' typo correct to 'vec3', etc, in glsl files
-
-x instanced rendering with constant buffers
 x render a framebuffer
 x render a quilt
 x render a complex mesh
 x optimize sdf rendering buffer
 x depth of field
+x @editor consider a switch to imgui
+x instanced rendering with constant buffers
+x remove the "collection" command line argument and just reference odin-sokol in the lib directory explicitly
+x (A) api hook for sokol assertions so that stack traces appear there!
+x use hash in caller_procedure to do microui stuff
+x check for same mu scissor rect before resetting draw
+x consider using D3DCOMPILE_OPTIMIZATION_LEVEL0 for debug mode in sokol-"Directs the compiler to use the lowest optimization level. If you set this constant, the compiler might produce slower code but produces the code more quickly. Set this constant when you develop the shader iteratively."
+x @qualityOfLife sokol's asserts could trigger a stack trace

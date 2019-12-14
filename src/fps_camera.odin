@@ -1,7 +1,7 @@
 package main
 
 using import "math"
-import sapp "sokol:sokol_app"
+import sapp "../lib/odin-sokol/src/sokol_app"
 
 FPS_Camera :: struct {
     position: Vector3,

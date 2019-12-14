@@ -1,7 +1,7 @@
 package main
 
 import "core:intrinsics"
-import sg "sokol:sokol_gfx"
+import sg "../lib/odin-sokol/src/sokol_gfx"
 
 apply_uniforms_ptr :: proc(stage: sg.Shader_Stage, slot: int, uniforms: ^$T) {
     sg.apply_uniforms(stage, slot, uniforms, size_of(T));

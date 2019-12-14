@@ -1,6 +1,6 @@
 package main
 
-import sgl "sokol:sokol_gl"
+import sgl "../lib/odin-sokol/src/sokol_gl"
 using import "math"
 
 Editor_Settings :: struct {

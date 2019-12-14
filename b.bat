@@ -22,6 +22,6 @@ echo Compiling shaders... &&^
 %SHDC% depthoffield.glsl --output %OUT_DIR%/depthoffield.odin && ^
 %SHDC% blit.glsl --output %OUT_DIR%/blit.odin && ^
 echo Building game... &&^
-odin build src -collection=sokol=./lib/odin-sokol/src -opt=%OPT_LEVEL% -ignore-unknown-attributes %DEBUG_OPT% 
+odin build src -opt=%OPT_LEVEL% -ignore-unknown-attributes %DEBUG_OPT% 
 
 REM -show-timings -keep-temp-files 

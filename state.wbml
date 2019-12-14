@@ -1,0 +1,35 @@
+{
+	sdftext {
+		gamma 0.120
+		buf 0.750
+		num_layers 10.000
+		buf_falloff 0.900
+		z_thickness 0.150
+		z_start 0.000
+		pos [
+			-1.200
+			-0.810
+			-3.300
+		]
+
+	}
+	subview_w 1200.000
+	num_views 45.000
+	lkg_camera_size 3.400
+	lkg_view_cone 2.510
+	dof {
+		distance 7.400
+		range 3.800
+		bokeh_radius 3.900
+	}
+	visualize_depth false
+	visualize_dof_coc true
+	fov 25.700
+	grid_offset [
+		0.000
+		0.000
+		0.000
+	]
+
+	ui_mousewheel_scroll_speed -16.000
+}

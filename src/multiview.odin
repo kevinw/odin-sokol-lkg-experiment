@@ -1,7 +1,7 @@
 package main
 
 import "core:fmt"
-import sg "sokol:sokol_gfx"
+import sg "../lib/odin-sokol/src/sokol_gfx"
 import "./shader_meta";
 
 MAXIMUM_VIEWS :: 45; // must match shader value
