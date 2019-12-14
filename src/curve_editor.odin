@@ -34,9 +34,9 @@ mu_anim_curve :: proc(ctx: ^mu.Context, curve: ^Bezier_Curve) -> i32 {
     _curve = curve^;
 
     cb:rawptr = cast(rawptr)proc(rect: mu.Rect) {
-        r_end(); // @Cleanup: is r_end/r_begin really necessary here?
+        //r_end(); // @Cleanup: is r_end/r_begin really necessary here?
         w, h := sapp.width(), sapp.height();
-        defer r_begin(w, h);
+        //defer r_begin(w, h);
 
         sgl.defaults();
         sgl.viewport(0, 0, cast(i32)w, cast(i32)h, true);

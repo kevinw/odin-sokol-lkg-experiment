@@ -9,18 +9,26 @@ import "core:sys/win32"
 
 using import "math"
 
-import sg "sokol:sokol_gfx"
-import sapp "sokol:sokol_app"
-import stime "sokol:sokol_time"
-import sfetch "sokol:sokol_fetch"
-import sgl "sokol:sokol_gl"
-import simgui "sokol:sokol_imgui"
+import sg "../lib/odin-sokol/src/sokol_gfx"
+import sapp "../lib/odin-sokol/src/sokol_app"
+import stime "../lib/odin-sokol/src/sokol_time"
+import sfetch "../lib/odin-sokol/src/sokol_fetch"
+import sgl "../lib/odin-sokol/src/sokol_gl"
+import simgui "../lib/odin-sokol/src/sokol_imgui"
 import imgui "../lib/odin-imgui"
 import mu "../lib/microui"
+import "../lib/wbml"
 import "../lib/basisu"
 import "./watcher"
 
-SNAKE :: true;
+Scene :: enum {
+    None,
+    Snake,
+    Tunnel
+}
+
+scene: Scene = .Snake;
+
 OSC :: true;
 
 when OSC {
@@ -352,9 +360,9 @@ init_callback :: proc "c" () {
     basisu.setup();
 
     init_camera(&state.camera, true, DEFAULT_CAMERA_FOV, sapp.width(), sapp.height());
-    state.camera.position = {0, 0.05, 3.90};
 
-    if SNAKE {
+    #complete switch scene {
+    case .Snake:
         state.camera.position = {-4, .26, 13.7};
         state.camera.rotation = {0, -.12, 0, 0.99};
         {
@@ -367,6 +375,10 @@ init_callback :: proc "c" () {
             }
             lkg_camera_size = 3.40;
         }
+    case .Tunnel:
+        state.camera.position = {0, 0.05, 3.90};
+    case .None:
+        state.camera.position = {0, 0.05, 3.90};
     }
 
     gizmos_ctx.render = render_gizmos;
@@ -399,6 +411,7 @@ init_callback :: proc "c" () {
 
     // request the mesh GLTF file
     gltf_path:cstring = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf";
+    //gltf_path:cstring = "resources/gltf/Drevo/scene.gltf";
 
     sfetch.send({
         path = gltf_path,
@@ -636,12 +649,26 @@ frame_callback :: proc "c" () {
         //imgui.show_demo_window();
 
         if BEGIN("Inspector") {
-            for tweakable in all_tweakables {
-                any_ptr := tweakable.ptr();
-                imgui_struct_ti(tweakable.name, any_ptr.data, type_info_of(any_ptr.id), "", true);
-            }
 
+            if imgui.button("Save") {
+                s := wbml.serialize(&editor_settings);
+                os.write_entire_file("state.wbml", transmute([]u8)s);
+            }
+            imgui.same_line();
+            if imgui.button("Load") {
+                bytes, ok := os.read_entire_file("state.wbml");
+                if ok {
+                    wbml.deserialize(bytes, &editor_settings);
+                }
+            }
+            imgui_struct(&editor_settings, "Editor Settings");
+
+            //for tweakable in all_tweakables {
+                //any_ptr := tweakable.ptr();
+                //imgui_struct_ti(tweakable.name, any_ptr.data, type_info_of(any_ptr.id), "", true);
+            //}
             imgui_struct(&state, "state");
+
         }
     }
 
@@ -654,7 +681,13 @@ frame_callback :: proc "c" () {
     // TODO: write this only when the value changes?
     state.pass_action.colors[0] = {action = .CLEAR, val = {bg[0], bg[1], bg[2], 1}};
 
-    num_instances :: SNAKE ? 35 : 1;
+    num_instances: int;
+    switch scene {
+        case .None: num_instances = 1;
+        case .Snake: num_instances = 35;
+        case .Tunnel: num_instances = 50;
+    }
+
     //@static instance_model: sg.Buffer;
     //@static instance_model_matrices: [num_instances]Matrix4;
 
@@ -718,22 +751,24 @@ frame_callback :: proc "c" () {
 
             root_m := mul(gizmos.matrix(state.xform_a), node.transform);
 
-            if SNAKE {
-                now := cast(f32)now_seconds * 0.3;
-                for m in 0..<num_instances {
-                    f := f32(m) / f32(num_instances);
-                    factor := f * TAU;
-                    pos := v3(sin(factor + cast(f32)now_seconds * 1.0), cos(factor) * sin(factor), cos(factor)) * factor;
-                    FREQ :: 1.0;
-                    DEPTH :: 3;
-                    pos += v3(perlin2d(factor, now, FREQ, DEPTH), perlin2d(now, factor, FREQ, DEPTH), perlin2d(now * factor, now, FREQ, DEPTH));
-                    rot := mat4_rotate(norm(pos), cast(f32)now_seconds * 0.5 * f);
-                    vs_params.instance_model_matrices[m] = mul(mul(root_m, mat4_translate(pos)), rot);
-                }
-            } else {
-                for m in 0..<num_instances {
-                    vs_params.instance_model_matrices[m] = root_m;
-                }
+            #complete switch scene {
+                case .Snake:
+                    now := cast(f32)now_seconds * 0.3;
+                    for m in 0..<num_instances {
+                        f := f32(m) / f32(num_instances);
+                        factor := f * TAU;
+                        pos := v3(sin(factor + cast(f32)now_seconds * 1.0), cos(factor) * sin(factor), cos(factor)) * factor;
+                        FREQ :: 1.0;
+                        DEPTH :: 3;
+                        pos += v3(perlin2d(factor, now, FREQ, DEPTH), perlin2d(now, factor, FREQ, DEPTH), perlin2d(now * factor, now, FREQ, DEPTH));
+                        rot := mat4_rotate(norm(pos), cast(f32)now_seconds * 0.5 * f);
+                        vs_params.instance_model_matrices[m] = mul(mul(root_m, mat4_translate(pos)), rot);
+                    }
+                case .Tunnel:
+                case .None:
+                    for m in 0..<num_instances {
+                        vs_params.instance_model_matrices[m] = root_m;
+                    }
             }
 
             for view_i:int = 0; view_i < _num_views; view_i += 1 {
