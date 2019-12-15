@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt"
+import "core:log"
 import sg "../lib/odin-sokol/src/sokol_gfx"
 import "./shader_meta";
 
@@ -9,7 +10,17 @@ MAXIMUM_VIEWS :: 45; // must match shader value
 hp_info: Display_Info;
 hp_connected: bool;
 
-force_num_views: int = -1;
+@private force_num_views: int = -1;
+
+toggle_multiview :: proc() {
+    if num_views() > 1 {
+        force_num_views = 1;
+        log.info("changing to single view mode");
+    } else {
+        force_num_views = -1;
+        log.info("changing to %d views", num_views());
+    }
+}
 
 num_views :: proc() -> int {
     if force_num_views != -1 do return force_num_views;

@@ -1039,21 +1039,6 @@ frame_callback :: proc "c" () {
 	sg.commit();
 }
 
-_old_num_views: int;
-toggle_multiview :: proc() {
-    views := num_views();
-    if views > 1 {
-        _old_num_views = views;
-        log.info("changing to single view mode");
-        fmt.println("[dummy] changing to single view mode");
-        force_num_views = 1;
-    } else {
-        force_num_views = -1;
-        log.info("changing to %d views", num_views());
-        fmt.println("[dummy] changing to multiview mode:", num_views(), "views");
-    }
-}
-
 toggle_fullscreen :: proc() {
     is_fullscreen = !is_fullscreen;
 
