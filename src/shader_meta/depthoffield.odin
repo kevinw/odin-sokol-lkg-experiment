@@ -1490,6 +1490,12 @@ dof_prefilter_shader_desc_hlsl5 := sg.Shader_Desc {
 // #if !defined(SOKOL_GFX_INCLUDED)
 //  #error "Please include sokol_gfx.h before depthoffield.odin"
 // #endif
+dof_bokeh_shader_filenames := [?]string {
+  "depthoffield.glsl",
+  "common.glsl",
+  "builtin.glsl",
+};
+
 dof_bokeh_shader_desc :: proc() -> ^sg.Shader_Desc {
     when SOKOL_D3D11 {
     if sg.query_backend() == sg.Backend.D3D11 {
@@ -1498,6 +1504,12 @@ dof_bokeh_shader_desc :: proc() -> ^sg.Shader_Desc {
     } /* SOKOL_D3D11 */
     return nil; /* can't happen */
 }
+dof_coc_shader_filenames := [?]string {
+  "depthoffield.glsl",
+  "common.glsl",
+  "builtin.glsl",
+};
+
 dof_coc_shader_desc :: proc() -> ^sg.Shader_Desc {
     when SOKOL_D3D11 {
     if sg.query_backend() == sg.Backend.D3D11 {
@@ -1506,6 +1518,12 @@ dof_coc_shader_desc :: proc() -> ^sg.Shader_Desc {
     } /* SOKOL_D3D11 */
     return nil; /* can't happen */
 }
+dof_combine_shader_filenames := [?]string {
+  "depthoffield.glsl",
+  "common.glsl",
+  "builtin.glsl",
+};
+
 dof_combine_shader_desc :: proc() -> ^sg.Shader_Desc {
     when SOKOL_D3D11 {
     if sg.query_backend() == sg.Backend.D3D11 {
@@ -1514,6 +1532,12 @@ dof_combine_shader_desc :: proc() -> ^sg.Shader_Desc {
     } /* SOKOL_D3D11 */
     return nil; /* can't happen */
 }
+dof_postfilter_shader_filenames := [?]string {
+  "depthoffield.glsl",
+  "common.glsl",
+  "builtin.glsl",
+};
+
 dof_postfilter_shader_desc :: proc() -> ^sg.Shader_Desc {
     when SOKOL_D3D11 {
     if sg.query_backend() == sg.Backend.D3D11 {
@@ -1522,6 +1546,12 @@ dof_postfilter_shader_desc :: proc() -> ^sg.Shader_Desc {
     } /* SOKOL_D3D11 */
     return nil; /* can't happen */
 }
+dof_prefilter_shader_filenames := [?]string {
+  "depthoffield.glsl",
+  "common.glsl",
+  "builtin.glsl",
+};
+
 dof_prefilter_shader_desc :: proc() -> ^sg.Shader_Desc {
     when SOKOL_D3D11 {
     if sg.query_backend() == sg.Backend.D3D11 {

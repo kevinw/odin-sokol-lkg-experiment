@@ -45,11 +45,17 @@ Change_Notification :: struct {
 }
 
 
-handle_changes :: proc() {
+_default_on_change :: proc(change: Change_Notification) {
+    fmt.println(change);
+}
+
+handle_changes :: proc(on_change: proc(change: Change_Notification) = nil) {
     //TODO(Hoej): Use try locks instead.
     sync.mutex_lock(&_change_mutex);
     qlen := len(_change_queue);
     sync.mutex_unlock(&_change_mutex);
+
+    func := on_change == nil ? _default_on_change : on_change;
     
     for qlen > 0 {
         sync.mutex_lock(&_change_mutex);
@@ -58,7 +64,7 @@ handle_changes :: proc() {
         sync.mutex_unlock(&_change_mutex);
         
         //handle
-        fmt.println(noti);
+        func(noti);
         /*
         asset := find(noti.catalog, noti.asset_id);
         switch a in asset.derived {
@@ -137,7 +143,7 @@ _setup_notification :: proc(path: string) {
                                                       nil, nil);
                         assert(ok != 0);
                         str := string(buf[:]);
-                        asset_id = remove_last_extension(str);
+                        asset_id = str;//remove_last_extension(str);
                     } 
 
                     switch c.action {

@@ -395,7 +395,12 @@ create_sg_pipeline_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Pr
         assert(is_metallic, "exptecting metallic for now");
 
         using pip_params;
-        append(&state.scene.pipelines, sg.make_pipeline({
+
+        append(&state.scene.pipelines, sg.Pipeline {});
+        p := &state.scene.pipelines[len(state.scene.pipelines) - 1];
+
+        reinit_pipeline(p, {
+            label = "cgltf_metallic",
             layout = layout,
             shader = state.shaders.metallic, // TODO is_metallic ? state.shaders.metallic : state.shaders.specular,
             primitive_type = prim_type,
@@ -415,7 +420,7 @@ create_sg_pipeline_for_gltf_primitive :: proc(gltf: ^cgltf.Data, prim: ^cgltf.Pr
                 face_winding = .CCW,
                 sample_count = MSAA_SAMPLE_COUNT,
             }
-        }));
+        });
     }
 
     assert(len(state.scene.pipelines) <= SCENE_MAX_PIPELINES);

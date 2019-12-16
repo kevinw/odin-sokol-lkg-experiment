@@ -17,7 +17,6 @@ import sfetch "../lib/odin-sokol/src/sokol_fetch"
 import sgl "../lib/odin-sokol/src/sokol_gl"
 import simgui "../lib/odin-sokol/src/sokol_imgui"
 import imgui "../lib/odin-imgui"
-import mu "../lib/microui"
 import "../lib/wbml"
 import "../lib/basisu"
 import "./watcher"
@@ -575,7 +574,9 @@ frame_callback :: proc "c" () {
 	// UPDATE
 	//
 
-    if frame_count % 30 == 0 do watcher.handle_changes();
+    if frame_count % 30 == 0 {
+        watcher.handle_changes(on_shader_changed);
+    }
 
     maybe_recreate_multiview_pass(num_views(), sapp.framebuffer_size());
 
@@ -1133,7 +1134,13 @@ event_callback :: proc "c" (event: ^sapp.Event) {
                 g = true;
                 draw_gizmos = !draw_gizmos;
             case .T: t = true;
-            case .L: l = true;
+            case .L:
+                l = true;
+                res := win32.call_external_process(
+                    `C:\src\fips-deploy\sokol-tools\win64-vstudio-release\sokol-shdc.exe`,
+                    fmt.tprintf("--slang hlsl5 --input %s --bare", "gizmos.glsl")
+                );
+                fmt.println("res", res);
             case .P:
                 p = true;
                 //window.open = window.open == 1 ? 0 : 1;
@@ -1180,13 +1187,14 @@ event_callback :: proc "c" (event: ^sapp.Event) {
 	}
 }
 
-handle_args :: proc() {
+handle_args :: proc(fullscreen: ^bool) {
     for arg in os.args {
         switch arg {
             case "--no-dof": state.depth_of_field.enabled = false;
             case "--no-osc": osc_enabled = false;
             case "--2D", "--2d": force_num_views = 1;
             case "--no-model": draw_mesh = false;
+            case "--window": fullscreen^ = false;
         }
     }
 }
@@ -1211,7 +1219,9 @@ passthrough_allocator: mem.Allocator;
 
 main :: proc() {
     state.depth_of_field.enabled = true; // TODO: have a state init function
-    handle_args();
+
+    fullscreen := true;
+    handle_args(&fullscreen);
 
     // install a stacktrace handler for asserts
     when STACK_TRACES {
@@ -1245,7 +1255,7 @@ main :: proc() {
 
     setup_logger();
 
-	os.exit(run_app());
+	os.exit(run_app(fullscreen));
 }
 
 is_fullscreen: bool;
@@ -1273,8 +1283,8 @@ cleanup_logger :: proc() {
     }
 }
 
-run_app :: proc() -> int {
-    is_fullscreen = true;
+run_app :: proc(fullscreen: bool) -> int {
+    is_fullscreen = fullscreen;
 
 	return sapp.run({
 		init_cb      = init_callback,

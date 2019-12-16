@@ -5,6 +5,15 @@ import "core:mem"
 
 v2 :: inline proc(w, h: $T) -> Vector2 { return Vector2 { cast(f32)w, cast(f32)h }; }
 
+remove_last_extension :: proc(str : string) -> string {
+    last_dot := -1;
+    for r, i in str {
+        if r == '.' do last_dot = i;
+    }
+    
+    return last_dot != -1 ? str[:last_dot] : str;
+}
+
 
 strlen :: proc(s: ^$T) -> int { // TODO: doesn't this already exist?
     i := 0;

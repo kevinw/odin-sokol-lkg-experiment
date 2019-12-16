@@ -913,6 +913,10 @@ offscreen_shader_desc_hlsl5 := sg.Shader_Desc {
 // #if !defined(SOKOL_GFX_INCLUDED)
 //  #error "Please include sokol_gfx.h before mrt_sapp.odin"
 // #endif
+dbg_shader_filenames := [?]string {
+  "mrt_sapp.glsl",
+};
+
 dbg_shader_desc :: proc() -> ^sg.Shader_Desc {
     when SOKOL_D3D11 {
     if sg.query_backend() == sg.Backend.D3D11 {
@@ -921,6 +925,10 @@ dbg_shader_desc :: proc() -> ^sg.Shader_Desc {
     } /* SOKOL_D3D11 */
     return nil; /* can't happen */
 }
+fsq_shader_filenames := [?]string {
+  "mrt_sapp.glsl",
+};
+
 fsq_shader_desc :: proc() -> ^sg.Shader_Desc {
     when SOKOL_D3D11 {
     if sg.query_backend() == sg.Backend.D3D11 {
@@ -929,6 +937,10 @@ fsq_shader_desc :: proc() -> ^sg.Shader_Desc {
     } /* SOKOL_D3D11 */
     return nil; /* can't happen */
 }
+offscreen_shader_filenames := [?]string {
+  "mrt_sapp.glsl",
+};
+
 offscreen_shader_desc :: proc() -> ^sg.Shader_Desc {
     when SOKOL_D3D11 {
     if sg.query_backend() == sg.Backend.D3D11 {

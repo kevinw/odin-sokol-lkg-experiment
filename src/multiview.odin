@@ -6,11 +6,19 @@ import sg "../lib/odin-sokol/src/sokol_gfx"
 import "./shader_meta";
 
 MAXIMUM_VIEWS :: 45; // must match shader value
+DOF_COC_IMAGE_FORMAT: sg.Pixel_Format = .R32F;
 
 hp_info: Display_Info;
 hp_connected: bool;
 
 @private force_num_views: int = -1;
+
+Blitter :: struct {
+    pass: sg.Pass,
+    pipeline: sg.Pipeline,
+    bindings: sg.Bindings,
+};
+
 
 toggle_multiview :: proc() {
     if num_views() > 1 {
@@ -49,17 +57,14 @@ calc_lkg_subquilt_size :: proc(framebuffer_width, framebuffer_height: int) -> (i
     return cast(i32)width, cast(i32)height;
 }
 
-DOF_COC_IMAGE_FORMAT: sg.Pixel_Format = .R32F;
-
 init_dof_pipelines :: proc() {
     quad_buf := get_quad_negone_one();
 
     {
         using state.depth_of_field.coc_material;
         bindings.vertex_buffers[0] = quad_buf;
-        pipeline = sg.make_pipeline({
-            label = "dof coc pipeline",
-            shader = sg.make_shader(shader_meta.dof_coc_shader_desc()^),
+        reloadable_pipeline(&pipeline, shader_meta.dof_coc_shader_filenames[:], shader_meta.dof_coc_shader_desc()^, {
+            label = "dof_coc",
             blend = {
                 color_format = DOF_COC_IMAGE_FORMAT,
                 depth_format = .NONE,
@@ -75,9 +80,8 @@ init_dof_pipelines :: proc() {
     {
         using state.depth_of_field.bokeh_material;
         bindings.vertex_buffers[0] = quad_buf;
-        pipeline = sg.make_pipeline({
-            label = "dof bokeh pipeline",
-            shader = sg.make_shader(shader_meta.dof_bokeh_shader_desc()^),
+        reloadable_pipeline(&pipeline, shader_meta.dof_bokeh_shader_filenames[:], shader_meta.dof_bokeh_shader_desc()^, {
+            label = "dof_bokeh",
             blend = {
                 depth_format = .NONE,
             },
@@ -91,27 +95,13 @@ init_dof_pipelines :: proc() {
     }
 }
 
-Blitter :: struct {
-    pass: sg.Pass,
-    pipeline: sg.Pipeline,
-    bindings: sg.Bindings,
-};
+recreate_blit_simple :: proc(using b: ^Blitter, label: cstring, target_rt: sg.Image) {
+    recreate_blit(b, label, target_rt, shader_meta.blit_shader_desc()^);
+}
 
-recreate_blit :: proc(using b: ^Blitter, label: cstring, target_rt: sg.Image, shader_: sg.Shader = {}) {
-
-    // @Leak 
-    shader := shader_;
-    if shader.id == 0 {
-        @static blit_shader: sg.Shader;
-        if blit_shader.id == 0 {
-            blit_shader = sg.make_shader(shader_meta.blit_shader_desc()^);
-        }
-        shader = blit_shader;
-    }
-
-    reinit_pipeline(&pipeline, {
-        label = label,
-        shader = shader,
+recreate_blit :: proc(using b: ^Blitter, label: cstring, target_rt: sg.Image, shader_desc: sg.Shader_Desc = {}) {
+    reloadable_pipeline(&pipeline, shader_meta.blit_shader_filenames[:], shader_desc, {
+        label = "blit",
         blend = {
             depth_format = .NONE,
         },
@@ -135,7 +125,6 @@ recreate_blit :: proc(using b: ^Blitter, label: cstring, target_rt: sg.Image, sh
 
 blit :: proc(using b: ^Blitter, source_rt: sg.Image, source_slot: int = 0) {
     BEGIN_PASS(pass, { colors = { 0 = { action = .LOAD }}});
-
     assert(pipeline.id != sg.INVALID_ID, fmt.tprintf("blit pipeline is invalid for blit at %p", b));
 
     sg.apply_pipeline(pipeline);
@@ -226,11 +215,10 @@ create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: 
 
         reinit_image(&half_size_color, rendertarget_array_desc(half_w, half_h, cast(i32)num_views, "half_size_color"));
 
-        @static prefilter_shader, postfilter_shader, combine_shader: sg.Shader;
-        recreate_blit(&prefilter_blit, "prefilter", half_size_color, static_shader(&prefilter_shader, shader_meta.dof_prefilter_shader_desc()));
-        recreate_blit(&postfilter_blit, "postfilter", half_size_color, static_shader(&postfilter_shader, shader_meta.dof_postfilter_shader_desc()));
+        recreate_blit(&prefilter_blit, "prefilter", half_size_color, shader_meta.dof_prefilter_shader_desc()^);
+        recreate_blit(&postfilter_blit, "postfilter", half_size_color, shader_meta.dof_postfilter_shader_desc()^);
         reinit_image(&final_img, rendertarget_array_desc(width, height, cast(i32)num_views, "full size dof final"));
-        recreate_blit(&combine_blit, "dof_combine", final_img, static_shader(&combine_shader, shader_meta.dof_combine_shader_desc()));
+        recreate_blit(&combine_blit, "dof_combine", final_img, shader_meta.dof_combine_shader_desc()^);
 
         // init the worldspace sdf text pass-need to blit to the color image
         post_dof_image := state.depth_of_field.enabled ? final_img : state.offscreen.pass_desc.color_attachments[0].image;

@@ -10,3 +10,4 @@ build[s]/
 .vscode/
 resources/gltf/SampleModels/
 temp/
+temp_shaders/

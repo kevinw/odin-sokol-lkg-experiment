@@ -1,7 +1,12 @@
 package main
 
 import "core:intrinsics"
+using import "core:fmt"
 import sg "../lib/odin-sokol/src/sokol_gfx"
+import "./watcher"
+import "core:log"
+import "core:os"
+import "core:strings"
 
 apply_uniforms_ptr :: proc(stage: sg.Shader_Stage, slot: int, uniforms: ^$T) {
     sg.apply_uniforms(stage, slot, uniforms, size_of(T));
@@ -100,7 +105,6 @@ rendertarget_array_desc :: proc(width, height, num_layers: i32, label: cstring) 
     return desc;
 }
 
-
 reinit_image :: inline proc(img: ^sg.Image, desc: sg.Image_Desc) {
     assert(img != nil);
 
@@ -120,6 +124,108 @@ reinit_pipeline :: inline proc(pipeline: ^sg.Pipeline, desc: sg.Pipeline_Desc) {
 
     sg.destroy_pipeline(pipeline^);
     pipeline^ = sg.make_pipeline(desc);
+}
+
+on_shader_changed :: proc(notification: watcher.Change_Notification) {
+    for _, i in reloadable_pipelines {
+        p := &reloadable_pipelines[i];
+
+        needs_recompile := false;
+        for filename in p.filenames {
+            if filename == notification.asset_id {
+                needs_recompile = true;
+                break;
+            }
+        }
+
+        if !needs_recompile do continue;
+
+        using notification;
+
+        exe := `C:\src\fips-deploy\sokol-tools\win64-vstudio-release\sokol-shdc.exe`;
+        //filename_without_ext := remove_last_extension(asset_id);
+        args := fmt.tprintf(`--slang hlsl5 --input %s --format bare --output "temp_shaders/"`, asset_id);
+        if !subprocess("%s %s", exe, args) { 
+            log.error("error calling sokol-shdc");
+            continue;
+        }
+
+        program_name := p.label;
+        if program_name == "" {
+            fmt.println("no label, skipping");
+            continue;
+        }
+
+        vert_filename := tprintf("temp_shaders/%s_vs.hlsl", program_name);
+        frag_filename := tprintf("temp_shaders/%s_fs.hlsl", program_name);
+        vert, ok1 := os.read_entire_file(vert_filename);
+        frag, ok2 := os.read_entire_file(frag_filename);
+
+        if ok1 && ok2 {
+            shader_desc := p.shader_desc;
+            shader_desc.vs.source = strings.clone_to_cstring(string(vert)); // @Leak
+            shader_desc.fs.source = strings.clone_to_cstring(string(frag)); // @Leak
+            new_shader := sg.make_shader(shader_desc);
+            if new_shader.id == sg.INVALID_ID {
+                log.error("could not compile new shader");
+            } else {
+                p.shader_desc = shader_desc;
+                sg.destroy_shader(p.pipeline_desc.shader);
+                p.pipeline_desc.shader = new_shader;
+                new_pipeline := sg.make_pipeline(p.pipeline_desc);
+                if new_pipeline.id == sg.INVALID_ID {
+                    log.error("could not compile new pipeline");
+                } else {
+                    sg.destroy_pipeline(p.pipeline^);
+                    log.info("reassigning pipeline %s", p.pipeline_desc.label);
+                    p.pipeline^ = new_pipeline;
+                }
+            }
+        } else {
+            log.error("couldn't find output shaders %s or %s", frag_filename, vert_filename);
+        }
+    }
+}
+
+Reloadable_Pipeline :: struct {
+    label: string, // TODO: this needs to correspond to the @program name in the shader for now
+    pipeline: ^sg.Pipeline,
+    pipeline_desc: sg.Pipeline_Desc,
+    shader_desc: sg.Shader_Desc,
+    filenames: []string,
+};
+
+reloadable_pipelines: [dynamic]Reloadable_Pipeline;
+
+reloadable_pipeline :: proc(pipeline: ^sg.Pipeline, filenames: []string, shader_desc: sg.Shader_Desc, pipeline_desc_: sg.Pipeline_Desc) {
+    found := false;
+    for _, i in reloadable_pipelines {
+        p := &reloadable_pipelines[i];
+        if p.pipeline == pipeline {
+            found = true;
+            break;
+        }
+    }
+
+    pipeline_desc := pipeline_desc_;
+
+    assert(pipeline_desc.shader.id == 0, "expected to make our own shader here");
+    shader := sg.make_shader(shader_desc);
+    pipeline_desc.shader = shader;
+
+    assert(pipeline != nil);
+    sg.destroy_pipeline(pipeline^);
+    pipeline^ = sg.make_pipeline(pipeline_desc);
+
+    if !found {
+        append(&reloadable_pipelines, Reloadable_Pipeline {
+            label = string(pipeline_desc.label),
+            pipeline = pipeline,
+            shader_desc = shader_desc,
+            filenames = filenames,
+            pipeline_desc = pipeline_desc,
+        });
+    }
 }
 
 static_shader :: inline proc(s: ^sg.Shader, desc: ^sg.Shader_Desc) -> sg.Shader {
