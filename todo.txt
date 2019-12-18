@@ -1,7 +1,8 @@
+(A) import some more interesting things with assimp
 (A) shader_meta needs a cleanup. at the very least, start with package-per-shader?
     or should we just go immediately for a more late-binding approach?
     ideally some mix of both is ideal...where to look for inspiration?
-(A) shader reloading - see https://github.com/ThisDrunkDane/libbrew/blob/6ecefb232bc5d8d1b71fad706fc0a857da156fb6/catalog/catalog.odin for an example of using ReadDirectoryChangesW in this context
+    does this mean we need to rewrite shdc in odin?
 (A) think about what it would take to have a live reload DLL for real...where is the boundary? "gameplay" code, state that gets automatically serialized, etc...
 
 (B) try some of the PBR textures here https://texturehaven.com/textures/
@@ -16,10 +17,11 @@ a set of "println" tools for the screen - temporary message, permanent message w
     change the "subview" var to a factor, default to 1.0, which is the resolution of the device
 (B) a set of "println" tools for the screen - temporary message, permanent message with corner
     log system with info/debug/warn/error
-(B) bloom/hdr/post processing/filmic aes?
+(B) bloom/hdr/post processing/filmic aes? https://twitter.com/Bananaft/status/1203637253072990209?s=20
 (B) multiple window support with a scene view - essential for lkg development?
 (B) @graphics reflect a cubemap of the helmet, like https://github.com/DiligentGraphics/DiligentFX/tree/master/GLTF_PBR_Renderer
 (B) vimlike @editor https://github.com/cmaughan/zep
+(B) renderdoc - one keypress to open renderdoc with a frame capture https://renderdoc.org/docs/in_application_api.html
 
 
 (C) unify the multiview rendering thing with a set of macros shared between cgltf and sdf_text.glsl
@@ -70,3 +72,4 @@ x @qualityOfLife sokol's asserts could trigger a stack trace
 x (A) colored terminal text for readability. use for error logs, and for highlighting the important parts of stack traces
 x (C) @editor use relative mouse movement when dragging sliders (not needed w/ imgui?)
 x (B) @vim @qualityOfLife CamelCase to snake_case converter [got tpope's abolish plugin; 'crs' motion does it]
+x (A) shader reloading - see https://github.com/ThisDrunkDane/libbrew/blob/6ecefb232bc5d8d1b71fad706fc0a857da156fb6/catalog/catalog.odin for an example of using ReadDirectoryChangesW in this context

@@ -55,7 +55,7 @@ import "./shader_meta";
 
 osc_enabled := true;
 
-draw_mesh := true;
+draw_mesh := false;
 draw_quad := false;
 draw_grid_lines := false;
 draw_gizmos := false;
@@ -121,7 +121,7 @@ Image_Creation_Params :: struct {
     gltf_image_index: int,
 };
 
-Mesh :: struct {
+GLTFMesh :: struct {
     first_primitive: i16, // index into scene.sub_meshes
     num_primitives: i16,
 };
@@ -141,7 +141,7 @@ Sub_Mesh :: struct { // a 'primitive' (aka submesh) contains everything needed t
     num_elements: i32,
 };
 
-Node :: struct {
+GLTFNode :: struct {
     mesh: i16, // index into scene.meshes
     transform: Matrix4,
 };
@@ -157,6 +157,7 @@ apply_material :: proc(using material: ^Material) {
 }
 
 state: struct {
+    assimp_model: Model,
     offscreen: struct {
         pass_desc: sg.Pass_Desc,
         color_img_desc: sg.Image_Desc,
@@ -205,8 +206,8 @@ state: struct {
         buffers: [dynamic]sg.Buffer,
         images: [dynamic]sg.Image,
         materials: [dynamic]Metallic_Material,
-        meshes: [dynamic]Mesh,
-        nodes: [dynamic]Node,
+        meshes: [dynamic]GLTFMesh,
+        nodes: [dynamic]GLTFNode,
         sub_meshes: [dynamic]Sub_Mesh,
         pipelines: [dynamic]sg.Pipeline,
     },
@@ -215,7 +216,6 @@ state: struct {
     view_proj: Matrix4,
     view_proj_array: [MAXIMUM_VIEWS]Matrix4,
 
-    placeholders: struct { white, normal, black: sg.Image },
     pip_cache: [dynamic]Pipeline_Cache_Params,
     point_light: shader_meta.light_params,
     failed: bool,
@@ -295,9 +295,7 @@ when OSC {
     }
 }
 
-init_callback :: proc "c" () {
-    context.logger = main_thread_logger;
-
+init_callback :: proc() {
     watcher._setup_notification(".");
 
     state.auto_rotate = true;
@@ -424,15 +422,6 @@ init_callback :: proc "c" () {
         }
     });
 
-    // create placeholder textures
-    pixels: [64]u32;
-    for i in 0..<64 do pixels[i] = 0xFFFFFFFF;
-    state.placeholders.white = make_image(8, 8, sg.Pixel_Format.RGBA8, pixels[:]);
-    for i in 0..<64 do pixels[i] = 0xFF000000;
-    state.placeholders.black = make_image(8, 8, sg.Pixel_Format.RGBA8, pixels[:]);
-    for i in 0..<64 do pixels[i] = 0xFFFF7FFF;
-    state.placeholders.normal = make_image(8, 8, sg.Pixel_Format.RGBA8, pixels[:]);
-
     //
     // make quad rendering pipeline
     //
@@ -534,17 +523,28 @@ init_callback :: proc "c" () {
     draw_gizmos = false;
 
     log.info("init callback has finished.");
+
+    state.assimp_model = load_model_from_file("resources/models/box.obj");
 }
 
-frame_callback :: proc "c" () {
+setup_context_fn :: proc(cb: proc()) {
     context.logger = main_thread_logger;
- 
+    context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
+    cb();
+}
+
+setup_context_event :: proc(cb: proc(e: ^sapp.Event), e: ^sapp.Event) {
+    context.logger = main_thread_logger;
+    context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
+    cb(e);
+}
+
+setup_context :: proc { setup_context_fn, setup_context_event };
+
+frame_callback :: proc() {
     sfetch.dowork();
     if !_did_load do return;
 
-    when STACK_TRACES {
-        context.assertion_failure_proc = stacktrace.assertion_failure_with_stacktrace_proc;
-    }
 
 	//
 	// TIME
@@ -732,13 +732,15 @@ frame_callback :: proc "c" () {
     //
     // DRAW MESH
     //
-    if draw_mesh {
+    {
         //for i in 0..<num_instances {
             //instance_model_matrices[i] = translate(identity(Matrix4), v3(i, 0, 0));
         //}
         //sg.update_buffer(instance_model, &instance_model_matrices[0], len(instance_model_matrices) * size_of(Matrix4));
 
         BEGIN_PASS(state.offscreen.pass, { colors = { 0 = { action = .CLEAR, val = { 0.00, 0.0, 0.0, 1.0 } }}});
+
+        if draw_mesh {
 
         using state.scene;
         for _, node_index in nodes {
@@ -775,6 +777,8 @@ frame_callback :: proc "c" () {
                 vs_params.view_proj_array[view_i] = state.view_proj_array[view_i];
             }
 
+            white, black, normal := get_placeholder_image(.WHITE), get_placeholder_image(.BLACK), get_placeholder_image(.NORMALS);
+
             mesh := &meshes[node.mesh];
             for i in 0..<mesh.num_primitives {
                 prim := &sub_meshes[i + mesh.first_primitive];
@@ -792,11 +796,11 @@ frame_callback :: proc "c" () {
                 apply_uniforms(.FS, shader_meta.SLOT_light_params, &state.point_light);
                 //if mat.is_metallic {
                     {
-                        base_color_tex := state.placeholders.white;
-                        metallic_roughness_tex := state.placeholders.white;
-                        normal_tex := state.placeholders.normal;
-                        occlusion_tex := state.placeholders.white;
-                        emissive_tex := state.placeholders.black;
+                        base_color_tex := white;
+                        metallic_roughness_tex := white;
+                        normal_tex := normal;
+                        occlusion_tex := white;
+                        emissive_tex := black;
 
                         // TODO: can we just make the asset loader put the
                         // placeholders there, and then overwrite them when
@@ -837,7 +841,21 @@ frame_callback :: proc "c" () {
                 sg.draw(cast(int)prim.base_element, cast(int)prim.num_elements, _num_views * num_instances);
             }
         }
-    }
+        } // draw_mesh
+
+        // draw assimp mesh
+        {
+            scale := v3(1, 1, 1);
+            rotation := v4(0, 0, 0, 0);
+            position := v3(0, 0, 0);
+
+            @static vert_color: sg.Shader;
+            shader := static_shader(&vert_color, shader_meta.vertcolor_shader_desc());
+            draw_model(&state.assimp_model, shader, position, rotation, scale);
+        }
+
+    } // draw_mesh (offscreen pass)
+
 
     //
     // DEPTH OF FIELD
@@ -1073,9 +1091,7 @@ toggle_fullscreen :: proc() {
     }
 }
 
-cleanup :: proc "c" () {
-    context.logger = main_thread_logger;
-
+cleanup :: proc() {
     when OSC {
         if osc_enabled {
             stop_osc_thread();
@@ -1090,9 +1106,7 @@ cleanup :: proc "c" () {
     cleanup_logger();
 }
 
-event_callback :: proc "c" (event: ^sapp.Event) {
-    context.logger = main_thread_logger;
-
+event_callback :: proc(event: ^sapp.Event) {
     want_capture_keyboard := simgui.handle_event(event);
 
     switch event.type {
@@ -1118,7 +1132,7 @@ event_callback :: proc "c" (event: ^sapp.Event) {
 		using input_state;
 		switch event.key_code {
 			case .ESCAPE:
-				sapp.request_quit();
+                if !want_capture_keyboard do sapp.request_quit();
 			case .RIGHT: right = true;
 			case .LEFT: left = true;
 			case .UP: up = true;
@@ -1132,26 +1146,19 @@ event_callback :: proc "c" (event: ^sapp.Event) {
             case .R: r = true;
             case .G:
                 g = true;
-                draw_gizmos = !draw_gizmos;
+                if !want_capture_keyboard do draw_gizmos = !draw_gizmos;
             case .T: t = true;
-            case .L:
-                l = true;
-                res := win32.call_external_process(
-                    `C:\src\fips-deploy\sokol-tools\win64-vstudio-release\sokol-shdc.exe`,
-                    fmt.tprintf("--slang hlsl5 --input %s --bare", "gizmos.glsl")
-                );
-                fmt.println("res", res);
+            case .L: l = true;
             case .P:
                 p = true;
-                //window.open = window.open == 1 ? 0 : 1;
             case .NUM_0: num_0 = true;
             case .NUM_1: num_1 = true;
             case .NUM_2:
                 num_2 = true;
-                toggle_fullscreen();
+                if !want_capture_keyboard do toggle_fullscreen();
             case .NUM_3: num_3 = true;
                 num_3 = true;
-                toggle_multiview();
+                if !want_capture_keyboard do toggle_multiview();
             case .LEFT_ALT: left_alt = true;
             case .LEFT_CONTROL: left_ctrl = true;
             case .LEFT_SHIFT: left_shift = true;
@@ -1218,6 +1225,11 @@ passthrough_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_M
 passthrough_allocator: mem.Allocator;
 
 main :: proc() {
+    main_thread_logger = log.create_multi_logger(
+        log.create_console_logger(),
+        log.Logger { imgui_logger_proc, nil, nil }
+    );
+
     state.depth_of_field.enabled = true; // TODO: have a state init function
 
     fullscreen := true;
@@ -1229,8 +1241,6 @@ main :: proc() {
     }
 
     sg.set_assert_func(proc "c" (expr, file: cstring, line: i32) {
-        context.logger = main_thread_logger;
-
         fd := os.stderr;
         os.write_string(fd, "sokol_gfx assert failed: '");
         os.write_string(fd, string(expr));
@@ -1245,6 +1255,9 @@ main :: proc() {
 
 
     when LEAK_CHECK {
+        // TODO: this won't really work with all the proc "c"s around. I think we need to have a module-level
+        // allocator, like the main_thread_logger, and then assign it in setup_context, which is getting
+        // called in our proc "c" callbacks.
         original_allocator := context.allocator;
         passthrough_allocator = {
             procedure = passthrough_allocator_proc,
@@ -1253,26 +1266,12 @@ main :: proc() {
         context.allocator = passthrough_allocator;
     }
 
-    setup_logger();
-
 	os.exit(run_app(fullscreen));
 }
 
 is_fullscreen: bool;
 
 main_thread_logger: log.Logger;
-
-setup_logger :: proc() {
-    c := context;
-    main_thread_logger = log.create_multi_logger(
-        log.create_console_logger(),
-        log.Logger { imgui_logger_proc, nil, nil }
-    );
-    c.logger = main_thread_logger;
-    context = c;
-
-    log.warn("logger has been setup!");
-}
 
 cleanup_logger :: proc() {
     multi_logger := main_thread_logger;
@@ -1287,10 +1286,10 @@ run_app :: proc(fullscreen: bool) -> int {
     is_fullscreen = fullscreen;
 
 	return sapp.run({
-		init_cb      = init_callback,
-		frame_cb     = frame_callback,
-		cleanup_cb   = cleanup,
-		event_cb     = event_callback,
+		init_cb      = proc "c" () { setup_context(init_callback); },
+		frame_cb     = proc "c" () { setup_context(frame_callback); },
+		cleanup_cb   = proc "c" () { setup_context(cleanup); },
+		event_cb     = proc "c" (e: ^sapp.Event) { setup_context(event_callback, e); },
 		width        = WINDOW_WIDTH,
 		height       = WINDOW_HEIGHT,
 		window_title = "testbed",

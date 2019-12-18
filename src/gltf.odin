@@ -201,7 +201,7 @@ gltf_parse :: proc(bytes: []u8, path_root: string) {
     {
         for _, i in meshes {
             gltf_mesh := &meshes[i];
-            append(&state.scene.meshes, Mesh {});
+            append(&state.scene.meshes, GLTFMesh {});
             mesh := &state.scene.meshes[len(state.scene.meshes) - 1];
             mesh.first_primitive = safe_cast_i16(len(state.scene.sub_meshes));
             mesh.num_primitives = safe_cast_i16(gltf_mesh.primitives_count);
@@ -241,7 +241,7 @@ gltf_parse :: proc(bytes: []u8, path_root: string) {
         // ignore nodes without mesh, those are not relevant since we
         // bake the transform hierarchy into per-node world space transforms
         if gltf_node.mesh != nil {
-            append(&state.scene.nodes, Node {});
+            append(&state.scene.nodes, GLTFNode {});
             node := &state.scene.nodes[len(state.scene.nodes) - 1];
             node.mesh = safe_cast_i16(mem.ptr_sub(gltf_node.mesh, gltf.meshes));
             node.transform = build_transform_for_gltf_node(gltf, gltf_node);

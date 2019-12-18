@@ -236,6 +236,37 @@ static_shader :: inline proc(s: ^sg.Shader, desc: ^sg.Shader_Desc) -> sg.Shader 
     return s^;
 }
 
+Placeholder_Texture :: enum {
+    WHITE,
+    BLACK,
+    NORMALS,
+}
+
+
+get_placeholder_image :: proc(type: Placeholder_Texture) -> sg.Image {
+    @static did_init_placeholders := false;
+    @static white, black, normals: sg.Image;
+    if !did_init_placeholders {
+        pixels: [64]u32;
+        for i in 0..<64 do pixels[i] = 0xFFFFFFFF;
+        white = make_image(8, 8, sg.Pixel_Format.RGBA8, pixels[:]);
+        for i in 0..<64 do pixels[i] = 0xFF000000;
+        black = make_image(8, 8, sg.Pixel_Format.RGBA8, pixels[:]);
+        for i in 0..<64 do pixels[i] = 0xFFFF7FFF;
+        normals = make_image(8, 8, sg.Pixel_Format.RGBA8, pixels[:]);
+
+        did_init_placeholders = true;
+    }
+
+    #complete switch type {
+        case .WHITE: return white;
+        case .BLACK: return black;
+        case .NORMALS: return normals;
+    }
+
+    return sg.Image {};
+}
+
 @(deferred_out=sg.end_pass)
 BEGIN_PASS :: proc(pass: sg.Pass, pass_action: sg.Pass_Action) {
     sg.begin_pass(pass, pass_action);

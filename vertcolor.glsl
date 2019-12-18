@@ -1,8 +1,12 @@
 @include common.glsl
 
 @vs vs
-in vec4 position;
-in vec4 color0;
+
+@include base.glsl
+
+layout (location = POSITION) in vec4 position;
+layout (location = 1) in vec4 color0;
+
 out vec4 color;
 
 uniform vs_uniforms {
@@ -17,13 +21,14 @@ void main() {
 
 @fs fs
 
-@include globals.glsl
+//@include globals.glsl
 
 in vec4 color;
 out vec4 frag_color;
 
 void main() {
-    frag_color = mix(color, vec4(1, 0, 1, 1), (sin(time) + 1.0) * 0.5);
+    //frag_color = mix(color, vec4(1, 0, 1, 1), (sin(time) + 1.0) * 0.5);
+    frag_color = color;
 }
 @end
 

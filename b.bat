@@ -13,6 +13,7 @@ set OUT_DIR=src/shader_meta
 
 preprocess.exe &&^
 echo Compiling shaders... &&^
+%SHDC% vertcolor.glsl --output %OUT_DIR%/vertcolor.odin && ^
 %SHDC% gizmos.glsl --output %OUT_DIR%/gizmos.odin && ^
 %SHDC% shadertoy.glsl --output %OUT_DIR%/shadertoy.odin && ^
 %SHDC% sdf_text.glsl --output %OUT_DIR%/sdf_text.odin && ^

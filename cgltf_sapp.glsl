@@ -10,11 +10,9 @@
 #define MAX_INSTANCES 100
 #extension GL_ARB_shader_viewport_layer_array : require
 uniform vs_params {
-    //mat4 model;
     mat4 view_proj_array[MAX_VIEWS];
     vec3 eye_pos;
     int num_instances;
-    //int num_views;
     mat4 instance_model_matrices[MAX_INSTANCES];
 };
 

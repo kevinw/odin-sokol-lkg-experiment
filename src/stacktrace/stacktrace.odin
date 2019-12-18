@@ -25,6 +25,8 @@ THE SOFTWARE.
 package stacktrace
 
 import "core:fmt"
+import "core:runtime"
+import "core:os"
 
 when ODIN_OS == "windows" {
 	import "core:sys/win32"
@@ -182,8 +184,6 @@ else when ODIN_OS == "linux" {
 	}
 }
 
-import "core:runtime"
-import "core:os"
 assertion_failure_with_stacktrace_proc :: proc(prefix, message: string, loc: runtime.Source_Code_Location) {
 	fd := os.stderr;
 	runtime.print_caller_location(fd, loc);
@@ -194,22 +194,7 @@ assertion_failure_with_stacktrace_proc :: proc(prefix, message: string, loc: run
 		os.write_string(fd, message);
 	}
 	os.write_byte(fd, '\n');
-	print_stack_trace(1);
+	print_stack_trace(2);
 	runtime.debug_trap();
 }
 
-/*
-
-test2 :: proc() {
-	panic("What is this? A strack trace?!");
-}
-
-test :: proc() {
-	test2();
-}
-
-main :: proc() {
-	context.assertion_failure_proc = assertion_failure_with_stacktrace_proc;
-	test();
-}
-*/
