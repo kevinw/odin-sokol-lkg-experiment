@@ -4,6 +4,7 @@
     ideally some mix of both is ideal...where to look for inspiration?
     does this mean we need to rewrite shdc in odin?
 (A) think about what it would take to have a live reload DLL for real...where is the boundary? "gameplay" code, state that gets automatically serialized, etc...
+    ^ see https://fungos.github.io/blog/2017/11/20/cr.h-a-simple-c-hot-reload-header-only-library/#development-stats
 
 (B) try some of the PBR textures here https://texturehaven.com/textures/
 (B) prioritize this list by using a game idea as a forcing function
@@ -73,3 +74,4 @@ x (A) colored terminal text for readability. use for error logs, and for highlig
 x (C) @editor use relative mouse movement when dragging sliders (not needed w/ imgui?)
 x (B) @vim @qualityOfLife CamelCase to snake_case converter [got tpope's abolish plugin; 'crs' motion does it]
 x (A) shader reloading - see https://github.com/ThisDrunkDane/libbrew/blob/6ecefb232bc5d8d1b71fad706fc0a857da156fb6/catalog/catalog.odin for an example of using ReadDirectoryChangesW in this context
+x (A) finish sgs importer--make a pipeline/bindings that that creates them based on an sgs file. render a damn quad with vertex colors.

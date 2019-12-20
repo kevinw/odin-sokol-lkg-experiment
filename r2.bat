@@ -1,1 +1,1 @@
-@call b.bat && src.exe --2d --window --no-osc --no-dof
+@call b.bat && src.exe --2d --window --no-osc

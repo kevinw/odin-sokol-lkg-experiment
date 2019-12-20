@@ -12,6 +12,8 @@ import "./shader_meta"
 import "shared:odin-stb/stbi"
 using import "math"
 
+import "gizmos"
+
 VERBOSE :: false;
 
 Image_Type :: enum {
@@ -47,6 +49,114 @@ Pipeline_Cache_Params :: struct {
 
 SCENE_INVALID_INDEX :: -1;
 SCENE_MAX_PIPELINES :: 16;
+
+draw :: proc(using scene: ^Scene, _num_views: int, now_seconds: f64) {
+    num_instances: int;
+    switch game_mode {
+        case .None: num_instances = 1;
+        case .Snake: num_instances = 35;
+        case .Tunnel: num_instances = 50;
+    }
+
+    for _, node_index in nodes {
+        node := &nodes[node_index];
+        vs_params := shader_meta.vs_params {
+            //model = mul(gizmos.matrix(state.xform_a), node.transform),
+            eye_pos = state.camera.position,
+            num_instances = cast(i32)num_instances,
+        };
+
+        root_m := mul(gizmos.matrix(state.xform_a), node.transform);
+
+        #complete switch game_mode {
+            case .Snake:
+                now := cast(f32)now_seconds * 0.3;
+                for m in 0..<num_instances {
+                    f := f32(m) / f32(num_instances);
+                    factor := f * TAU;
+                    pos := v3(sin(factor + cast(f32)now_seconds * 1.0), cos(factor) * sin(factor), cos(factor)) * factor;
+                    FREQ :: 1.0;
+                    DEPTH :: 3;
+                    pos += v3(perlin2d(factor, now, FREQ, DEPTH), perlin2d(now, factor, FREQ, DEPTH), perlin2d(now * factor, now, FREQ, DEPTH));
+                    rot := mat4_rotate(norm(pos), cast(f32)now_seconds * 0.5 * f);
+                    vs_params.instance_model_matrices[m] = mul(mul(root_m, mat4_translate(pos)), rot);
+                }
+            case .Tunnel:
+            case .None:
+                for m in 0..<num_instances {
+                    vs_params.instance_model_matrices[m] = root_m;
+                }
+        }
+
+        for view_i:int = 0; view_i < _num_views; view_i += 1 {
+            vs_params.view_proj_array[view_i] = state.view_proj_array[view_i];
+        }
+
+        white, black, normal := get_placeholder_image(.WHITE), get_placeholder_image(.BLACK), get_placeholder_image(.NORMALS);
+
+        mesh := &meshes[node.mesh];
+        for i in 0..<mesh.num_primitives {
+            prim := &sub_meshes[i + mesh.first_primitive];
+            sg.apply_pipeline(pipelines[prim.pipeline]);
+            bind := sg.Bindings {};
+            for vb_slot in 0..<prim.vertex_buffers.num {
+                bind.vertex_buffers[vb_slot] = buffers[prim.vertex_buffers.buffer[vb_slot]];
+            }
+            if prim.index_buffer != SCENE_INVALID_INDEX {
+                bind.index_buffer = buffers[prim.index_buffer];
+            }
+            //bind.vertex_buffers[shader_meta.ATTR_vs_instance_model] = instance_model;
+
+            apply_uniforms(.VS, shader_meta.SLOT_vs_params, &vs_params);
+            apply_uniforms(.FS, shader_meta.SLOT_light_params, &state.point_light);
+            //if mat.is_metallic {
+                {
+                    base_color_tex := white;
+                    metallic_roughness_tex := white;
+                    normal_tex := normal;
+                    occlusion_tex := white;
+                    emissive_tex := black;
+
+                    // TODO: can we just make the asset loader put the
+                    // placeholders there, and then overwrite them when
+                    // they arrive/are decoded? we shouldn't be "looking
+                    // them up" every frame.
+
+                    if prim.material != -1 {
+                        metallic := &materials[prim.material];
+
+                        apply_uniforms(sg.Shader_Stage.FS,
+                            shader_meta.SLOT_metallic_params,
+                            &metallic.fs_params);
+                            
+
+                        using metallic.images;
+                        if base_color != -1         && images[base_color].id != 0         do base_color_tex = images[base_color];
+                        if metallic_roughness != -1 && images[metallic_roughness].id != 0 do metallic_roughness_tex = images[metallic_roughness];
+                        if normal != -1             && images[normal].id != 0             do normal_tex = images[normal];
+                        if occlusion != -1          && images[occlusion].id != 0          do occlusion_tex = images[occlusion];
+                        if emissive != -1           && images[emissive].id != 0           do emissive_tex = images[emissive];
+                    }
+
+                    using shader_meta;
+                    bind.fs_images[SLOT_base_color_texture] = base_color_tex;
+                    bind.fs_images[SLOT_metallic_roughness_texture] = metallic_roughness_tex;
+                    bind.fs_images[SLOT_normal_texture] = normal_tex;
+                    bind.fs_images[SLOT_occlusion_texture] = occlusion_tex;
+                    bind.fs_images[SLOT_emissive_texture] = emissive_tex;
+                }
+            //} else {
+                //assert(false, "nonmetallic is unimplemented");
+            //}
+
+            sg.apply_bindings(bind);
+
+            assert(prim.num_elements > 0);
+            per_frame_stats.num_elements += cast(u64)prim.num_elements;
+            sg.draw(cast(int)prim.base_element, cast(int)prim.num_elements, _num_views * num_instances);
+        }
+    }
+}
 
 @private
 safe_cast_i16 :: inline proc(n: $T) -> i16 {

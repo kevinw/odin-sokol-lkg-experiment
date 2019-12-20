@@ -16,25 +16,25 @@ Mat4 :: math.Matrix4;
 Vec3 :: math.Vector3;
 BONES_PER_VERTEX :: 4;
 
-
 load_model_from_file :: proc(path: string) -> Model {
 	path_c := strings.clone_to_cstring(path);
 	defer delete(path_c);
 
+    using ai.Post_Process_Steps;
 	scene := ai.import_file(path_c,
-		// cast(u32) ai.Post_Process_Steps.Calc_Tangent_Space |
-		cast(u32) ai.Post_Process_Steps.Triangulate |
-		// cast(u32) ai.Post_Process_Steps.Join_Identical_Vertices |
-		// cast(u32) ai.Post_Process_Steps.Sort_By_PType |
-		// cast(u32) ai.Post_Process_Steps.Find_Invalid_Data |
-		// cast(u32) ai.Post_Process_Steps.Gen_UV_Coords |
-		// cast(u32) ai.Post_Process_Steps.Find_Degenerates |
-		// cast(u32) ai.Post_Process_Steps.Transform_UV_Coords |
-		// cast(u32) ai.Post_Process_Steps.Pre_Transform_Vertices |
-		cast(u32) ai.Post_Process_Steps.Gen_Smooth_Normals |
-		// cast(u32) ai.Post_Process_Steps.Flip_Winding_Order |
-		cast(u32) ai.Post_Process_Steps.Flip_UVs
-		);
+		// cast(u32) Calc_Tangent_Space |
+		   cast(u32) Triangulate |
+		// cast(u32) Join_Identical_Vertices |
+		// cast(u32) Sort_By_PType |
+		// cast(u32) Find_Invalid_Data |
+		// cast(u32) Gen_UV_Coords |
+		// cast(u32) Find_Degenerates |
+		// cast(u32) Transform_UV_Coords |
+		// cast(u32) Pre_Transform_Vertices |
+		   cast(u32) Gen_Smooth_Normals |
+		// cast(u32) Flip_Winding_Order |
+		   cast(u32) Flip_UVs
+    );
 	assert(scene != nil, tprint(ai.get_error_string()));
 	defer ai.release_import(scene);
 
@@ -74,7 +74,6 @@ Bone :: struct {
 	offset: Mat4,
 	name: string,
 }
-
 
 Node :: struct {
     name: string,
@@ -120,7 +119,6 @@ get_mesh_transform :: proc(node: ^ai.Node, mesh_name: string) -> Mat4 {
 
 	return ret;
 }
-
 
 _load_model_internal :: proc(scene: ^ai.Scene, loc := #caller_location) -> Model {
 	mesh_count := cast(int) scene.num_meshes;
@@ -307,7 +305,7 @@ add_mesh_to_model :: proc(model: ^Model, vertices: []$Vertex_Type, indices: []u3
         content = &vertices[0]
     });
     
-    fmt.println("Vertices:\n", vertices);
+    //fmt.println("Vertices:\n", vertices);
 
     index_buffer := sg.make_buffer({
         label = "mesh indices",
@@ -316,7 +314,7 @@ add_mesh_to_model :: proc(model: ^Model, vertices: []$Vertex_Type, indices: []u3
         content = &indices[0],
     });
 
-    fmt.println("Indices:\n", indices);
+    //fmt.println("Indices:\n", indices);
 
 	idx := len(model.meshes);
     // fmt.println("adding mesh to model at idx", idx);
@@ -366,6 +364,10 @@ get_pipeline_and_bindings :: proc(mesh: ^Mesh, shader: sg.Shader) -> (sg.Pipelin
     if _pip.id == 0 {
         desc := sg.Pipeline_Desc {
             label = "assimp mesh pipeline",
+            rasterizer = {
+                cull_mode = .NONE,
+                face_winding = .CCW,
+            },
             shader = shader,
             index_type = .UINT32,
             layout = sg.Layout_Desc {
@@ -405,7 +407,6 @@ get_pipeline_and_bindings :: proc(mesh: ^Mesh, shader: sg.Shader) -> (sg.Pipelin
     pipeline := _pip;
 
     assert(pipeline.id != sg.INVALID_ID);
-    assert(false);
 
     bindings := sg.Bindings {
         vertex_buffers = {
@@ -434,7 +435,6 @@ draw_model :: proc(model: ^Model, shader: sg.Shader, position: Vector3, rotation
         pipeline, bindings := get_pipeline_and_bindings(mesh, shader);
         sg.apply_pipeline(pipeline);
         sg.apply_bindings(bindings);
-
 
         /*
         vs_params := shader_meta.vs_params {

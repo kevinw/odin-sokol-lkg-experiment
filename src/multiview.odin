@@ -19,7 +19,6 @@ Blitter :: struct {
     bindings: sg.Bindings,
 };
 
-
 toggle_multiview :: proc() {
     if num_views() > 1 {
         force_num_views = 1;
@@ -39,7 +38,7 @@ num_views :: proc() -> int {
 maybe_recreate_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: int) {
     using state.offscreen;
 
-    width, height := calc_lkg_subquilt_size(framebuffer_width, framebuffer_height);
+    width, height := calc_lkg_subquilt_size(num_views, framebuffer_width, framebuffer_height);
 
     if cast(i32)num_views == color_img_desc.layers &&
         color_img_desc.width == width &&
@@ -50,7 +49,11 @@ maybe_recreate_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_
     create_multiview_pass(num_views, framebuffer_width, framebuffer_height);
 }
 
-calc_lkg_subquilt_size :: proc(framebuffer_width, framebuffer_height: int) -> (i32, i32) {
+calc_lkg_subquilt_size :: proc(num_views, framebuffer_width, framebuffer_height: int) -> (i32, i32) {
+    if num_views == 1 {
+        return cast(i32)framebuffer_width, cast(i32)framebuffer_height;
+    }
+
     aspect := cast(f32)framebuffer_width / cast(f32)framebuffer_height;
     width := max(10, cast(int)editor_settings.subview_w);
     height := cast(int)(cast(f32)width / aspect);
@@ -134,7 +137,7 @@ blit :: proc(using b: ^Blitter, source_rt: sg.Image, source_slot: int = 0) {
 }
 
 create_multiview_pass :: proc(num_views, framebuffer_width, framebuffer_height: int) {
-    width, height := calc_lkg_subquilt_size(framebuffer_width, framebuffer_height);
+    width, height := calc_lkg_subquilt_size(num_views, framebuffer_width, framebuffer_height);
 
     assert(width > 0 && height > 0);
     //fmt.printf("creating offscreen multiview pass (%dx%d) with %d views\n", width, height, num_views);
