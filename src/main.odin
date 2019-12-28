@@ -1,13 +1,13 @@
 package main
 
-using import "core:runtime"
+import "core:runtime"
 import "core:os"
 import "core:mem"
 import "core:fmt"
 import "core:log"
 import "core:sys/win32"
 
-using import "math"
+import "./math"
 
 import sg "../lib/odin-sokol/src/sokol_gfx"
 import sapp "../lib/odin-sokol/src/sokol_app"
@@ -26,7 +26,7 @@ Game_Mode :: enum {
     Tunnel
 }
 
-game_mode: Game_Mode = .Snake;
+game_mode: Game_Mode = .None;
 
 OSC :: true;
 
@@ -298,6 +298,8 @@ when OSC {
 }
 
 init_callback :: proc() {
+    using math;
+
     watcher._setup_notification(".");
 
     state.auto_rotate = true;
@@ -353,7 +355,7 @@ init_callback :: proc() {
 
     init_camera(&state.camera, true, DEFAULT_CAMERA_FOV, sapp.width(), sapp.height());
 
-    #complete switch game_mode {
+    switch game_mode {
     case .Snake:
         state.camera.position = {-4, .26, 13.7};
         state.camera.rotation = {0, -.12, 0, 0.99};
@@ -402,7 +404,8 @@ init_callback :: proc() {
     };
 
     // request the mesh GLTF file
-    gltf_path:cstring = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf";
+    //gltf_path:cstring = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf";
+    gltf_path:cstring = "resources/gltf/Duck/Duck.gltf";
     //gltf_path:cstring = "resources/gltf/Drevo/scene.gltf";
 
     sfetch.send({
@@ -546,6 +549,8 @@ setup_context_event :: proc(cb: proc(e: ^sapp.Event), e: ^sapp.Event) {
 setup_context :: proc { setup_context_fn, setup_context_event };
 
 frame_callback :: proc() {
+    using math;
+
     sfetch.dowork();
     if !_did_load do return;
 
@@ -989,7 +994,7 @@ cleanup :: proc() {
 event_callback :: proc(event: ^sapp.Event) {
     want_capture_keyboard := simgui.handle_event(event);
 
-    switch event.type {
+    #partial switch event.type {
         case .RESIZED:
             camera_target_resized(&state.camera, cast(f32)sapp.width(), cast(f32)sapp.height());
         case .MOUSE_DOWN:
@@ -997,12 +1002,16 @@ event_callback :: proc(event: ^sapp.Event) {
             switch event.mouse_button {
                 case .LEFT: input_state.left_mouse = true;
                 case .RIGHT: input_state.right_mouse = true;
+                case .MIDDLE:
+                case .INVALID: 
             }
         case .MOUSE_UP:
             //release_capture(sapp.win32_get_hwnd());
             switch event.mouse_button {
                 case .LEFT: input_state.left_mouse = false;
                 case .RIGHT: input_state.right_mouse = false;
+                case .MIDDLE:
+                case .INVALID:
             }
         case .MOUSE_MOVE:
             state.mouse.pos = v2(event.mouse_x, event.mouse_y);
@@ -1010,7 +1019,7 @@ event_callback :: proc(event: ^sapp.Event) {
 
 	if event.type == .KEY_DOWN && !event.key_repeat {
 		using input_state;
-		switch event.key_code {
+        #partial switch event.key_code {
 			case .ESCAPE:
                 sapp.request_quit();
 			case .RIGHT: right = true;
@@ -1047,7 +1056,7 @@ event_callback :: proc(event: ^sapp.Event) {
 
 	if event.type == .KEY_UP {
 		using input_state;
-		switch event.key_code {
+        #partial switch event.key_code {
 			case .RIGHT: right = false;
 			case .LEFT: left = false;
 			case .UP: up = false;

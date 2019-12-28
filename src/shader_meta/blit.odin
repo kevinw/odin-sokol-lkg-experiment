@@ -1,7 +1,7 @@
 package shader_meta;
 
 import sg "../../lib/odin-sokol/src/sokol_gfx"
-using import "../math"
+import "../math"
 
 /*
     #version:1# (machine generated, don't edit!)
@@ -306,9 +306,6 @@ blit_shader_desc_hlsl5 := sg.Shader_Desc {
   0, /* _end_canary */
 };
 } // SOKOL_D3D11
-// #if !defined(SOKOL_GFX_INCLUDED)
-//  #error "Please include sokol_gfx.h before blit.odin"
-// #endif
 blit_shader_filenames := [?]string {
   "blit.glsl",
   "common.glsl",

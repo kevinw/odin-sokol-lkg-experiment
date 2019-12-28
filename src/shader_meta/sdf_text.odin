@@ -1,7 +1,7 @@
 package shader_meta;
 
 import sg "../../lib/odin-sokol/src/sokol_gfx"
-using import "../math"
+import "../math"
 
 /*
     #version:1# (machine generated, don't edit!)
@@ -87,13 +87,13 @@ ATTR_vs_a_attribs :: 2;
 SLOT_font_atlas :: 0;
 SLOT_sdf_vs_uniforms :: 0;
 sdf_vs_uniforms :: struct #align 16 {
-    view_proj_array: [45]Matrix4,
-    model_matrix: Matrix4,
-    texsize: Vector2,
+    view_proj_array: [45]math.Matrix4,
+    model_matrix: math.Matrix4,
+    texsize: math.Vector2,
 };
 SLOT_sdf_fs_uniforms :: 0;
 sdf_fs_uniforms :: struct #align 16 {
-    color: Vector4,
+    color: math.Vector4,
     debug: f32,
 };
 when SOKOL_D3D11 {
@@ -441,9 +441,6 @@ sdf_text_shader_desc_hlsl5 := sg.Shader_Desc {
   0, /* _end_canary */
 };
 } // SOKOL_D3D11
-// #if !defined(SOKOL_GFX_INCLUDED)
-//  #error "Please include sokol_gfx.h before sdf_text.odin"
-// #endif
 sdf_text_shader_filenames := [?]string {
   "sdf_text.glsl",
   "common.glsl",

@@ -3,10 +3,10 @@ package main
 import sapp "../lib/odin-sokol/src/sokol_app"
 import sgl "../lib/odin-sokol/src/sokol_gl"
 import mu "../lib/microui"
-using import "math"
+import m "math"
 import "core:fmt"
 
-bezier_interp :: inline proc(t: f32, start, control_1, control_2, end: Vector2) -> Vector2 {
+bezier_interp :: inline proc(t: f32, start, control_1, control_2, end: m.Vector2) -> m.Vector2 {
     omt := 1.0 - t;
     omt2 := omt * omt;
     omt3 := omt2 * omt;
@@ -16,15 +16,15 @@ bezier_interp :: inline proc(t: f32, start, control_1, control_2, end: Vector2) 
 	return start * omt3 + control_1 * omt2 * t * 3.0 + control_2 * omt * t2 * 3.0 + end * t3;
 }
 
-evaluate :: inline proc(using curve: ^Bezier_Curve, t: f32) -> Vector2 {
+evaluate :: inline proc(using curve: ^Bezier_Curve, t: f32) -> m.Vector2 {
     return bezier_interp(t, p0, p1, p2, p3);
 }
 
 Bezier_Curve :: struct {
-    p0, p1, p2, p3: Vector2,
+    p0, p1, p2, p3: m.Vector2,
 };
 
-_base := Vector2 {};
+_base := m.Vector2 {};
 _curve : Bezier_Curve;
 
 mu_anim_curve :: proc(ctx: ^mu.Context, curve: ^Bezier_Curve) -> i32 {

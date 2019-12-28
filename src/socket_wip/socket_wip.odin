@@ -1,6 +1,5 @@
 package socket_wip
 
-using import "core:sys/win32"
 foreign import "system:ws2_32.lib"
 
 WSADESCRIPTION_LEN :: 256;

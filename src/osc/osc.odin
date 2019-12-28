@@ -1,25 +1,29 @@
 package main
 
 import "core:fmt"
-using import "../math"
+import "../math"
 import "core:log"
 
-using import "../socket_wip"
+import socket "../socket_wip"
 import tosc "../../lib/tinyosc"
 
 port :: 8005;
 
-s: Socket = INVALID_SOCKET;
+Socket :: socket.Socket;
+
+s: Socket = socket.INVALID_SOCKET;
 
 Callbacks :: struct {
-    on_vector2 : proc(name: string, val: Vector2),
-    on_vector3 : proc(name: string, val: Vector3),
+    on_vector2 : proc(name: string, val: math.Vector2),
+    on_vector3 : proc(name: string, val: math.Vector3),
     on_bool : proc(name: string, val: bool),
 };
 
 _cbs : Callbacks;
 
 init :: proc(cbs: Callbacks) {
+    using socket;
+
     _cbs = cbs;
     data : WSA_Data;
     if err := wsa_startup(make_word(2, 2), &data); err != 0 {
@@ -67,11 +71,11 @@ handle_message :: proc(message: ^tosc.Message) {
     switch format {
         case "ff":
             if _cbs.on_vector2 != nil {
-                _cbs.on_vector2(address, Vec2{get_next_f32(message), get_next_f32(message)});
+                _cbs.on_vector2(address, math.Vec2{get_next_f32(message), get_next_f32(message)});
             }
         case "fff":
             if _cbs.on_vector3 != nil {
-                _cbs.on_vector3(address, Vec3{get_next_f32(message), get_next_f32(message), get_next_f32(message)});
+                _cbs.on_vector3(address, math.Vec3{get_next_f32(message), get_next_f32(message), get_next_f32(message)});
             }
         case:
             fmt.println("unhandled format", format);
@@ -79,6 +83,8 @@ handle_message :: proc(message: ^tosc.Message) {
 }
 
 update :: proc() {
+    using socket;
+
     if s == INVALID_SOCKET do return;
 		
     // try to receive some data, this is a blocking call
@@ -106,8 +112,8 @@ update :: proc() {
 }
 
 shutdown :: proc() {
-    if s == INVALID_SOCKET do return;
-    closesocket(s);
+    if s == socket.INVALID_SOCKET do return;
+    socket.closesocket(s);
     //wsa_cleanup();
 }
 

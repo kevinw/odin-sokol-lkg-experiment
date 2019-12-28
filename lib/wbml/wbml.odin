@@ -6,33 +6,33 @@ import "core:reflect"
 
       import "../reflection"
 
-using import "core:strings"
-using import "core:fmt"
-using import "../laas"
+import "core:strings"
+import "core:fmt"
+import "../laas"
 
 serialize :: proc(value: ^$Type) -> string {
-	sb: Builder;
+	sb: strings.Builder;
 	serialize_string_builder(value, &sb);
-	return to_string(sb);
+	return strings.to_string(sb);
 }
 
-serialize_string_builder :: proc(value: ^$Type, sb: ^Builder) {
+serialize_string_builder :: proc(value: ^$Type, sb: ^strings.Builder) {
 	ti := type_info_of(Type);
 	serialize_with_type_info("", value, ti, sb, 0);
 }
 
-serialize_with_type_info :: proc(name: string, value: rawptr, ti: ^rt.Type_Info, sb: ^Builder, indent_level: int, loc := #caller_location) {
+serialize_with_type_info :: proc(name: string, value: rawptr, ti: ^rt.Type_Info, sb: ^strings.Builder, indent_level_: int, loc := #caller_location) {
 	assert(ti != nil);
-	indent_level := indent_level;
+	indent_level := indent_level_;
 
-	print_indents :: inline proc(indent_level: int, sb: ^Builder) {
-		for i in 0..indent_level-1 {
-			sbprint(sb, "\t");
+	print_indents :: inline proc(indent_level: int, sb: ^strings.Builder) {
+		for _ in 0..indent_level-1 {
+			fmt.sbprint(sb, "\t");
 		}
 	}
 
-	print_to_buf :: inline proc(sb: ^Builder, args: ..any) {
-		sbprint(sb, ..args);
+	print_to_buf :: inline proc(sb: ^strings.Builder, args: ..any) {
+		fmt.sbprint(sb, ..args);
 	}
 
 	if name != "" {
@@ -40,10 +40,9 @@ serialize_with_type_info :: proc(name: string, value: rawptr, ti: ^rt.Type_Info,
 	}
 
 	do_newline := true;
-	switch kind in ti.variant {
+    #partial switch kind in ti.variant {
 		case rt.Type_Info_Integer: {
 			if kind.signed {
-				#complete
 				switch kind.endianness {
 					case .Platform: {
 						switch ti.size {
@@ -51,7 +50,7 @@ serialize_with_type_info :: proc(name: string, value: rawptr, ti: ^rt.Type_Info,
 							case 2: print_to_buf(sb, (cast(^i16)value)^);
 							case 4: print_to_buf(sb, (cast(^i32)value)^);
 							case 8: print_to_buf(sb, (cast(^i64)value)^);
-							case: panic(tprint(ti.size));
+							case: panic(fmt.tprint(ti.size));
 						}
 					}
 					case .Little: {
@@ -59,7 +58,7 @@ serialize_with_type_info :: proc(name: string, value: rawptr, ti: ^rt.Type_Info,
 							case 2: print_to_buf(sb, (cast(^i16le)value)^);
 							case 4: print_to_buf(sb, (cast(^i32le)value)^);
 							case 8: print_to_buf(sb, (cast(^i64le)value)^);
-							case: panic(tprint(ti.size));
+							case: panic(fmt.tprint(ti.size));
 						}
 					}
 					case .Big: {
@@ -67,13 +66,12 @@ serialize_with_type_info :: proc(name: string, value: rawptr, ti: ^rt.Type_Info,
 							case 2: print_to_buf(sb, (cast(^i16be)value)^);
 							case 4: print_to_buf(sb, (cast(^i32be)value)^);
 							case 8: print_to_buf(sb, (cast(^i64be)value)^);
-							case: panic(tprint(ti.size));
+							case: panic(fmt.tprint(ti.size));
 						}
 					}
 				}
 			}
 			else {
-				#complete
 				switch kind.endianness {
 					case .Platform: {
 						switch ti.size {
@@ -81,7 +79,7 @@ serialize_with_type_info :: proc(name: string, value: rawptr, ti: ^rt.Type_Info,
 							case 2: print_to_buf(sb, (cast(^u16)value)^);
 							case 4: print_to_buf(sb, (cast(^u32)value)^);
 							case 8: print_to_buf(sb, (cast(^u64)value)^);
-							case: panic(tprint(ti.size));
+							case: panic(fmt.tprint(ti.size));
 						}
 					}
 					case .Little: {
@@ -89,7 +87,7 @@ serialize_with_type_info :: proc(name: string, value: rawptr, ti: ^rt.Type_Info,
 							case 2: print_to_buf(sb, (cast(^u16le)value)^);
 							case 4: print_to_buf(sb, (cast(^u32le)value)^);
 							case 8: print_to_buf(sb, (cast(^u64le)value)^);
-							case: panic(tprint(ti.size));
+							case: panic(fmt.tprint(ti.size));
 						}
 					}
 					case .Big: {
@@ -97,7 +95,7 @@ serialize_with_type_info :: proc(name: string, value: rawptr, ti: ^rt.Type_Info,
 							case 2: print_to_buf(sb, (cast(^u16be)value)^);
 							case 4: print_to_buf(sb, (cast(^u32be)value)^);
 							case 8: print_to_buf(sb, (cast(^u64be)value)^);
-							case: panic(tprint(ti.size));
+							case: panic(fmt.tprint(ti.size));
 						}
 					}
 				}
@@ -108,7 +106,7 @@ serialize_with_type_info :: proc(name: string, value: rawptr, ti: ^rt.Type_Info,
 			switch ti.size {
 				case 4: print_to_buf(sb, (cast(^f32)value)^);
 				case 8: print_to_buf(sb, (cast(^f64)value)^);
-				case: panic(tprint(ti.size));
+				case: panic(fmt.tprint(ti.size));
 			}
 		}
 
@@ -187,7 +185,7 @@ serialize_with_type_info :: proc(name: string, value: rawptr, ti: ^rt.Type_Info,
 				print_to_buf(sb, "nil");
 			}
 			else {
-				print_to_buf(sb, ".", tprint(union_ti), " ");
+				print_to_buf(sb, ".", fmt.tprint(union_ti), " ");
 				serialize_with_type_info("", value, union_ti, sb, indent_level);
 			}
 		}
@@ -235,7 +233,7 @@ serialize_with_type_info :: proc(name: string, value: rawptr, ti: ^rt.Type_Info,
 			unimplemented();
 		}
 
-		case: panic(tprint(kind));
+		case: panic(fmt.tprint(kind));
 	}
 
 	if do_newline {
@@ -277,11 +275,13 @@ deserialize_into_pointer_with_type_info :: proc(data: []u8, ptr: rawptr, ti: ^rt
 	write_value(root, ptr, ti);
 }
 
-parse_value :: proc(lexer: ^Lexer, is_negative_number := false) -> ^Node {
+parse_value :: proc(lexer: ^laas.Lexer, is_negative_number := false) -> ^Node {
+    using laas;
+
 	eat_newlines(lexer);
 	root_token: Token;
-	ok := get_next_token(lexer, &root_token);
-	if !ok do return nil;
+	token_ok := get_next_token(lexer, &root_token);
+	if !token_ok do return nil;
 
 	if symbol, ok := root_token.kind.(laas.Symbol); ok {
 		if symbol.value == '-' {
@@ -289,7 +289,7 @@ parse_value :: proc(lexer: ^Lexer, is_negative_number := false) -> ^Node {
 		}
 	}
 
-	switch value_kind in root_token.kind {
+    #partial switch value_kind in root_token.kind {
 		case laas.Symbol: {
 			switch value_kind.value {
 				case '{': {
@@ -313,7 +313,7 @@ parse_value :: proc(lexer: ^Lexer, is_negative_number := false) -> ^Node {
 						assert(ok, "end of text from within object");
 
 						variable_name, ok2 := var_name_token.kind.(laas.Identifier);
-						assert(ok2, tprint(var_name_token));
+						assert(ok2, fmt.tprint(var_name_token));
 
 						value := parse_value(lexer);
 						append(&fields, Object_Field{variable_name.value, value});
@@ -355,7 +355,7 @@ parse_value :: proc(lexer: ^Lexer, is_negative_number := false) -> ^Node {
 				}
 
 				case: {
-					panic(tprint("Unhandled case: ", value_kind.value));
+					panic(fmt.tprint("Unhandled case: ", value_kind.value));
 				}
 			}
 		}
@@ -382,7 +382,7 @@ parse_value :: proc(lexer: ^Lexer, is_negative_number := false) -> ^Node {
 		}
 
 		case: {
-			panic(tprint(value_kind));
+			panic(fmt.tprint(value_kind));
 		}
 	}
 	unreachable();
@@ -390,7 +390,7 @@ parse_value :: proc(lexer: ^Lexer, is_negative_number := false) -> ^Node {
 }
 
 write_value :: proc(node: ^Node, ptr: rawptr, ti: ^rt.Type_Info) {
-	switch variant in ti.variant {
+    #partial switch variant in ti.variant {
 		case rt.Type_Info_Named: {
 			write_value(node, ptr, variant.base);
 		}
@@ -426,7 +426,7 @@ write_value :: proc(node: ^Node, ptr: rawptr, ti: ^rt.Type_Info) {
 			if size_needed > 0 {
 				memory := make([]byte, size_needed);
 				byte_index: int;
-				for element, idx in array.elements {
+				for element in array.elements {
 					assert(byte_index + variant.elem_size <= len(memory));
 					write_value(element, &memory[byte_index], variant.elem);
 					byte_index += variant.elem_size;
@@ -442,7 +442,7 @@ write_value :: proc(node: ^Node, ptr: rawptr, ti: ^rt.Type_Info) {
 			if size_needed > 0 {
 				memory := make([]byte, size_needed);
 				byte_index: int;
-				for element, idx in array.elements {
+				for element in array.elements {
 					assert(byte_index + variant.elem_size <= len(memory));
 					write_value(element, &memory[byte_index], variant.elem);
 					byte_index += variant.elem_size;
@@ -455,7 +455,6 @@ write_value :: proc(node: ^Node, ptr: rawptr, ti: ^rt.Type_Info) {
 		case rt.Type_Info_Integer: {
 			number := &node.kind.(Node_Number);
 			if variant.signed {
-				#complete
 				switch variant.endianness {
 					case .Platform: {
 						switch ti.size {
@@ -463,7 +462,7 @@ write_value :: proc(node: ^Node, ptr: rawptr, ti: ^rt.Type_Info) {
 							case 2: (cast(^i16)ptr)^ = cast(i16)number.int_value;
 							case 4: (cast(^i32)ptr)^ = cast(i32)number.int_value;
 							case 8: (cast(^i64)ptr)^ =          number.int_value;
-							case: panic(tprint(ti.size));
+							case: panic(fmt.tprint(ti.size));
 						}
 					}
 					case .Little: {
@@ -471,7 +470,7 @@ write_value :: proc(node: ^Node, ptr: rawptr, ti: ^rt.Type_Info) {
 							case 2: (cast(^i16le)ptr)^ = cast(i16le)number.int_value;
 							case 4: (cast(^i32le)ptr)^ = cast(i32le)number.int_value;
 							case 8: (cast(^i64le)ptr)^ = cast(i64le)number.int_value;
-							case: panic(tprint(ti.size));
+							case: panic(fmt.tprint(ti.size));
 						}
 					}
 					case .Big: {
@@ -479,13 +478,12 @@ write_value :: proc(node: ^Node, ptr: rawptr, ti: ^rt.Type_Info) {
 							case 2: (cast(^i16be)ptr)^ = cast(i16be)number.int_value;
 							case 4: (cast(^i32be)ptr)^ = cast(i32be)number.int_value;
 							case 8: (cast(^i64be)ptr)^ = cast(i64be)number.int_value;
-							case: panic(tprint(ti.size));
+							case: panic(fmt.tprint(ti.size));
 						}
 					}
 				}
 			}
 			else {
-				#complete
 				switch variant.endianness {
 					case .Platform: {
 						switch ti.size {
@@ -493,7 +491,7 @@ write_value :: proc(node: ^Node, ptr: rawptr, ti: ^rt.Type_Info) {
 							case 2: (cast(^u16)ptr)^ = cast(u16)number.uint_value;
 							case 4: (cast(^u32)ptr)^ = cast(u32)number.uint_value;
 							case 8: (cast(^u64)ptr)^ =          number.uint_value;
-							case: panic(tprint(ti.size));
+							case: panic(fmt.tprint(ti.size));
 						}
 					}
 					case .Little: {
@@ -501,7 +499,7 @@ write_value :: proc(node: ^Node, ptr: rawptr, ti: ^rt.Type_Info) {
 							case 2: (cast(^u16le)ptr)^ = cast(u16le)number.uint_value;
 							case 4: (cast(^u32le)ptr)^ = cast(u32le)number.uint_value;
 							case 8: (cast(^u64le)ptr)^ = cast(u64le)number.uint_value;
-							case: panic(tprint(ti.size));
+							case: panic(fmt.tprint(ti.size));
 						}
 					}
 					case .Big: {
@@ -509,7 +507,7 @@ write_value :: proc(node: ^Node, ptr: rawptr, ti: ^rt.Type_Info) {
 							case 2: (cast(^u16be)ptr)^ = cast(u16be)number.uint_value;
 							case 4: (cast(^u32be)ptr)^ = cast(u32be)number.uint_value;
 							case 8: (cast(^u64be)ptr)^ = cast(u64be)number.uint_value;
-							case: panic(tprint(ti.size));
+							case: panic(fmt.tprint(ti.size));
 						}
 					}
 				}
@@ -521,7 +519,7 @@ write_value :: proc(node: ^Node, ptr: rawptr, ti: ^rt.Type_Info) {
 			switch ti.size {
 				case 4: (cast(^f32)ptr)^ = cast(f32)number.float_value;
 				case 8: (cast(^f64)ptr)^ =          number.float_value;
-				case: panic(tprint(ti.size));
+				case: panic(fmt.tprint(ti.size));
 			}
 		}
 
@@ -542,18 +540,18 @@ write_value :: proc(node: ^Node, ptr: rawptr, ti: ^rt.Type_Info) {
 				case 2: (cast(^b16)ptr)^  = cast(b16)b.value;
 				case 4: (cast(^b32)ptr)^  = cast(b32)b.value;
 				case 8: (cast(^b64)ptr)^  = cast(b64)b.value;
-				case: panic(tprint(ti.size));
+				case: panic(fmt.tprint(ti.size));
 			}
 		}
 
 		case rt.Type_Info_Union: {
-			switch node_kind in node.kind {
+            #partial switch node_kind in node.kind {
 				case Node_Nil: {
 					// note(josh): Do nothing!
 				}
 				case Node_Union: {
 					for v in variant.variants {
-						name := tprint(v);
+						name := fmt.tprint(v);
 						if node_kind.variant_name == name {
 							reflection.set_union_type_info(any{ptr, ti.id}, v);
 							write_value(node_kind.value, ptr, v);
@@ -561,7 +559,7 @@ write_value :: proc(node: ^Node, ptr: rawptr, ti: ^rt.Type_Info) {
 						}
 					}
 				}
-				case: panic(tprint(node_kind));
+				case: panic(fmt.tprint(node_kind));
 			}
 		}
 
@@ -593,12 +591,11 @@ write_value :: proc(node: ^Node, ptr: rawptr, ti: ^rt.Type_Info) {
 			}
 		}
 
-		case: panic(tprint(variant));
+		case: panic(fmt.tprint(variant));
 	}
 }
 
 delete_node :: proc(node: ^Node) {
-	#complete
 	switch kind in node.kind {
 		case Node_Number:     // do nothing
 		case Node_Bool:       // do nothing
@@ -622,20 +619,20 @@ delete_node :: proc(node: ^Node) {
 			delete_node(kind.value);
 		}
 		case: {
-			panic(tprint(kind));
+			panic(fmt.tprint(kind));
 		}
 	}
 	free(node);
 }
 
-eat_newlines :: proc(lexer: ^Lexer, loc := #caller_location) {
-	token: Token;
+eat_newlines :: proc(lexer: ^laas.Lexer, loc := #caller_location) {
+	token: laas.Token;
 	for {
-		ok := peek(lexer, &token);
+		ok := laas.peek(lexer, &token);
 		if !ok do return;
 
-		if _, is_newline := token.kind.(New_Line); is_newline {
-			eat(lexer);
+		if _, is_newline := token.kind.(laas.New_Line); is_newline {
+			laas.eat(lexer);
 		}
 		else {
 			return;

@@ -10,7 +10,7 @@ import "../lib/cgltf"
 import "../lib/basisu"
 import "./shader_meta"
 import "shared:odin-stb/stbi"
-using import "math"
+import "math"
 
 import "gizmos"
 
@@ -51,6 +51,8 @@ SCENE_INVALID_INDEX :: -1;
 SCENE_MAX_PIPELINES :: 16;
 
 draw :: proc(using scene: ^Scene, _num_views: int, now_seconds: f64) {
+    using math;
+
     num_instances: int;
     switch game_mode {
         case .None: num_instances = 1;
@@ -68,7 +70,7 @@ draw :: proc(using scene: ^Scene, _num_views: int, now_seconds: f64) {
 
         root_m := mul(gizmos.matrix(state.xform_a), node.transform);
 
-        #complete switch game_mode {
+        switch game_mode {
             case .Snake:
                 now := cast(f32)now_seconds * 0.3;
                 for m in 0..<num_instances {
@@ -361,6 +363,8 @@ gltf_parse :: proc(bytes: []u8, path_root: string) {
 
 @private
 build_transform_for_gltf_node :: proc(gltf: ^cgltf.Data, node: ^cgltf.Node) -> Matrix4 {
+    using math;
+
     parent_tform := identity(Matrix4);
     if node.parent != nil {
         parent_tform = build_transform_for_gltf_node(gltf, node.parent);
@@ -388,7 +392,9 @@ build_transform_for_gltf_node :: proc(gltf: ^cgltf.Data, node: ^cgltf.Node) -> M
 }
 
 @private
-rotate_matrix4x4_quat :: proc(q_x, q_y, q_z, q_w: f32) -> Matrix4x4 {
+rotate_matrix4x4_quat :: proc(q_x, q_y, q_z, q_w: f32) -> math.Matrix4x4 {
+    using math;
+
     // thanks Unity decompiled
 
     // Precalculate coordinate products
@@ -596,7 +602,7 @@ create_sg_images_for_gltf_image :: proc(gltf_image_index: int, image_type: Image
         p := &state.creation_params.images[i];
         if p.gltf_image_index != gltf_image_index do continue;
         // @Speed should we make a new sg.Image for each one?
-        switch image_type {
+        #partial switch image_type {
             case .JPEG, .PNG:
                 desired_channels :: 4;
                 x, y, channels_in_file: i32;
@@ -651,7 +657,7 @@ gltf_to_sg_wrap :: proc(gltf_wrap: i32) -> sg.Wrap {
 }
 
 gltf_attr_type_to_vs_input_slot :: proc(attr_type: cgltf.Attribute_Type) -> i32 {
-    switch attr_type {
+    #partial switch attr_type {
         case .POSITION: return shader_meta.ATTR_vs_cgltf_position;
         case .NORMAL: return shader_meta.ATTR_vs_normal;
         case .TEXCOORD: return shader_meta.ATTR_vs_texcoord;
@@ -664,7 +670,7 @@ gltf_attr_type_to_vs_input_slot :: proc(attr_type: cgltf.Attribute_Type) -> i32 
 
 @(private)
 gltf_to_prim_type :: proc(prim_type: cgltf.Primitive_Type) -> sg.Primitive_Type {
-    switch prim_type {
+    #partial switch prim_type {
         case .POINTS: return .POINTS;
         case .LINES: return .LINES;
         case .LINE_STRIP: return .LINE_STRIP;
@@ -708,7 +714,7 @@ pipelines_equal :: proc(p0: ^Pipeline_Cache_Params, p1: ^Pipeline_Cache_Params) 
 
 @(private)
 gltf_to_vertex_format :: proc(acc: ^cgltf.Accessor) -> sg.Vertex_Format {
-    switch acc.component_type {
+    #partial switch acc.component_type {
         case .R_8:
             if acc.type == .VEC4 {
                 return acc.normalized != 0 ? .BYTE4N : .BYTE4;
@@ -718,12 +724,12 @@ gltf_to_vertex_format :: proc(acc: ^cgltf.Accessor) -> sg.Vertex_Format {
                 return acc.normalized != 0 ? .UBYTE4N : .UBYTE4;
             }
         case .R_16:
-            switch acc.type {
+            #partial switch acc.type {
                 case .VEC2: return acc.normalized != 0 ? .SHORT2N : .SHORT2;
                 case .VEC4: return acc.normalized != 0 ? .SHORT4N : .SHORT4;
             }
         case .R_32F:
-            switch acc.type {
+            #partial switch acc.type {
                 case .SCALAR: return .FLOAT;
                 case .VEC2: return .FLOAT2;
                 case .VEC3: return .FLOAT3;

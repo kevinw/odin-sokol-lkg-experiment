@@ -1,8 +1,10 @@
 package main
 
-using import "math"
+import "math"
 import sapp "../lib/odin-sokol/src/sokol_app"
 import "core:fmt"
+
+Quat :: math.Quat;
 
 Camera :: struct {
     is_perspective: bool,
@@ -29,6 +31,8 @@ camera_target_resized :: proc(camera: ^Camera, pixel_width, pixel_height: f32) {
 }
 
 worldspace_ray :: proc(using camera: ^Camera, screen_pt: Vector2) -> Ray {
+    using math;
+
     // thanks http://antongerdelan.net/opengl/raycasting.html
 
     ray_nds := v3(2 * screen_pt.x / pixel_width - 1.0,
@@ -51,6 +55,8 @@ worldspace_ray :: proc(using camera: ^Camera, screen_pt: Vector2) -> Ray {
 }
 
 construct_view_matrix :: proc(camera: ^Camera) -> Mat4 {
+    using math;
+
 	view_matrix := translate(identity(Mat4), -camera.position);
 
 	rotation := camera.rotation;
@@ -60,6 +66,8 @@ construct_view_matrix :: proc(camera: ^Camera) -> Mat4 {
 }
 
 construct_projection_matrix :: proc(using camera: ^Camera) -> Mat4 {
+    using math;
+
     if is_perspective {
         return perspective(to_radians(size), aspect, near_plane, far_plane);
     } else {
@@ -85,6 +93,8 @@ init_camera :: proc(camera: ^Camera, is_perspective: bool, size: f32, pixel_widt
 }
 
 do_camera_movement :: proc(camera: ^Camera, input_state: Input_State, dt: f32, normal_speed: f32, fast_speed: f32, slow_speed: f32) {
+    using math;
+
 	speed := normal_speed;
 
 	if input_state.left_shift {
@@ -129,6 +139,8 @@ do_camera_movement :: proc(camera: ^Camera, input_state: Input_State, dt: f32, n
 }
 
 rotate_quat_by_degrees :: proc(q: Quat, degrees: Vec3) -> Quat {
+    using math;
+
 	x := axis_angle(Vec3{1, 0, 0}, to_radians(degrees.x));
 	y := axis_angle(Vec3{0, 1, 0}, to_radians(degrees.y));
 	z := axis_angle(Vec3{0, 0, 1}, to_radians(degrees.z));

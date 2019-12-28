@@ -8,7 +8,6 @@ import "core:mem"
 import "shared:odin-stb/stbi"
 import shader_meta "./shader_meta"
 import "core:encoding/json"
-using import "math"
 
 SDF_Text_Vert_Attrib :: struct #packed {
     gamma: f32,

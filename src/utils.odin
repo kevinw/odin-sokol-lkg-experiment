@@ -1,7 +1,6 @@
 package main
 
-using import "math"
-import "core:mem"
+import "math"
 
 v2 :: inline proc(w, h: $T) -> Vector2 { return Vector2 { cast(f32)w, cast(f32)h }; }
 
@@ -32,9 +31,9 @@ cstring_ptr_to_slice :: proc(s: ^$T) -> []T { // @Unsafe
 
 
 // COMPAT WITH LINALG
-translate_matrix4 :: proc(v: Vec3) -> Mat4 do return translate(identity(Mat4), v);
-scale_matrix4 :: mat4_scale;
-rotate_matrix4 :: mat4_rotate;
+translate_matrix4 :: proc(v: math.Vec3) -> math.Mat4 do return math.translate(math.identity(math.Mat4), v);
+scale_matrix4 :: math.mat4_scale;
+rotate_matrix4 :: math.mat4_rotate;
 
 Colorf :: struct {
 	r: f32 "imgui_range=0:1",
@@ -87,6 +86,6 @@ sub :: proc(v1, v2: Vector3) -> Vector3 {
     return Vector3 { v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
 }
 
-DEG_TO_RAD :: PI / 180.0;
+DEG_TO_RAD :: math.PI / 180.0;
 deg2rad :: inline proc(f: $T) -> T { return f * DEG_TO_RAD; }
 

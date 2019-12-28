@@ -1,7 +1,9 @@
 package laas
 
-using import "core:fmt"
+import "core:fmt"
 import "core:strconv"
+
+tprint :: fmt.tprint;
 
 /*
 
@@ -90,8 +92,8 @@ make_lexer :: inline proc(text: string) -> Lexer {
 	return Lexer{text, 0, 0, 0, nil};
 }
 
-get_next_token :: proc(using lexer: ^Lexer, token: ^Token, ignore_newline := false, loc := #caller_location) -> bool {
-	token := token;
+get_next_token :: proc(using lexer: ^Lexer, token_: ^Token, ignore_newline := false, loc := #caller_location) -> bool {
+	token := token_;
 	_token: Token;
 	if token == nil {
 		token = &_token;
@@ -318,7 +320,7 @@ _dec :: inline proc(using lexer: ^Lexer) {
 
 _inc :: proc(using lexer: ^Lexer, location := #caller_location) -> bool {
 	if lex_idx >= len(lexer_text) do
-		printf(tprint(location));
+		fmt.printf(tprint(location));
 	r := lexer_text[lex_idx];
 	lex_idx += 1;
 

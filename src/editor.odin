@@ -1,7 +1,9 @@
 package main
 
 import sgl "../lib/odin-sokol/src/sokol_gl"
-using import "math"
+import "./math"
+
+Vector3 :: math.Vector3;
 
 Editor_Settings :: struct {
     sdftext: struct {

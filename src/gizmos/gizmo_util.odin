@@ -1,6 +1,10 @@
 package gizmos
 
-using import "../math"
+import "../math"
+
+Vector3 :: math.Vector3;
+Vector4 :: math.Vector4;
+Matrix4 :: math.Matrix4;
 
 @private v_vector4 :: inline proc(position: Vector4) -> Geo_Vertex {
     geo_vertex: Geo_Vertex;
@@ -21,7 +25,7 @@ v :: proc { v_vector3, v_vector4 };
 // TODO: use Quat from 'math' instead of Vector4 for rotations
 
 transform_coord :: proc(transform: Matrix4, coord: Vector3) -> Vector3 {
-    r := mul(transform, v4(coord, 1));
+    r := math.mul(transform, v4(coord, 1));
     return v3(r) / r.w;
 }
 
@@ -38,11 +42,13 @@ transform_point :: proc(using t: Transform, p: Vector3) -> Vector3 do return pos
 detransform_point :: proc(using t: Transform, p: Vector3) -> Vector3 do return detransform_vector(t, p - position);
 detransform_vector :: proc(using t: Transform, vec: Vector3) -> Vector3 do return qrot(qinv(orientation), vec) / scale;
 
-transform_vector_matrix :: proc(transform_matrix: Matrix4, vector: Vector3) -> Vector3 do return v3(mul(transform_matrix, v4(vector, 0)));
+transform_vector_matrix :: proc(transform_matrix: Matrix4, vector: Vector3) -> Vector3 {
+    return v3(math.mul(transform_matrix, v4(vector, 0)));
+}
 
 transform_vector :: proc { transform_vector_transform, transform_vector_matrix };
 
-length2 :: inline proc(a: Vector4) -> f32 do return dot(a, a);
+length2 :: inline proc(a: Vector4) -> f32 do return math.dot(a, a);
 qconj :: inline proc(q: Vector4) -> Vector4 do return {-q.x,-q.y,-q.z,q.w};
 qinv :: inline proc(q: Vector4) -> Vector4 do return qconj(q)/length2(q);
 qxdir :: inline proc(q: Vector4) -> Vector3 do return {q.w*q.w+q.x*q.x-q.y*q.y-q.z*q.z, (q.x*q.y+q.z*q.w)*2, (q.z*q.x-q.y*q.w)*2};
@@ -75,6 +81,7 @@ flush_to_zero :: proc(v: ^Vector3) {
 
 @private
 intersect_ray_plane :: proc(ray: Ray, plane: Vector4, hit_t: ^f32) -> bool {
+    using math;
     denom := dot(v3(plane), ray.direction);
     if abs(denom) == 0 do return false;
     if hit_t != nil do hit_t^ = -dot(plane, v4(ray.origin, 1)) / denom;
@@ -82,8 +89,9 @@ intersect_ray_plane :: proc(ray: Ray, plane: Vector4, hit_t: ^f32) -> bool {
 }
 
 @private
-intersect_ray_triangle :: proc(ray: Ray, v0: Vector3, v1: Vector3, v2: Vector3, hit_t: ^f32) -> bool
-{
+intersect_ray_triangle :: proc(ray: Ray, v0: Vector3, v1: Vector3, v2: Vector3, hit_t: ^f32) -> bool {
+    using math;
+
     e1 := v1 - v0;
     e2 := v2 - v0;
     h := cross(ray.direction, e2);
@@ -110,16 +118,15 @@ intersect_ray_triangle :: proc(ray: Ray, v0: Vector3, v1: Vector3, v2: Vector3, 
 
 // This will calculate a scale constant based on the number of screenspace pixels passed as pixel_scale.
 @private
-scale_screenspace :: proc(using ctx: ^Context, position: Vector3, pixel_scale: f32) -> f32
-{
+scale_screenspace :: proc(using ctx: ^Context, position: Vector3, pixel_scale: f32) -> f32 {
+    using math;
     dist:f32 = length(position - active_state.cam.position);
     return tan(active_state.cam.yfov) * dist * (pixel_scale / active_state.viewport_size.y);
 }
 
 // The only purpose of this is readability: to reduce the total column width of the intersect(...) statements in every gizmo
 @private
-intersect :: proc(using ctx: ^Context, r: Ray, i: Interact, t: ^f32, best_t: f32) -> bool
-{
+intersect :: proc(using ctx: ^Context, r: Ray, i: Interact, t: ^f32, best_t: f32) -> bool {
     if intersect_ray_mesh(r, &mesh_components[i].mesh, t) && t^ < best_t do return true;
     return false;
 }
@@ -170,6 +177,8 @@ make_box_geometry :: proc(min_bounds, max_bounds: Vector3) -> Mesh {
 
 @private
 make_lathed_geometry :: proc(_axis, arm1, arm2: Vector3, slices: int, points: []Vector2, eps:f32 = 0) -> Mesh {
+    using math;
+
     axis := _axis;
 
     mesh: Mesh;
@@ -224,18 +233,24 @@ hash_fnv1a :: proc(str: string) -> u32 {
     return result;
 }
 
-rotation_quat :: proc(axis: Vector3, angle: f32) -> Vector4 do return v4(axis*sin(angle/2), cos(angle/2));
-make_rotation_quat_axis_angle :: proc(axis: Vector3, angle: f32) -> Vector4 do return v4(axis * sin(angle / 2), cos(angle / 2));
+rotation_quat :: proc(axis: Vector3, angle: f32) -> Vector4 {
+    return v4(axis*math.sin(angle/2), math.cos(angle/2));
+}
+
+make_rotation_quat_axis_angle :: proc(axis: Vector3, angle: f32) -> Vector4 {
+    return v4(axis * math.sin(angle / 2), math.cos(angle / 2));
+}
 
 make_rotation_quat_between_vectors_snapped :: proc (from, to: Vector3, angle: f32) -> Vector4 {
+    using math;
     a := norm(from);
     b := norm(to);
     snappedAcos := floor(acos(dot(a, b)) / angle) * angle;
     return make_rotation_quat_axis_angle(norm(cross(a, b)), snappedAcos);
 }
 
-snap :: proc(value: Vector3, snap: f32) -> Vector3
-{
+snap :: proc(value: Vector3, snap: f32) -> Vector3 {
+    using math;
     if snap > 0 {
         return Vector3 { floor(value.x / snap), floor(value.y / snap), floor(value.z / snap) } * snap;
     }

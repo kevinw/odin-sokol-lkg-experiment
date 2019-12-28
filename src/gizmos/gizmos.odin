@@ -1,15 +1,17 @@
 package gizmos;
 
-using import "core:fmt"
-using import "../math"
+import "../math"
+
+Ray     :: math.Ray;
+Vector2 :: math.Vector2;
 
 @private INF:f32: 99999999999999;
 
 @private V3_ONE  := Vector3 {1, 1, 1};
 @private WHITE   := Vector4 {1, 1, 1, 1};
 @private RED     := Vector4 {1, 0, 0, 1};
-@private GREEN   := Vec4 { 0, 1, 0, 1 };
-@private BLUE    := Vec4 { 0, 0, 1, 1 };
+@private GREEN   := Vector4 { 0, 1, 0, 1 };
+@private BLUE    := Vector4 { 0, 0, 1, 1 };
 @private V3_ZERO := Vector3 {0, 0, 0};
 @private translate_x_arrow, translate_y_arrow:Mesh_Component;
 
@@ -119,8 +121,8 @@ update :: proc(using ctx: ^Context, state: Application_State) {
     clear(&draw_list);
 }
 
-min_vec :: proc (a, b: Vec3) -> Vec3 do return {min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)};
-max_vec :: proc (a, b: Vec3) -> Vec3 do return {max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)};
+min_vec :: proc (a, b: Vector3) -> Vector3 do return {min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)};
+max_vec :: proc (a, b: Vector3) -> Vector3 do return {max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)};
 
 _super_mesh: Mesh;
 draw :: proc(using ctx: ^Context) {
@@ -211,6 +213,8 @@ xform :: proc(using ctx: ^Context, name: string, t: ^Transform) -> bool {
 
 orientation_gizmo :: proc(using ctx: ^Context, name: string, center: Vector3, orientation: ^Vector4)
 {
+    using math;
+
     assert(length2(orientation^) > f32(1e-6));
 
     p := Transform { center, local_toggle ? orientation^ : Vector4 {0, 0, 0, 1}, Vector3{1,1,1}}; // Orientation is local by default
@@ -252,7 +256,7 @@ orientation_gizmo :: proc(using ctx: ^Context, name: string, center: Vector3, or
     activeAxis: Vector3;
     if gizmo.active {
         starting_orientation := local_toggle ? gizmo.original_orientation : Vector4{0, 0, 0, 1};
-        switch gizmo.interaction_mode {
+        #partial switch gizmo.interaction_mode {
             case .Rotate_X: axis_rotation_dragger(ctx, &gizmo, { 1, 0, 0 }, center, starting_orientation, &p.orientation); activeAxis = { 1, 0, 0 };
             case .Rotate_Y: axis_rotation_dragger(ctx, &gizmo, { 0, 1, 0 }, center, starting_orientation, &p.orientation); activeAxis = { 0, 1, 0 };
             case .Rotate_Z: axis_rotation_dragger(ctx, &gizmo, { 0, 0, 1 }, center, starting_orientation, &p.orientation); activeAxis = { 0, 0, 1 };
@@ -307,7 +311,7 @@ orientation_gizmo :: proc(using ctx: ^Context, name: string, center: Vector3, or
 
 }
 
-_draw_interactions :: proc(using ctx: ^Context, gizmo: ^Interaction_State, interactions: []Interact, model_matrix: Mat4) {
+_draw_interactions :: proc(using ctx: ^Context, gizmo: ^Interaction_State, interactions: []Interact, model_matrix: Matrix4) {
     for c in interactions {
         r := Renderable {
             mesh = clone(&mesh_components[c].mesh), // @Leak
@@ -325,6 +329,8 @@ _draw_interactions :: proc(using ctx: ^Context, gizmo: ^Interaction_State, inter
 }
 
 scale_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, center: Vector3, scale: ^Vector3) {
+    using math;
+
     p := Transform { center, orientation, Vector3 { 1, 1, 1 } };
     draw_scale := (active_state.screenspace_scale > 0) ? scale_screenspace(ctx, p.position, active_state.screenspace_scale) : 1;
     id := hash_fnv1a(name);
@@ -364,7 +370,7 @@ scale_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, cen
     }
 
     if gizmo.active {
-        switch (gizmo.interaction_mode) {
+        #partial switch (gizmo.interaction_mode) {
             case .Scale_X: axis_scale_dragger(ctx, &gizmo, { 1,0,0 }, center, scale, active_state.hotkey_ctrl);
             case .Scale_Y: axis_scale_dragger(ctx, &gizmo, { 0,1,0 }, center, scale, active_state.hotkey_ctrl);
             case .Scale_Z: axis_scale_dragger(ctx, &gizmo, { 0,0,1 }, center, scale, active_state.hotkey_ctrl);
@@ -376,6 +382,8 @@ scale_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, cen
 }
 
 position_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, position: ^Vector3) {
+    using math;
+
     p := Transform{position^, local_toggle ? orientation : Vector4{0, 0, 0, 1}, V3_ONE};
     draw_scale:f32 = active_state.screenspace_scale > 0 ? scale_screenspace(ctx, p.position, active_state.screenspace_scale) : 1;
     id := hash_fnv1a(name);
@@ -423,7 +431,7 @@ position_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, 
     if gizmo.active {
         position^ += gizmo.click_offset;
         defer position^ -= gizmo.click_offset;
-        switch gizmo.interaction_mode {
+        #partial switch gizmo.interaction_mode {
             case .Translate_X:   axis_translation_dragger( ctx, &gizmo, axes[0], position);
             case .Translate_Y:   axis_translation_dragger( ctx, &gizmo, axes[1], position);
             case .Translate_Z:   axis_translation_dragger( ctx, &gizmo, axes[2], position);
@@ -450,6 +458,8 @@ position_gizmo :: proc(using ctx: ^Context, name: string, orientation: Vector4, 
 
 @private
 axis_translation_dragger :: proc(using ctx: ^Context, interaction: ^Interaction_State, axis: Vector3, point: ^Vector3) {
+    using math;
+
     if !active_state.mouse_left do return;
 
     // First apply a plane translation dragger with a plane that contains the desired axis and is oriented to face the camera
@@ -463,6 +473,8 @@ axis_translation_dragger :: proc(using ctx: ^Context, interaction: ^Interaction_
 
 @private
 plane_translation_dragger :: proc(using ctx: ^Context, interaction: ^Interaction_State, plane_normal: Vector3, point: ^Vector3) {
+    using math;
+
     // Mouse clicked
     if has_clicked do interaction.original_position = point^;
 
@@ -486,6 +498,8 @@ plane_translation_dragger :: proc(using ctx: ^Context, interaction: ^Interaction
 
 @private
 axis_rotation_dragger :: proc(using ctx: ^Context, gizmo: ^Interaction_State, axis, center: Vector3, start_orientation: Vector4, orientation: ^Vector4) {
+    using math;
+
     if !active_state.mouse_left do return;
 
     original_pose := Transform { gizmo.original_position, start_orientation, Vector3{1,1,1} };
@@ -517,33 +531,34 @@ axis_rotation_dragger :: proc(using ctx: ^Context, gizmo: ^Interaction_State, ax
 
 @private
 axis_scale_dragger :: proc(using ctx: ^Context, interaction: ^Interaction_State, axis, center: Vector3, scale: ^Vector3, uniform: bool) {
+    using math;
+
     if !active_state.mouse_left do return;
 
-    plane_tangent := cross(axis, center - active_state.cam.position);
-    plane_normal := cross(axis, plane_tangent);
+    plane_tangent := math.cross(axis, center - active_state.cam.position);
+    plane_normal := math.cross(axis, plane_tangent);
 
-    distance:Vector3;
+    dist:Vector3;
     if active_state.mouse_left {
         // Define the plane to contain the original position of the object
         plane_point := center;
         ray := active_state.ray;
 
         // If an intersection exists between the ray and the plane, place the object at that point
-        denom := vec_dot(ray.direction, plane_normal);
+        denom := math.vec_dot(ray.direction, plane_normal);
         if abs(denom) == 0 do return;
 
-        t := vec_dot(plane_point - ray.origin, plane_normal) / denom;
+        t := math.vec_dot(plane_point - ray.origin, plane_normal) / denom;
         if t < 0 do return;
 
-        distance = ray.origin + ray.direction * t;
+        dist = ray.origin + ray.direction * t;
     }
 
-    offset_on_axis := (distance - interaction.click_offset) * axis;
+    offset_on_axis := (dist - interaction.click_offset) * axis;
     flush_to_zero(&offset_on_axis);
     new_scale := interaction.original_scale + offset_on_axis;
 
-    if uniform do scale^ = v3(clamp(dot(distance, new_scale), 0.01, 1000));
+    if uniform do scale^ = v3(clamp(dot(dist, new_scale), 0.01, 1000));
     else do scale^ = Vec3 { clamp(new_scale.x, 0.01, 1000), clamp(new_scale.y, 0.01, 1000), clamp(new_scale.z, 0.01, 1000) };
     if active_state.snap_scale != 0 do scale^ = snap(scale^, active_state.snap_scale);
 }
-

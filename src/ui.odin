@@ -3,10 +3,9 @@ package main
 import simgui "../lib/odin-sokol/src/sokol_imgui"
 import imgui "../lib/odin-imgui"
 import sapp "../lib/odin-sokol/src/sokol_app"
-import sg "../lib/odin-sokol/src/sokol_gfx"
 
-using import "core:fmt"
-using import "core:runtime"
+import "core:fmt"
+import "core:runtime"
 import "core:log"
 import "core:mem"
 import "core:strings"
@@ -28,12 +27,12 @@ BEGIN_CHILD :: proc (str_id : string, size : imgui.Vec2 = imgui.Vec2{0,0}, borde
 @private Log_Entry :: struct {
     message: string,
     level: log.Level,
-    location: Source_Code_Location,
+    location: runtime.Source_Code_Location,
 }
 
 @private imgui_log_entries : [dynamic]Log_Entry;
 
-imgui_logger_proc :: proc(data: rawptr, level: log.Level, text: string, options: log.Options, location : Source_Code_Location) {
+imgui_logger_proc :: proc(data: rawptr, level: log.Level, text: string, options: log.Options, location : runtime.Source_Code_Location) {
     append(&imgui_log_entries, Log_Entry {text, level, location});
 }
 
@@ -66,6 +65,7 @@ imgui_console :: proc() {
                 case .Error:
                     imgui.push_style_color(Style_Color.Text, Vec4{1, .4, .4, 1});
                     pop_color = true;
+                case .Debug, .Info, .Fatal:
             }
 
             imgui.text_unformatted(entry.message);
@@ -105,10 +105,10 @@ _imgui_struct_block_field_start :: proc(name: string, typename: string) -> bool 
     // if name != "" {
         header: string;
         if name != "" {
-            header = tprint(name, ": ", typename);
+            header = fmt.tprint(name, ": ", typename);
         }
         else {
-            header = tprint(typename);
+            header = fmt.tprint(typename);
         }
         if imgui.collapsing_header(header) {
             imgui.indent();
@@ -125,12 +125,12 @@ _imgui_struct_block_field_end :: proc(name: string) {
 }
 
 _readonly: bool;
-imgui_struct_ti :: proc(name: string, data: rawptr, ti: ^Type_Info, tags: string = "", do_header := true, type_name: string = "") {
+imgui_struct_ti :: proc(name: string, data: rawptr, ti: ^runtime.Type_Info, tags: string = "", do_header := true, type_name: string = "") {
     imgui.push_id(name);
     defer imgui.pop_id();
 
     if strings.contains(tags, "imgui_readonly") {
-        imgui.label_text(name, tprint(any{data, ti.id}));
+        imgui.label_text(name, fmt.tprint(any{data, ti.id}));
         return;
     }
 
@@ -145,8 +145,8 @@ imgui_struct_ti :: proc(name: string, data: rawptr, ti: ^Type_Info, tags: string
         has_range_constraint = true;
         range_idx := strings.index(tags, "imgui_range");
         assert(range_idx >= 0);
-        range_str := tags[range_idx:];
         /*
+        range_str := tags[range_idx:];
         range_lexer := laas.make_lexer(range_str);
         laas.get_next_token(&range_lexer, nil);
         laas.expect_symbol(&range_lexer, '=');
@@ -163,7 +163,10 @@ imgui_struct_ti :: proc(name: string, data: rawptr, ti: ^Type_Info, tags: string
         range_min = 1;
     }
 
-    switch kind in &ti.variant {
+    using runtime;
+    using fmt;
+
+    #partial switch kind in &ti.variant {
         case Type_Info_Integer: {
             if kind.signed {
                 switch ti.size {
@@ -171,7 +174,7 @@ imgui_struct_ti :: proc(name: string, data: rawptr, ti: ^Type_Info, tags: string
                     case 4: new_data := cast(i32)(cast(^i32)data)^; imgui.input_int(name, &new_data); (cast(^i32)data)^ = cast(i32)new_data;
                     case 2: new_data := cast(i32)(cast(^i16)data)^; imgui.input_int(name, &new_data); (cast(^i16)data)^ = cast(i16)new_data;
                     case 1: new_data := cast(i32)(cast(^i8 )data)^; imgui.input_int(name, &new_data); (cast(^i8 )data)^ = cast(i8 )new_data;
-                    case: assert(false, tprint(ti.size));
+                    case: assert(false, fmt.tprint(ti.size));
                 }
             }
             else {
@@ -180,7 +183,7 @@ imgui_struct_ti :: proc(name: string, data: rawptr, ti: ^Type_Info, tags: string
                     case 4: new_data := cast(i32)(cast(^u32)data)^; imgui.input_int(name, &new_data); (cast(^u32)data)^ = cast(u32)new_data;
                     case 2: new_data := cast(i32)(cast(^u16)data)^; imgui.input_int(name, &new_data); (cast(^u16)data)^ = cast(u16)new_data;
                     case 1: new_data := cast(i32)(cast(^u8 )data)^; imgui.input_int(name, &new_data); (cast(^u8 )data)^ = cast(u8 )new_data;
-                    case: assert(false, tprint(ti.size));
+                    case: assert(false, fmt.tprint(ti.size));
                 }
             }
         }
@@ -189,7 +192,7 @@ imgui_struct_ti :: proc(name: string, data: rawptr, ti: ^Type_Info, tags: string
                 case 8: {
                     new_data := cast(f32)(cast(^f64)data)^;
                     imgui.push_item_width(100);
-                    imgui.input_float(tprint(name, "##non_range"), &new_data);
+                    imgui.input_float(fmt.tprint(name, "##non_range"), &new_data);
                     imgui.pop_item_width();
                     if has_range_constraint {
                         imgui.same_line();
@@ -202,7 +205,7 @@ imgui_struct_ti :: proc(name: string, data: rawptr, ti: ^Type_Info, tags: string
                 case 4: {
                     new_data := cast(f32)(cast(^f32)data)^;
                     imgui.push_item_width(100);
-                    imgui.input_float(tprint(name, "##non_range"), &new_data);
+                    imgui.input_float(fmt.tprint(name, "##non_range"), &new_data);
                     imgui.pop_item_width();
                     if has_range_constraint {
                         imgui.same_line();
@@ -212,7 +215,7 @@ imgui_struct_ti :: proc(name: string, data: rawptr, ti: ^Type_Info, tags: string
                     }
                     (cast(^f32)data)^ = cast(f32)new_data;
                 }
-                case: assert(false, tprint(ti.size));
+                case: assert(false, fmt.tprint(ti.size));
             }
         }
         case Type_Info_String: {
@@ -275,7 +278,6 @@ imgui_struct_ti :: proc(name: string, data: rawptr, ti: ^Type_Info, tags: string
         case Type_Info_Enum: {
             if len(kind.values) > 0 {
                 current_item_index : i32 = -1;
-                #complete
                 switch _ in kind.values[0] {
                     case u8:        for v, idx in kind.values { if (cast(^u8     )data)^ == v.(u8)      { current_item_index = cast(i32)idx; break; } }
                     case u16:       for v, idx in kind.values { if (cast(^u16    )data)^ == v.(u16)     { current_item_index = cast(i32)idx; break; } }
@@ -371,7 +373,7 @@ imgui_struct_ti :: proc(name: string, data: rawptr, ti: ^Type_Info, tags: string
             }
 
             item := cast(i32)current_tag;
-            v := kind.variants;
+            //v := kind.variants;
             variant_names: [dynamic]string;
             append(&variant_names, "<none>");
             for v in kind.variants {

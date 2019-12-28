@@ -1,7 +1,7 @@
 package shader_meta;
 
 import sg "../../lib/odin-sokol/src/sokol_gfx"
-using import "../math"
+import "../math"
 
 /*
     #version:1# (machine generated, don't edit!)
@@ -75,7 +75,7 @@ ATTR_vs_st_uv :: 1;
 } */
 SLOT_st_fs_uniforms :: 0;
 st_fs_uniforms :: struct #align 16 {
-    iResolution: Vector3,
+    iResolution: math.Vector3,
     iTime: f32,
     iTimeDelta: f32,
     iFrame: i32,
@@ -83,10 +83,10 @@ st_fs_uniforms :: struct #align 16 {
     _pad_28: [4]u8,
     iChannelTime: [4]f32,
     _pad_48: [48]u8,
-    iChannelResolution: [4]Vector3,
+    iChannelResolution: [4]math.Vector3,
     _pad_144: [16]u8,
-    iMouse: Vector4,
-    iDate: Vector4,
+    iMouse: math.Vector4,
+    iDate: math.Vector4,
     iSampleRate: f32,
 };
 when SOKOL_D3D11 {
@@ -436,9 +436,6 @@ shadertoy_shader_desc_hlsl5 := sg.Shader_Desc {
   0, /* _end_canary */
 };
 } // SOKOL_D3D11
-// #if !defined(SOKOL_GFX_INCLUDED)
-//  #error "Please include sokol_gfx.h before shadertoy.odin"
-// #endif
 shadertoy_shader_filenames := [?]string {
   "shadertoy.glsl",
   "common.glsl",

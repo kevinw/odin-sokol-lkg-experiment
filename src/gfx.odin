@@ -1,7 +1,7 @@
 package main
 
 import "core:intrinsics"
-using import "core:fmt"
+import "core:fmt"
 import sg "../lib/odin-sokol/src/sokol_gfx"
 import "./watcher"
 import "core:log"
@@ -156,8 +156,8 @@ on_shader_changed :: proc(notification: watcher.Change_Notification) {
             continue;
         }
 
-        vert_filename := tprintf("temp_shaders/%s_vs.hlsl", program_name);
-        frag_filename := tprintf("temp_shaders/%s_fs.hlsl", program_name);
+        vert_filename := fmt.tprintf("temp_shaders/%s_vs.hlsl", program_name);
+        frag_filename := fmt.tprintf("temp_shaders/%s_fs.hlsl", program_name);
         vert, ok1 := os.read_entire_file(vert_filename);
         frag, ok2 := os.read_entire_file(frag_filename);
 
@@ -258,7 +258,7 @@ get_placeholder_image :: proc(type: Placeholder_Texture) -> sg.Image {
         did_init_placeholders = true;
     }
 
-    #complete switch type {
+    switch type {
         case .WHITE: return white;
         case .BLACK: return black;
         case .NORMALS: return normals;

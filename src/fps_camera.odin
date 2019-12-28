@@ -1,7 +1,12 @@
 package main
 
-using import "math"
+import m "math"
 import sapp "../lib/odin-sokol/src/sokol_app"
+
+Vector4 :: m.Vector4;
+Vector2 :: m.Vector2;
+Matrix4 :: m.Matrix4;
+Ray :: m.Ray;
 
 FPS_Camera :: struct {
     position: Vector3,
@@ -28,20 +33,20 @@ init :: proc(using Camera: ^FPS_Camera) {
     far = 1000.0;
 }
 
-screen_to_world_ray :: proc(using cam: ^FPS_Camera, pixel: Vector2) -> Ray {
-    viewport_x0:f32= 0; // TODO
-    viewport_y0:f32= 0; // TODO
+screen_to_world_ray :: proc(using cam: ^FPS_Camera, pixel: m.Vector2) -> Ray {
+    viewport_x0:f32 = 0; // TODO
+    viewport_y0:f32 = 0; // TODO
     viewport_width := cast(f32)sapp.width();
     viewport_height := cast(f32)sapp.height();
 
     x := 2 * (pixel.x - viewport_x0) / viewport_width - 1;
     y := 1 - 2 * (pixel.y - viewport_y0) / viewport_height;
 
-    view_proj := mul(proj, view); // TODO: don't do this more than once a frame
+    view_proj := m.mul(proj, view); // TODO: don't do this more than once a frame
 
     inv_view_proj:Matrix4 = inverse(view_proj);
-    p0:Vector4 = mul(inv_view_proj, Vector4{x, y, -1, 1});
-    p1:Vector4 = mul(inv_view_proj, Vector4{x, y, +1, 1});
+    p0:Vector4 = m.mul(inv_view_proj, Vector4{x, y, -1, 1});
+    p1:Vector4 = m.mul(inv_view_proj, Vector4{x, y, +1, 1});
 
     return { position, v3(p1) * p0.w - v3(p0) * p1.w };
 }
@@ -53,7 +58,7 @@ update :: proc(using camera: ^FPS_Camera, dt: f32, input_state: Input_State, asp
         angle += Vector2{cast(f32)move_x, cast(f32)move_y} * mouse_speed;
     }
 
-    proj = perspective(deg2rad(fov), aspect, near, far);
+    proj = m.perspective(deg2rad(fov), aspect, near, far);
     view = rotate_matrix(Vector3{angle.y, angle.x, 0});
 
     right   = v3(view[0][0], view[1][0], view[2][0]);
@@ -69,10 +74,12 @@ update :: proc(using camera: ^FPS_Camera, dt: f32, input_state: Input_State, asp
         if input_state.q                      do position += up * dt * speed;
     }
 
-    view = mul(view, translate_matrix4(position));
+    view = m.mul(view, translate_matrix4(position));
 }
 
 rotate_matrix :: proc(rotation: Vector3) -> Matrix4 {
+    using m;
+
     cosX := cos(deg2rad(rotation.x));
     cosY := cos(deg2rad(rotation.y));
     cosZ := cos(deg2rad(rotation.z));

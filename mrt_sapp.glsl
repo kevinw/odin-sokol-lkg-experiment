@@ -2,8 +2,8 @@
 //------------------------------------------------------------------------------
 //  shaders for mrt-sapp sample
 //------------------------------------------------------------------------------
-@ctype mat4 Mat4
-@ctype vec2 Vec2
+@ctype mat4 math.Mat4
+@ctype vec2 math.Vec2
 
 // shaders for offscreen-pass rendering
 @vs vs_offscreen

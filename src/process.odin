@@ -1,9 +1,8 @@
 package main
 
 import "core:fmt"
-using import "core:sys/win32"
+import "core:sys/win32"
 import "core:strings";
-import "core:os"
 
 subprocess :: proc(format := "", args: ..any) -> bool {
     cmd := fmt.tprintf(format, ..args);

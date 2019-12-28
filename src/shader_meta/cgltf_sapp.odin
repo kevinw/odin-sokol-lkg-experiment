@@ -1,7 +1,7 @@
 package shader_meta;
 
 import sg "../../lib/odin-sokol/src/sokol_gfx"
-using import "../math"
+import "../math"
 
 /*
     #version:1# (machine generated, don't edit!)
@@ -123,22 +123,22 @@ SLOT_occlusion_texture :: 3;
 SLOT_emissive_texture :: 4;
 SLOT_vs_params :: 0;
 vs_params :: struct #align 16 {
-    view_proj_array: [45]Matrix4,
-    eye_pos: Vector3,
+    view_proj_array: [45]math.Matrix4,
+    eye_pos: math.Vector3,
     num_instances: i32,
-    instance_model_matrices: [100]Matrix4,
+    instance_model_matrices: [100]math.Matrix4,
 };
 SLOT_light_params :: 0;
 light_params :: struct #align 16 {
-    light_pos: Vector3,
+    light_pos: math.Vector3,
     light_range: f32,
-    light_color: Vector3,
+    light_color: math.Vector3,
     light_intensity: f32,
 };
 SLOT_metallic_params :: 1;
 metallic_params :: struct #align 16 {
-    base_color_factor: Vector4,
-    emissive_factor: Vector3,
+    base_color_factor: math.Vector4,
+    emissive_factor: math.Vector3,
     metallic_factor: f32,
     roughness_factor: f32,
 };
@@ -1236,9 +1236,6 @@ cgltf_metallic_shader_desc_hlsl5 := sg.Shader_Desc {
   0, /* _end_canary */
 };
 } // SOKOL_D3D11
-// #if !defined(SOKOL_GFX_INCLUDED)
-//  #error "Please include sokol_gfx.h before cgltf_sapp.odin"
-// #endif
 cgltf_metallic_shader_filenames := [?]string {
   "cgltf_sapp.glsl",
   "common.glsl",

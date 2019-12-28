@@ -1,7 +1,7 @@
 package shader_meta;
 
 import sg "../../lib/odin-sokol/src/sokol_gfx"
-using import "../math"
+import "../math"
 
 /*
     #version:1# (machine generated, don't edit!)
@@ -97,9 +97,9 @@ lkg_fs_uniforms :: struct #align 16 {
     ri: i32,
     bi: i32,
     _pad_28: [4]u8,
-    tile: Vector4,
-    viewPortion: Vector4,
-    aspect: Vector4,
+    tile: math.Vector4,
+    viewPortion: math.Vector4,
+    aspect: math.Vector4,
     debugTile: i32,
     debug: i32,
 };
@@ -635,9 +635,6 @@ lenticular_shader_desc_hlsl5 := sg.Shader_Desc {
   0, /* _end_canary */
 };
 } // SOKOL_D3D11
-// #if !defined(SOKOL_GFX_INCLUDED)
-//  #error "Please include sokol_gfx.h before lenticular.odin"
-// #endif
 lenticular_shader_filenames := [?]string {
   "lenticular.glsl",
   "common.glsl",

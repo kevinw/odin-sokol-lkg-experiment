@@ -1,7 +1,7 @@
 package shader_meta;
 
 import sg "../../lib/odin-sokol/src/sokol_gfx"
-using import "../math"
+import "../math"
 
 /*
     #version:1# (machine generated, don't edit!)
@@ -134,11 +134,11 @@ SLOT_tex0 :: 0;
 SLOT_tex :: 0;
 SLOT_Offscreen_Params :: 0;
 Offscreen_Params :: struct #align 16 {
-    mvps: [45]Mat4,
+    mvps: [45]math.Mat4,
 };
 SLOT_FSQ_Params :: 0;
 FSQ_Params :: struct #align 16 {
-    offset: Vec2,
+    offset: math.Vec2,
 };
 SLOT_DebugUniforms :: 0;
 DebugUniforms :: struct #align 16 {
@@ -910,9 +910,6 @@ offscreen_shader_desc_hlsl5 := sg.Shader_Desc {
   0, /* _end_canary */
 };
 } // SOKOL_D3D11
-// #if !defined(SOKOL_GFX_INCLUDED)
-//  #error "Please include sokol_gfx.h before mrt_sapp.odin"
-// #endif
 dbg_shader_filenames := [?]string {
   "mrt_sapp.glsl",
 };

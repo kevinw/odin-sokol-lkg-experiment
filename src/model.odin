@@ -2,13 +2,12 @@ package main
 
 import sg "../lib/odin-sokol/src/sokol_gfx"
 import ai "../lib/assimp"
-using import "core:fmt"
-using import "core:strings"
-using import "core:runtime"
-using import "./math"
+import "core:fmt"
+import "core:runtime"
+import "core:strings"
+import "./math"
 import "core:mem"
 import "core:log"
-import "./stacktrace"
 
 import "./shader_meta"
 
@@ -35,7 +34,7 @@ load_model_from_file :: proc(path: string) -> Model {
 		// cast(u32) Flip_Winding_Order |
 		   cast(u32) Flip_UVs
     );
-	assert(scene != nil, tprint(ai.get_error_string()));
+	assert(scene != nil, fmt.tprint(ai.get_error_string()));
 	defer ai.release_import(scene);
 
 	model := _load_model_internal(scene);
@@ -53,7 +52,7 @@ Mesh :: struct {
     //vao: VAO,
     //vbo: VBO,
     //ibo: EBO,
-    vertex_type: ^Type_Info,
+    vertex_type: ^runtime.Type_Info,
 
     index_count:  int,
     vertex_count: int,
@@ -180,7 +179,7 @@ _load_model_internal :: proc(scene: ^ai.Scene, loc := #caller_location) -> Model
 				texture_coord = Vec3{texture_coords[i].x, texture_coords[i].y, texture_coords[i].z};
 			}
 
-			pos := mul(mesh_transform, Vec4{position.x, position.y, position.z, 1});
+			pos := math.mul(mesh_transform, math.Vec4{position.x, position.y, position.z, 1});
 			vert := Vertex3D{
 				Vec3{pos.x, pos.y, pos.z},
 				texture_coord,
@@ -259,7 +258,7 @@ _load_model_internal :: proc(scene: ^ai.Scene, loc := #caller_location) -> Model
 			skin
 		);
 
-		read_node_hierarchy(&model.meshes[idx], scene.root_node, identity(Mat4), nil);
+		read_node_hierarchy(&model.meshes[idx], scene.root_node, math.identity(math.Mat4), nil);
 	}
 
 	return model;
@@ -269,7 +268,7 @@ read_node_hierarchy :: proc(using mesh: ^Mesh, ai_node : ^ai.Node, parent_transf
 	node_name := strings.clone(strings.string_from_ptr(&ai_node.name.data[0], cast(int)ai_node.name.length));
 
 	node_transform := ai_to_wb(ai_node.transformation);
-	global_transform := mul(parent_transform, node_transform);
+	global_transform := math.mul(parent_transform, node_transform);
 
 	node := Node {
 				node_name,
@@ -427,7 +426,7 @@ get_pipeline_and_bindings :: proc(mesh: ^Mesh, shader: sg.Shader) -> (sg.Pipelin
     return pipeline, bindings;
 }
 
-draw_model :: proc(model: ^Model, shader: sg.Shader, position: Vector3, rotation: Vector4, scale: Vector3) {
+draw_model :: proc(model: ^Model, shader: sg.Shader, position: math.Vector3, rotation: math.Vector4, scale: math.Vector3) {
     for _, i in model.meshes {
         mesh := &model.meshes[i];
 

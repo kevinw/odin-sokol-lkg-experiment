@@ -1,5 +1,5 @@
-@ctype vec2 Vector2
-@ctype vec3 Vector3
-@ctype vec4 Vector4
-@ctype mat4 Matrix4
+@ctype vec2 math.Vector2
+@ctype vec3 math.Vector3
+@ctype vec4 math.Vector4
+@ctype mat4 math.Matrix4
 
