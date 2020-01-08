@@ -28,17 +28,17 @@ Game_Mode :: enum {
 
 game_mode: Game_Mode = .None;
 
-OSC :: true;
+OSC :: false;
+LKG_ASPECT:f32 = 1;
+DEFAULT_CAMERA_FOV:f32 = 14.0;
+STACK_TRACES :: true;
+LEAK_CHECK :: false;
+
 
 when OSC {
     import "osc"
     import "core:thread"
 }
-
-LKG_ASPECT:f32 = 1;
-DEFAULT_CAMERA_FOV:f32 = 14.0;
-STACK_TRACES :: true;
-LEAK_CHECK :: false;
 
 when STACK_TRACES {
     import "stacktrace"
@@ -936,6 +936,14 @@ frame_callback :: proc() {
         }
     }
 
+    // draw word tiles
+    {
+        sgl.defaults();
+        sgl.push_pipeline();
+        defer sgl.pop_pipeline();
+        draw_level();
+    }
+
     // DRAW UI
     simgui.render();
 
@@ -1105,7 +1113,10 @@ passthrough_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_M
 passthrough_allocator: mem.Allocator;
 
 main :: proc() {
-    // json_to_shader_desc("vertcolor_vs.output.json");
+    // WORDS
+    load_word_list();
+    init_level();
+    force_num_views = 1;
 
     main_thread_logger = log.create_multi_logger(
         log.create_console_logger(),
