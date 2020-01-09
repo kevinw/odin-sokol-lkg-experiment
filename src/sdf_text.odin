@@ -143,7 +143,7 @@ sdf_text_render :: proc(view_proj_array: [MAXIMUM_VIEWS]Matrix4, model_matrix: M
     sg.draw(0, len(vertex_elems), num_views);
 }
 
-draw_text :: proc(str: string, size: f32, pos: Vector3, gamma, buf: f32) {
+draw_text :: proc(flip_y: bool, str: string, size: f32, pos: Vector3, gamma, buf: f32) {
     using text;
 
     needs_update = true;
@@ -157,12 +157,12 @@ draw_text :: proc(str: string, size: f32, pos: Vector3, gamma, buf: f32) {
         strings.reset_builder(&string_buf);
         strings.write_rune(&string_buf, r);
         r_str := strings.to_string(string_buf);
-        draw_glyph(r_str, &pen, size, &vertex_elems, gamma, buf);
+        draw_glyph(flip_y, r_str, &pen, size, &vertex_elems, gamma, buf);
     }
 
 }
 
-draw_glyph :: proc(character: string, pen: ^Vector3, size: f32, vertex_elements: ^[dynamic]SDF_Text_Vert, gamma, buf: f32) {
+draw_glyph :: proc(flip_y: bool, character: string, pen: ^Vector3, size: f32, vertex_elements: ^[dynamic]SDF_Text_Vert, gamma, buf: f32) {
     metric, found := text.metrics.chars[character];
     if !found do return;
 
@@ -181,6 +181,14 @@ draw_glyph :: proc(character: string, pen: ^Vector3, size: f32, vertex_elements:
     pos_x := cast(f32)metric.pos_x;
     pos_y := cast(f32)metric.pos_y;
 
+    pos_y_0 := pos_y;
+    pos_y_1 := pos_y + height;
+
+    if flip_y {
+        pos_y_1 = pos_y;
+        pos_y_0 = pos_y + height;
+    }
+
     if width > 0 && height > 0 {
         width += buffer * 2.0;
         height += buffer * 2.0;
@@ -198,18 +206,18 @@ draw_glyph :: proc(character: string, pen: ^Vector3, size: f32, vertex_elements:
         V :: SDF_Text_Vert;
         append(vertex_elements, 
             V{ { (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y0), z }, 
-               { pos_x, pos_y + height, }, attribs },
+               { pos_x, pos_y_1, }, attribs },
             V{ { (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y0), z },
-               { pos_x + width, pos_y + height }, attribs },
+               { pos_x + width, pos_y_1 }, attribs },
             V{ { (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y1), z },
-                { pos_x, pos_y }, attribs },
+                { pos_x, pos_y_0 }, attribs },
 
             V{ { (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y0), z },
-               { pos_x + width, pos_y + height }, attribs },
+               { pos_x + width, pos_y_1 }, attribs },
             V{ { (factor * (pen.x + ((h_bearing_x - buffer) * scale))), (factor * y1), z },
-               { pos_x, pos_y }, attribs },
+               { pos_x, pos_y_0 }, attribs },
             V{ { (factor * (pen.x + ((h_bearing_x - buffer + width) * scale))), (factor * y1), z },
-               { pos_x + width, pos_y }, attribs },
+               { pos_x + width, pos_y_0 }, attribs },
         );
     }
 

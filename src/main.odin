@@ -59,7 +59,7 @@ draw_mesh := true;
 draw_quad := false;
 draw_grid_lines := false;
 draw_gizmos := false;
-draw_sdf_text := true;
+draw_sdf_text := false;
 mesh_rotate_speed:f32 = 12.0;
 
 ANIM_CURVE_WIP :: false;
@@ -73,18 +73,6 @@ MAX_FILE_SIZE :: 10 * MEGABYTE;
 MSAA_SAMPLE_COUNT :: 1; // anything > 1 causes an assert in sokol_gfx, prob due to my unfinished Render Target Array changes....
 
 sfetch_buffers: [SFETCH_NUM_CHANNELS][SFETCH_NUM_LANES][MAX_FILE_SIZE]u8;
-
-Input_State :: struct {
-	right, left, up, down: bool,
-	w, a, s, d, q, e, r, t, g, l, p: bool,
-    num_0, num_1, num_2, num_3: bool,
-    left_mouse, right_mouse: bool,
-    left_ctrl, left_alt, left_shift: bool,
-    osc_move: Vector2,
-    osc_rotate: Vector3,
-}
-
-input_state := Input_State {};
 
 Change :: struct { val, old_val: any };
 
@@ -397,10 +385,10 @@ init_callback :: proc() {
 
     // create point light
     state.point_light = {
-        light_pos = Vector3{10.0, 10.0, 10.0},
-        light_range = 100.0,
-        light_color = Vector3{1000.0, 1000.0, 1000.0},
-        light_intensity = 1.0
+        light_pos = Vector3{10, 10, 10},
+        light_range = 100,
+        light_color = Vector3{1000, 1000, 1000},
+        light_intensity = 1
     };
 
     // request the mesh GLTF file
@@ -438,8 +426,8 @@ init_callback :: proc() {
 
         C :: 0.6;
         vertices := [?]Vertex{
-            {{+C, +C, +C}, {1.0, 0.0}}, {{+C, -C, +C}, {0.0, 1.0}}, {{-C, -C, +C}, {0.0, 0.0}},
-            {{-C, -C, +C}, {0.0, 0.0}}, {{-C, +C, +C}, {0.0, 0.0}}, {{+C, +C, +C}, {1.0, 0.0}},
+            {{+C, +C, +C}, {1, 0}}, {{+C, -C, +C}, {0, 1}}, {{-C, -C, +C}, {0, 0}},
+            {{-C, -C, +C}, {0, 0}}, {{-C, +C, +C}, {0, 0}}, {{+C, +C, +C}, {1, 0}},
         };
 
         state.bind.vertex_buffers[0] = sg.make_buffer({
@@ -554,7 +542,6 @@ frame_callback :: proc() {
     sfetch.dowork();
     if !_did_load do return;
 
-
 	//
 	// TIME
 	//
@@ -633,6 +620,8 @@ frame_callback :: proc() {
     }
     */
 
+    update_level();
+
     // update camera
     state.camera.fov = editor_settings.fov;
     do_camera_movement(&state.camera, input_state, dt, 2.0, 4.0, 1.0);
@@ -655,6 +644,10 @@ frame_callback :: proc() {
     //
     {
         //imgui.show_demo_window();
+
+        PAD :: 40;
+        W :: 400;
+        imgui.set_next_window_pos({f32(sapp.width() - W - PAD), f32(PAD)}, .FirstUseEver);
 
         if imgui.begin("Inspector") {
             if imgui.button("Save") {
@@ -785,6 +778,7 @@ frame_callback :: proc() {
 
             sg.draw(0, 6, num_views());
         }
+
         {
             // post filter pass
             blit(&postfilter_blit, bokeh_pass_desc.color_attachments[0].image);
@@ -813,7 +807,7 @@ frame_callback :: proc() {
                 factor := f32(i)/f32(num_layers);
                 layer_buf := lerp(buf, lerp(buf, 1.0, buf_falloff), factor);
                 z := z_start - factor * z_thickness;
-                draw_text(txt, y, v3(f32(0), y, z), gamma, layer_buf);
+                draw_text(false, txt, y, v3(f32(0), y, z), gamma, layer_buf);
             }
         }
 
@@ -937,18 +931,15 @@ frame_callback :: proc() {
     }
 
     // draw word tiles
-    {
-        sgl.defaults();
-        sgl.push_pipeline();
-        defer sgl.pop_pipeline();
-        draw_level();
-    }
+    draw_level();
 
     // DRAW UI
     simgui.render();
 
     sg.end_pass();
 	sg.commit();
+
+    _last_input_state = input_state;
 }
 
 toggle_fullscreen :: proc() {
