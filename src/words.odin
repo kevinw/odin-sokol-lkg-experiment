@@ -33,9 +33,13 @@ grid_set :: inline proc(pos: [2]i16, cell: Cell) {
     level.grid[pos.y * level.w + pos.x] = cell;
 }
 
-grid_get :: inline proc(pos: [2]i16) -> Cell {
+grid_get_pos :: inline proc(pos: [2]i16) -> Cell {
     return level.grid[pos.y * level.w + pos.x];
 }
+
+grid_get_xy :: inline proc(x, y: i16) -> Cell do return grid_get_pos([2]i16 {x, y});
+
+grid_get :: proc { grid_get_pos, grid_get_xy };
 
 init_level :: proc() {
     using level;
@@ -109,14 +113,34 @@ check_for_words :: proc() {
     using level;
 
     letters := make([dynamic]Letter, context.temp_allocator);
+    defer delete(letters);
 
     // check horizontal runs
     for y in 0..<h {
         min_index:i16 = -1;
         for x in 0..<w {
-            v := grid_get([2]i16 {x, y});
-            if letter, ok := v.(Letter); ok {
+            if letter, ok := grid_get(x, y).(Letter); ok {
                 if min_index == -1 do min_index = x;
+                append(&letters, letter);
+            } else {
+                // TODO: check end (in case the last thing is a letter)
+                if min_index != -1 {
+                    check_letters(letters[:]);
+                    clear(&letters);
+                    min_index = -1;
+                }
+            }
+        }
+    }
+
+    clear(&letters);
+
+    // check vertical runs
+    for x in 0..<w {
+        min_index:i16 = -1;
+        for y in 0..<h {
+            if letter, ok := grid_get(x, y).(Letter); ok {
+                if min_index == -1 do min_index = y;
                 append(&letters, letter);
             } else {
                 // TODO: check end (in case the last thing is a letter)
@@ -135,7 +159,9 @@ check_letters :: proc(letters: []Letter) {
     for letter in letters {
         strings.write_byte(&builder, letter.char);
     }
-    fmt.println(strings.to_string(builder));
+
+    word := strings.to_string(builder);
+    fmt.println("is word? ", word, word in word_list);
 }
 
 update_level :: proc() {
