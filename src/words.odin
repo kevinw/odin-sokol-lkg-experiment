@@ -5,6 +5,7 @@ import sapp "../lib/odin-sokol/src/sokol_app"
 
 import "./math"
 import "core:fmt"
+import "core:log"
 import "core:os"
 import "core:math/rand"
 import "core:strings"
@@ -88,15 +89,15 @@ try_push :: proc(pos: [2]i16, delta: [2]i16) -> bool {
         case Wall, Player:
             return false;
         case Letter:
-            fmt.println("trying to push Letter ", cast(rune)v.char);
+            log.info("trying to push Letter %v", cast(rune)v.char);
 
             past := new_pos + delta;
             switch past_v in grid[past.y * w + past.x] {
                 case Letter, Player, Wall:
-                    fmt.println("...but cannot, it is blocked");
+                    log.info("...but cannot, it is blocked");
                     return false;
                 case None:
-                    fmt.println("...success! moving ", v, " into ", past);
+                    log.info("...success! moving %v into %v", v, past);
                     grid_set(past, v);
             }
     }
@@ -161,7 +162,7 @@ check_letters :: proc(letters: []Letter) {
     }
 
     word := strings.to_string(builder);
-    fmt.println("is word? ", word, word in word_list);
+    log.info("is word? %v %v", word, word in word_list);
 }
 
 update_level :: proc() {
