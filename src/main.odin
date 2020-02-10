@@ -19,6 +19,7 @@ import imgui "../lib/odin-imgui"
 import "../lib/wbml"
 import "../lib/basisu"
 import "./watcher"
+import "../lib/jcl"
 
 Game_Mode :: enum {
     None,
@@ -290,6 +291,8 @@ init_callback :: proc() {
 
     watcher._setup_notification(".");
 
+    jcl.begin();
+
     state.auto_rotate = true;
     editor_settings = editor_settings_defaults();
 
@@ -392,8 +395,8 @@ init_callback :: proc() {
     };
 
     // request the mesh GLTF file
-    //gltf_path:cstring = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf";
-    gltf_path:cstring = "resources/gltf/Duck/Duck.gltf";
+    gltf_path:cstring = "resources/gltf/DamagedHelmet/DamagedHelmet.gltf";
+    //gltf_path:cstring = "resources/gltf/Duck/Duck.gltf";
     //gltf_path:cstring = "resources/gltf/Drevo/scene.gltf";
 
     sfetch.send({
@@ -541,6 +544,16 @@ frame_callback :: proc() {
 
     sfetch.dowork();
     if !_did_load do return;
+
+    {
+        state: jcl.Joycon_State;
+        if jcl.joycon_state(0, .LEFT, &state) {
+            fmt.println(state);
+        }
+        if jcl.joycon_state(0, .RIGHT, &state) {
+            fmt.println(state);
+        }
+    }
 
 	//
 	// TIME
@@ -976,6 +989,8 @@ toggle_fullscreen :: proc() {
 }
 
 cleanup :: proc() {
+    jcl.cleanup();
+
     when OSC {
         if osc_enabled {
             stop_osc_thread();
@@ -1111,7 +1126,7 @@ main :: proc() {
 
     main_thread_logger = log.create_multi_logger(
         log.create_console_logger(),
-        log.Logger { imgui_logger_proc, nil, nil }
+        log.Logger { imgui_logger_proc, nil, nil, nil }
     );
 
     state.depth_of_field.enabled = true; // TODO: have a state init function
