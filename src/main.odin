@@ -55,8 +55,8 @@ import "./shader_meta";
 
 osc_enabled := true;
 
-load_assimp_model := false;
-draw_mesh := true;
+load_assimp_model := true;
+draw_mesh := false;
 draw_quad := false;
 draw_grid_lines := false;
 draw_gizmos := false;
@@ -298,6 +298,7 @@ init_callback :: proc() {
 
     hp_infos:[]Display_Info;
     hp_connected, hp_infos = holoplaycore_init();
+    fmt.println(hp_infos[0]);
 
     if len(hp_infos) == 0 do hp_connected = false;
     hp_info = hp_connected ? hp_infos[0] : STOCK_DISPLAY_INFO;
@@ -521,7 +522,7 @@ init_callback :: proc() {
     log.info("init callback has finished.");
 
     if load_assimp_model {
-        state.assimp_model = load_model_from_file("resources/models/box.obj");
+        state.assimp_model = load_model_from_file("resources/models/tree-elm-low-poly.fbx");
     }
 }
 

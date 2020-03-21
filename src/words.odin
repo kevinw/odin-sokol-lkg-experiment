@@ -187,68 +187,71 @@ draw_level :: proc() {
 
     tw, th :f32 = 40, 40;
 
-    sgl.defaults();
-    sgl.push_pipeline();
-    defer sgl.pop_pipeline();
-    sgl.viewport(0, 0, cast(i32)sapp.width(), cast(i32)sapp.height(), true);
-    sgl.ortho(0, cast(f32)sapp.width(), cast(f32)sapp.height(), 0, -10, 10);
-    vp := math.ortho3d(0, cast(f32)sapp.width(), cast(f32)sapp.height(), 0, -10, 10);
-    defer sgl.draw();
-
-    sgl.begin_quads();
-    defer sgl.end();
-
     builder := strings.make_builder();
     defer strings.destroy_builder(&builder);
 
-    for y in 0..<h {
-        for x in 0..<w {
-            cell := grid[x + y * w];
-            r, g, b: u8;
-            debug_char := " ";
-            empty := false;
-            is_letter := false;
-            switch v in cell {
-                case None:
-                    empty = true;
-                case Wall:
-                    r, g, b = 255, 0, 0;
-                    debug_char = "*";
-                case Letter:
-                    r, g, b = 128, 128, 128;
-                    strings.reset_builder(&builder);
-                    strings.write_byte(&builder, v.char);
-                    debug_char = strings.to_string(builder);
-                    is_letter = true;
-                case Player:
-                    r, g, b = 0, 0, 255;
-                    debug_char = "@";
+    vp := math.ortho3d(0, cast(f32)sapp.width(), cast(f32)sapp.height(), 0, -10, 10);
+
+    if true {
+        sgl.defaults();
+        sgl.push_pipeline();
+        defer sgl.pop_pipeline();
+        sgl.viewport(0, 0, cast(i32)sapp.width(), cast(i32)sapp.height(), true);
+        sgl.ortho(0, cast(f32)sapp.width(), cast(f32)sapp.height(), 0, -10, 10);
+
+        sgl.begin_quads();
+        defer sgl.end();
+        defer sgl.draw();
+
+        for y in 0..<h {
+            for x in 0..<w {
+                cell := grid[x + y * w];
+                r, g, b: u8;
+                debug_char := " ";
+                empty := false;
+                is_letter := false;
+                switch v in cell {
+                    case None:
+                        empty = true;
+                    case Wall:
+                        r, g, b = 255, 0, 0;
+                        debug_char = "*";
+                    case Letter:
+                        r, g, b = 128, 128, 128;
+                        strings.reset_builder(&builder);
+                        strings.write_byte(&builder, v.char);
+                        debug_char = strings.to_string(builder);
+                        is_letter = true;
+                    case Player:
+                        r, g, b = 0, 0, 255;
+                        debug_char = "@";
+                }
+
+                if !_did_draw_text {
+                    fmt.printf("%s", debug_char);
+                }
+
+                if !empty {
+                    xf, yf := f32(x), f32(y);
+
+                    sgl.c3b(r, g, b);
+                    sgl.v2f(xf * tw, yf * th);
+                    sgl.v2f(xf * tw + tw, yf * th);
+                    sgl.v2f(xf * tw + tw, yf * th + th);
+                    sgl.v2f(xf * tw, yf * th + th);
+                    if is_letter {
+                        gamma := editor_settings.sdftext.gamma;
+                        layer_buf := editor_settings.sdftext.buf;
+                        draw_text(true, debug_char, th, math.Vector3 { xf * tw, yf * th, -0.1 }, gamma, layer_buf);
+                    }
+                }
             }
 
             if !_did_draw_text {
-                fmt.printf("%s", debug_char);
-            }
-
-            if !empty {
-                xf, yf := f32(x), f32(y);
-
-                sgl.c3b(r, g, b);
-                sgl.v2f(xf * tw, yf * th);
-                sgl.v2f(xf * tw + tw, yf * th);
-                sgl.v2f(xf * tw + tw, yf * th + th);
-                sgl.v2f(xf * tw, yf * th + th);
-                if is_letter {
-                    gamma := editor_settings.sdftext.gamma;
-                    layer_buf := editor_settings.sdftext.buf;
-                    draw_text(true, debug_char, th, math.Vector3 { xf * tw, yf * th, -0.1 }, gamma, layer_buf);
-                }
+                fmt.printf("\n");
             }
         }
-
-        if !_did_draw_text {
-            fmt.printf("\n");
-        }
-    }
+    } // end quads
 
     {
         //BEGIN_PASS(text.pass, text.pass_action);
